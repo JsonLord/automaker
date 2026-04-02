@@ -47,6 +47,13 @@ hf upload AUXteam/Web-Agent-Internal . --repo-type=space
 ### OpenCode CLI Authentication
 The Space is configured to automatically log in to OpenCode if the `OPENCODE_AUTH_TOKEN` environment variable is set in the Space secrets.
 
+#### How to get OPENCODE_AUTH_TOKEN
+1. Visit [https://opencode.ai/auth](https://opencode.ai/auth).
+2. Sign in with your account.
+3. If you haven't already, add your billing details or ensure you have access to OpenCode Zen.
+4. Copy your **API Key** from the dashboard.
+5. This API Key is what you should use as the `OPENCODE_AUTH_TOKEN` secret in your Hugging Face Space settings.
+
 Monitor logs via:
 - Build logs: `curl -N -H "Authorization: Bearer <TOKEN>" "https://huggingface.co/api/spaces/AUXteam/Web-Agent-Internal/logs/build"`
 - Run logs: `curl -N -H "Authorization: Bearer <TOKEN>" "https://huggingface.co/api/spaces/AUXteam/Web-Agent-Internal/logs/run"`

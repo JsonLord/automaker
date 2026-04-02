@@ -22,6 +22,15 @@ export interface GhCliStatus {
   error?: string;
 }
 
+// Jules CLI Status
+export interface JulesCliStatus {
+  installed: boolean;
+  version: string | null;
+  path: string | null;
+  method: string;
+  error?: string;
+}
+
 // Cursor CLI Status
 export interface CursorCliStatus {
   installed: boolean;
@@ -191,6 +200,9 @@ export interface SetupState {
   // GitHub CLI state
   ghCliStatus: GhCliStatus | null;
 
+  // Jules CLI state
+  julesCliStatus: JulesCliStatus | null;
+
   // Cursor CLI state
   cursorCliStatus: CursorCliStatus | null;
 
@@ -233,6 +245,9 @@ export interface SetupActions {
 
   // GitHub CLI
   setGhCliStatus: (status: GhCliStatus | null) => void;
+
+  // Jules CLI
+  setJulesCliStatus: (status: JulesCliStatus | null) => void;
 
   // Cursor CLI
   setCursorCliStatus: (status: CursorCliStatus | null) => void;
@@ -310,6 +325,7 @@ const initialState: SetupState = {
   claudeIsVerifying: false,
 
   ghCliStatus: null,
+  julesCliStatus: null,
   cursorCliStatus: null,
 
   codexCliStatus: null,
@@ -376,6 +392,9 @@ export const useSetupStore = create<SetupState & SetupActions>()((set, get) => (
 
   // GitHub CLI
   setGhCliStatus: (status) => set({ ghCliStatus: status }),
+
+  // Jules CLI
+  setJulesCliStatus: (status) => set({ julesCliStatus: status }),
 
   // Cursor CLI
   setCursorCliStatus: (status) => set({ cursorCliStatus: status }),

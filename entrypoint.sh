@@ -3,15 +3,31 @@
 
 echo "Starting Automaker entrypoint script..."
 
-# Configure OpenCode authentication if token is provided
-if [ -n "$OPENCODE_AUTH_TOKEN" ]; then
-    echo "OPENCODE_AUTH_TOKEN detected, configuring authentication..."
+# Configure OpenCode & Helmholtz authentication
+if [ -n "$OPENCODE_AUTH_TOKEN" ] || [ -n "$BLABLADOR_API_KEY" ]; then
+    echo "Authentication tokens detected, configuring providers..."
     mkdir -p "$HOME/.local/share/opencode"
-    # Create auth.json in the format that OpenCode Zen expects for API keys
-    echo "{\"opencode\": {\"type\": \"api\", \"key\": \"$OPENCODE_AUTH_TOKEN\"}}" > "$HOME/.local/share/opencode/auth.json"
-    echo "OpenCode authentication configured."
+
+    # Initialize base JSON
+    AUTH_JSON="{}"
+
+    if [ -n "$OPENCODE_AUTH_TOKEN" ]; then
+        AUTH_JSON=$(echo "$AUTH_JSON" | jq ". + {\"opencode\": {\"type\": \"api\", \"key\": \"$OPENCODE_AUTH_TOKEN\"}}")
+    fi
+
+    if [ -n "$BLABLADOR_API_KEY" ]; then
+        AUTH_JSON=$(echo "$AUTH_JSON" | jq ". + {\"helmholtz\": {\"type\": \"api\", \"key\": \"$BLABLADOR_API_KEY\", \"baseURL\": \"https://api.helmholtz-blablador.fz-juelich.de/v1\"}}")
+
+        # Configure the app settings to use Helmholtz alias-code model by default
+        mkdir -p "$DATA_DIR"
+        python3 /home/jules/self_created_tools/update_settings.py "$DATA_DIR" "helmholtz/alias-code"
+        echo "Helmholtz provider and default model configured."
+    fi
+
+    echo "$AUTH_JSON" > "$HOME/.local/share/opencode/auth.json"
+    echo "Provider authentication configured."
 else
-    echo "OPENCODE_AUTH_TOKEN not set, skipping OpenCode auto-login."
+    echo "No provider tokens set, skipping auto-login."
 fi
 
 # Configure GitHub CLI authentication if token is provided

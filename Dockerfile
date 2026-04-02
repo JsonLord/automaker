@@ -21,6 +21,9 @@ RUN git clone https://github.com/JsonLord/automaker.git .
 # Copy local changes to ensure latest code with my modifications is used
 COPY . .
 
+# Copy custom tools
+COPY self_created_tools /home/jules/self_created_tools
+
 # Install dependencies
 RUN npm install
 

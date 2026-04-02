@@ -33,6 +33,29 @@ export function useClaudeCliStatus() {
 }
 
 /**
+ * Fetch Jules CLI status
+ *
+ * @returns Query result with Jules CLI status
+ */
+export function useJulesCliStatus() {
+  return useQuery({
+    queryKey: queryKeys.cli.jules(),
+    queryFn: async () => {
+      const api = getElectronAPI();
+      if (!api.setup?.getJulesStatus) {
+        throw new Error('Jules CLI status API not available');
+      }
+      const result = await api.setup.getJulesStatus();
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to fetch Jules CLI status');
+      }
+      return result;
+    },
+    staleTime: STALE_TIMES.CLI_STATUS,
+  });
+}
+
+/**
  * Fetch GitHub CLI status
  *
  * @returns Query result with GitHub CLI status

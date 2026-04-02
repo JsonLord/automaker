@@ -143,6 +143,8 @@ export {
   findOpenCodeCliPath,
   getOpenCodeAuthIndicators,
   type OpenCodeAuthIndicators,
+  getJulesCliPaths,
+  findJulesCliPath,
   // Electron userData operations
   setElectronUserDataPath,
   getElectronUserDataPath,

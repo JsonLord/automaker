@@ -47,6 +47,9 @@ hf upload AUXteam/Web-Agent-Internal . --repo-type=space
 ### OpenCode CLI Authentication
 The Space is configured to automatically log in to OpenCode if the `OPENCODE_AUTH_TOKEN` environment variable is set in the Space secrets.
 
+### GitHub CLI Authentication
+To enable GitHub operations (like PR creation), provide a GitHub Personal Access Token (PAT) via the `GITHUB_API_TOKEN` environment variable in the Space secrets.
+
 #### How to get OPENCODE_AUTH_TOKEN
 1. Visit [https://opencode.ai/auth](https://opencode.ai/auth).
 2. Sign in with your account.

@@ -12,6 +12,9 @@ projects
 .env
 .npmrc
 .nvmrc
+.cache
+.local
+.config
 .prettierignore
 .prettierrc
 docker-compose.yml

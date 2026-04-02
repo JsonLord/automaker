@@ -39,6 +39,15 @@ RUN npx playwright install chromium
 # Install OpenCode CLI
 RUN npm install -g opencode-ai
 
+# Install GitHub CLI
+RUN (type -p wget >/dev/null || (apt-get update && apt-get install -y wget)) \
+    && mkdir -p -m 755 /etc/apt/keyrings \
+    && wget -qO- https://cli.github.com/packages/githubcli-archive-keyring.gpg | tee /etc/apt/keyrings/githubcli-archive-keyring.gpg > /dev/null \
+    && chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
+    && apt-get update \
+    && apt-get install gh -y
+
 # Set environment variables for Hugging Face
 ENV PORT=7860
 ENV DATA_DIR=/app/data
@@ -51,13 +60,9 @@ RUN mkdir -p /app/data /app/.local/share/opencode /app/.config/opencode /app/.ca
 # Expose the mandatory port
 EXPOSE 7860
 
-# Use a shell script as entrypoint to handle opencode login
-RUN echo '#!/bin/sh\n\
-if [ -n "$OPENCODE_AUTH_TOKEN" ]; then\n\
-  mkdir -p $HOME/.local/share/opencode\n\
-  echo "{\\"credentials\\": [{\\"provider\\": \\"opencode\\", \\"token\\": \\"$OPENCODE_AUTH_TOKEN\\"}]}" > $HOME/.local/share/opencode/auth.json\n\
-fi\n\
-node apps/server/dist/index.js' > /app/entrypoint.sh && chmod +x /app/entrypoint.sh
+# Copy entrypoint script
+COPY entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
 
 # Start the server via entrypoint
 ENTRYPOINT ["/app/entrypoint.sh"]

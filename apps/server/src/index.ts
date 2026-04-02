@@ -551,6 +551,15 @@ app.get('/health', (_req, res) => {
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
+    version: '1.0.0',
+  });
+});
+
+app.get('/api/health', (_req, res) => {
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    version: '1.0.0',
   });
 });
 
@@ -597,7 +606,12 @@ app.use(express.static(UI_DIST_PATH));
 
 // SPA catch-all route (should be after all other routes)
 app.use((req, res, next) => {
-  if (req.path.startsWith('/api') || req.path === '/health' || req.path === '/api-docs') {
+  if (
+    req.path.startsWith('/api') ||
+    req.path === '/health' ||
+    req.path === '/api-docs' ||
+    req.path === '/api/health'
+  ) {
     return next();
   }
   res.sendFile(path.join(UI_DIST_PATH, 'index.html'), (err) => {

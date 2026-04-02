@@ -36,6 +36,9 @@ RUN npm run build --workspace=apps/server
 # Install Playwright Chromium
 RUN npx playwright install chromium
 
+# Install OpenCode CLI
+RUN npm install -g opencode-ai
+
 # Set environment variables for Hugging Face
 ENV PORT=7860
 ENV DATA_DIR=/app/data

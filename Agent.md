@@ -5,10 +5,9 @@ This file serves as a guide for further agents regarding deployment best practic
 ## 1. Deployment Configuration
 The app is configured to run as a Docker container on port 7860.
 
-### Target Space
-- **Profile:** `AUXteam`
-- **Space:** `Web-Agent-Internal`
-- **Full Identifier:** `AUXteam/Web-Agent-Internal`
+### Target Spaces
+- **Main Internal:** `AUXteam/Web-Agent-Internal`
+- **Mistral Lotus:** `Leon4gr45/AnythingLLm_Ollama_LoTUs5494_mistral-small-3.1`
 - **Frontend Port:** `7860`
 
 ### Mandatory Endpoints
@@ -41,7 +40,11 @@ The app is configured to run as a Docker container on port 7860.
 
 To redeploy, use:
 ```bash
+# Deploy to Main Internal
 hf upload AUXteam/Web-Agent-Internal . --repo-type=space
+
+# Deploy to Mistral Lotus
+hf upload Leon4gr45/AnythingLLm_Ollama_LoTUs5494_mistral-small-3.1 . --repo-type=space
 ```
 
 ### OpenCode CLI Authentication
@@ -58,8 +61,8 @@ To enable GitHub operations (like PR creation), provide a GitHub Personal Access
 5. This API Key is what you should use as the `OPENCODE_AUTH_TOKEN` secret in your Hugging Face Space settings.
 
 Monitor logs via:
-- Build logs: `curl -N -H "Authorization: Bearer <TOKEN>" "https://huggingface.co/api/spaces/AUXteam/Web-Agent-Internal/logs/build"`
-- Run logs: `curl -N -H "Authorization: Bearer <TOKEN>" "https://huggingface.co/api/spaces/AUXteam/Web-Agent-Internal/logs/run"`
+- Build logs: `curl -N -H "Authorization: Bearer <TOKEN>" "https://huggingface.co/api/spaces/<SPACE_ID>/logs/build"`
+- Run logs: `curl -N -H "Authorization: Bearer <TOKEN>" "https://huggingface.co/api/spaces/<SPACE_ID>/logs/run"`
 
 ## Tips
 - Ensure the Dockerfile builds both the UI and Server.

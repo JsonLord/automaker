@@ -43,12 +43,21 @@ RUN npm install -g opencode-ai
 ENV PORT=7860
 ENV DATA_DIR=/app/data
 ENV NODE_ENV=production
+ENV HOME=/app
 
-# Create data directory
-RUN mkdir -p /app/data && chmod 777 /app/data
+# Create data directory and config directories
+RUN mkdir -p /app/data /app/.local/share/opencode /app/.config/opencode /app/.cache/opencode && chmod -R 777 /app
 
 # Expose the mandatory port
 EXPOSE 7860
 
-# Start the server
-CMD ["node", "apps/server/dist/index.js"]
+# Use a shell script as entrypoint to handle opencode login
+RUN echo '#!/bin/sh\n\
+if [ -n "$OPENCODE_AUTH_TOKEN" ]; then\n\
+  mkdir -p $HOME/.local/share/opencode\n\
+  echo "{\\"credentials\\": [{\\"provider\\": \\"opencode\\", \\"token\\": \\"$OPENCODE_AUTH_TOKEN\\"}]}" > $HOME/.local/share/opencode/auth.json\n\
+fi\n\
+node apps/server/dist/index.js' > /app/entrypoint.sh && chmod +x /app/entrypoint.sh
+
+# Start the server via entrypoint
+ENTRYPOINT ["/app/entrypoint.sh"]

@@ -44,6 +44,9 @@ To redeploy, use:
 hf upload AUXteam/Web-Agent-Internal . --repo-type=space
 ```
 
+### OpenCode CLI Authentication
+The Space is configured to automatically log in to OpenCode if the `OPENCODE_AUTH_TOKEN` environment variable is set in the Space secrets.
+
 Monitor logs via:
 - Build logs: `curl -N -H "Authorization: Bearer <TOKEN>" "https://huggingface.co/api/spaces/AUXteam/Web-Agent-Internal/logs/build"`
 - Run logs: `curl -N -H "Authorization: Bearer <TOKEN>" "https://huggingface.co/api/spaces/AUXteam/Web-Agent-Internal/logs/run"`

@@ -1,0 +1,54 @@
+# Deployment Manager Agent.md
+
+This file serves as a guide for further agents regarding deployment best practices and tips for Automaker on Hugging Face Spaces.
+
+## 1. Deployment Configuration
+The app is configured to run as a Docker container on port 7860.
+
+### Target Space
+- **Profile:** `AUXteam`
+- **Space:** `Web-Agent-Internal`
+- **Full Identifier:** `AUXteam/Web-Agent-Internal`
+- **Frontend Port:** `7860`
+
+### Mandatory Endpoints
+- **`/health`**: Returns HTTP 200 when ready.
+- **`/api-docs`**: Documents all API endpoints.
+
+## 2. API Documentation
+
+### /api/health
+- **Method:** GET
+- **Purpose:** Check server health
+- **Response:**
+  ```json
+  {
+    "status": "ok",
+    "timestamp": "ISO Date String",
+    "version": "1.0.0"
+  }
+  ```
+
+### /api/auth/session
+- **Method:** GET
+- **Purpose:** Check current session status
+
+### /api/agent/chat
+- **Method:** POST
+- **Purpose:** Send message to AI agent
+
+## 3. Deployment Workflow
+
+To redeploy, use:
+```bash
+hf upload AUXteam/Web-Agent-Internal . --repo-type=space
+```
+
+Monitor logs via:
+- Build logs: `curl -N -H "Authorization: Bearer <TOKEN>" "https://huggingface.co/api/spaces/AUXteam/Web-Agent-Internal/logs/build"`
+- Run logs: `curl -N -H "Authorization: Bearer <TOKEN>" "https://huggingface.co/api/spaces/AUXteam/Web-Agent-Internal/logs/run"`
+
+## Tips
+- Ensure the Dockerfile builds both the UI and Server.
+- The server must serve the UI static files and provide a catch-all route for SPA.
+- Data is stored in `/app/data` inside the container.

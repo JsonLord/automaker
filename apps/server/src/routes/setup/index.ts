@@ -13,7 +13,6 @@ import { createPlatformHandler } from './routes/platform.js';
 import { createVerifyClaudeAuthHandler } from './routes/verify-claude-auth.js';
 import { createVerifyCodexAuthHandler } from './routes/verify-codex-auth.js';
 import { createGhStatusHandler } from './routes/gh-status.js';
-import { createJulesStatusHandler } from './routes/jules-status.js';
 import { createCursorStatusHandler } from './routes/cursor-status.js';
 import { createCodexStatusHandler } from './routes/codex-status.js';
 import { createInstallCodexHandler } from './routes/install-codex.js';
@@ -67,7 +66,6 @@ export function createSetupRoutes(): Router {
   router.post('/verify-claude-auth', createVerifyClaudeAuthHandler());
   router.post('/verify-codex-auth', createVerifyCodexAuthHandler());
   router.get('/gh-status', createGhStatusHandler());
-  router.get('/jules-status', createJulesStatusHandler());
 
   // Cursor CLI routes
   router.get('/cursor-status', createCursorStatusHandler());

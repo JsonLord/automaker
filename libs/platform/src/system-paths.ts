@@ -1339,38 +1339,6 @@ export async function findOpenCodeCliPath(): Promise<string | null> {
   return findFirstExistingPath(getOpenCodeCliPaths());
 }
 
-/**
- * Get common paths where Jules CLI might be installed
- */
-export function getJulesCliPaths(): string[] {
-  const isWindows = process.platform === 'win32';
-  const homeDir = os.homedir();
-
-  if (isWindows) {
-    const appData = process.env.APPDATA || path.join(homeDir, 'AppData', 'Roaming');
-    return [
-      path.join(homeDir, '.jules', 'bin', 'jules.exe'),
-      path.join(appData, 'npm', 'jules.cmd'),
-      path.join(appData, 'npm', 'jules'),
-    ];
-  }
-
-  return [
-    path.join(homeDir, '.jules', 'bin', 'jules'),
-    path.join(homeDir, '.local', 'bin', 'jules'),
-    '/usr/local/bin/jules',
-    '/usr/bin/jules',
-    path.join(homeDir, '.npm-global', 'bin', 'jules'),
-  ];
-}
-
-/**
- * Check if Jules CLI is installed and return its path
- */
-export async function findJulesCliPath(): Promise<string | null> {
-  return findFirstExistingPath(getJulesCliPaths());
-}
-
 export interface OpenCodeAuthIndicators {
   hasAuthFile: boolean;
   hasOAuthToken: boolean;
@@ -1390,8 +1358,6 @@ const OPENCODE_PROVIDERS = [
   'amazon-bedrock',
   'github-copilot',
   'copilot',
-  'opencode',
-  'opencode-zen',
 ] as const;
 
 function getOpenCodeNestedTokens(record: Record<string, unknown>): Record<string, unknown> | null {
@@ -1442,12 +1408,8 @@ function hasProviderApiKey(authJson: Record<string, unknown>): boolean {
     const providerAuth = authJson[provider];
     if (providerAuth && typeof providerAuth === 'object' && !Array.isArray(providerAuth)) {
       const auth = providerAuth as Record<string, unknown>;
-      // Check for API key type (OpenCode uses 'api' or 'api_key')
-      if (
-        (auth.type === 'api' || auth.type === 'api_key') &&
-        typeof auth.key === 'string' &&
-        auth.key
-      ) {
+      // Check for API key type
+      if (auth.type === 'api_key' && typeof auth.key === 'string' && auth.key) {
         return true;
       }
       // Also check for api_key field directly

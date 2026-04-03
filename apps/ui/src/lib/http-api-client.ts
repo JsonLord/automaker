@@ -1533,15 +1533,6 @@ export class HttpApiClient implements ElectronAPI {
       error?: string;
     }> => this.get('/api/setup/gh-status'),
 
-    getJulesStatus: (): Promise<{
-      success: boolean;
-      installed: boolean;
-      version: string | null;
-      path: string | null;
-      method: string;
-      error?: string;
-    }> => this.get('/api/setup/jules-status'),
-
     // Cursor CLI methods
     getCursorStatus: (): Promise<{
       success: boolean;

@@ -1,7 +1,10 @@
 #!/bin/sh
-# entrypoint.sh - Initialize environment and start Automaker
+# entrypoint.sh - Initialize environment and start Automaker for Hugging Face
 
 echo "Starting Automaker entrypoint script..."
+
+# Ensure DATA_DIR exists
+mkdir -p "$DATA_DIR"
 
 # Configure OpenCode & Helmholtz authentication
 if [ -n "$OPENCODE_AUTH_TOKEN" ] || [ -n "$BLABLADOR_API_KEY" ]; then
@@ -19,8 +22,7 @@ if [ -n "$OPENCODE_AUTH_TOKEN" ] || [ -n "$BLABLADOR_API_KEY" ]; then
         AUTH_JSON=$(echo "$AUTH_JSON" | jq ". + {\"helmholtz\": {\"type\": \"api\", \"key\": \"$BLABLADOR_API_KEY\", \"baseURL\": \"https://api.helmholtz-blablador.fz-juelich.de/v1\"}}")
 
         # Configure the app settings to use Helmholtz alias-code model by default
-        mkdir -p "$DATA_DIR"
-        python3 /home/jules/self_created_tools/update_settings.py "$DATA_DIR" "helmholtz/alias-code"
+        python3 /usr/local/bin/update_settings.py "$DATA_DIR" "helmholtz/alias-code"
         echo "Helmholtz provider and default model configured."
     fi
 
@@ -35,17 +37,8 @@ if [ -n "$GITHUB_API_TOKEN" ]; then
     echo "GITHUB_API_TOKEN detected, configuring GitHub CLI..."
     export GH_TOKEN="$GITHUB_API_TOKEN"
     echo "GitHub CLI token exported."
-else
-    echo "GITHUB_API_TOKEN not set, skipping GitHub CLI auto-login."
-fi
-
-# Set a fixed API key for Automaker if requested, otherwise it generates a random one
-if [ -n "$AUTOMAKER_API_KEY" ]; then
-    echo "AUTOMAKER_API_KEY detected, using provided key."
-else
-    echo "AUTOMAKER_API_KEY not set, a random key will be generated on startup (see logs)."
 fi
 
 # Start the application
-echo "Starting application..."
+echo "Starting application on port $PORT..."
 exec node apps/server/dist/index.js

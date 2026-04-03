@@ -17,6 +17,9 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 import { createEventEmitter, type EventEmitter } from './lib/events.js';
 import { initAllowedPaths, getClaudeAuthIndicators } from '@automaker/platform';
 import { createLogger, setLogLevel, LogLevel } from '@automaker/utils';
@@ -93,9 +96,6 @@ import { createProjectsRoutes } from './routes/projects/index.js';
 
 // Load environment variables
 dotenv.config();
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 const PORT = parseInt(process.env.PORT || '3008', 10);
 const HOST = process.env.HOST || '0.0.0.0';
@@ -276,33 +276,22 @@ app.use(
 // When using credentials (cookies), origin cannot be '*'
 // We dynamically allow the requesting origin for local development
 
-/**
- * Check if origin is a local/private network address or Hugging Face Space
- */
-function isAllowedOrigin(origin: string): boolean {
+// Check if origin is a local/private network address
+function isLocalOrigin(origin: string): boolean {
   try {
     const url = new URL(origin);
     const hostname = url.hostname;
-
-    // Local/Private network
-    if (
+    return (
       hostname === 'localhost' ||
       hostname === '127.0.0.1' ||
       hostname === '[::1]' ||
       hostname === '0.0.0.0' ||
       hostname.startsWith('192.168.') ||
       hostname.startsWith('10.') ||
-      /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(hostname)
-    ) {
-      return true;
-    }
-
-    // Hugging Face Spaces
-    if (hostname.endsWith('.hf.space')) {
-      return true;
-    }
-
-    return false;
+      /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(hostname) ||
+      hostname.endsWith('.hf.space') ||
+      hostname.endsWith('.huggingface.co')
+    );
   } catch {
     return false;
   }
@@ -311,7 +300,7 @@ function isAllowedOrigin(origin: string): boolean {
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (like mobile apps, curl, Electron, same-origin static assets)
+      // Allow requests with no origin (like mobile apps, curl, Electron)
       if (!origin) {
         callback(null, true);
         return;
@@ -321,26 +310,20 @@ app.use(
       const allowedOrigins = process.env.CORS_ORIGIN?.split(',')
         .map((o) => o.trim())
         .filter(Boolean);
-
       if (allowedOrigins && allowedOrigins.length > 0) {
         if (allowedOrigins.includes('*')) {
-          callback(null, origin); // Return origin instead of '*' when credentials are true
+          callback(null, true);
           return;
         }
         if (allowedOrigins.includes(origin)) {
           callback(null, origin);
           return;
         }
+        // Fall through to local network check below
       }
 
-      // Allow all localhost/loopback/private network/HF origins
-      if (isAllowedOrigin(origin)) {
-        callback(null, origin);
-        return;
-      }
-
-      // Hugging Face Specific: allow the Space direct URL as well
-      if (origin.includes('huggingface.co') || origin.includes('hf.space')) {
+      // Allow all localhost/loopback/private network origins (any port)
+      if (isLocalOrigin(origin)) {
         callback(null, origin);
         return;
       }
@@ -500,6 +483,20 @@ setInterval(() => {
 // This helps prevent CSRF and content-type confusion attacks
 app.use('/api', requireJsonContentType);
 
+// Serve static files from UI build
+const UI_DIST_PATH = path.resolve(__dirname, '../../../apps/ui/dist');
+app.use(express.static(UI_DIST_PATH));
+
+// Mandatory Hugging Face health checks
+app.get('/health', (_req, res) => res.status(200).json({ status: 'ok' }));
+app.get('/api-docs', (_req, res) => res.status(200).json({
+  message: 'Automaker API Documentation',
+  endpoints: [
+    { method: 'GET', path: '/api/health', purpose: 'Health Check' },
+    { method: 'POST', path: '/api/auth/login', purpose: 'Login' }
+  ]
+}));
+
 // Mount API routes - health, auth, and setup are unauthenticated
 app.use('/api/health', createHealthRoutes());
 app.use('/api/auth', createAuthRoutes());
@@ -546,80 +543,12 @@ app.use(
   createProjectsRoutes(featureLoader, autoModeService, settingsService, notificationService)
 );
 
-// Mandatory endpoints for Hugging Face
-app.get('/health', (_req, res) => {
-  res.json({
-    status: 'ok',
-    timestamp: new Date().toISOString(),
-    version: '1.0.0',
-  });
-});
-
-app.get('/api/health', (_req, res) => {
-  res.json({
-    status: 'ok',
-    timestamp: new Date().toISOString(),
-    version: '1.0.0',
-  });
-});
-
-app.get('/api-docs', (_req, res) => {
-  res.json({
-    title: 'Automaker API',
-    version: '1.0.0',
-    endpoints: [
-      {
-        path: '/api/health',
-        method: 'GET',
-        purpose: 'Check server health',
-        response: { status: 'ok', timestamp: 'string', version: 'string' },
-      },
-      {
-        path: '/api/auth/session',
-        method: 'GET',
-        purpose: 'Check current session',
-      },
-      {
-        path: '/api/agent/chat',
-        method: 'POST',
-        purpose: 'Send a message to an AI agent',
-        request: { message: 'string', sessionId: 'string' },
-      },
-      {
-        path: '/api/features',
-        method: 'GET',
-        purpose: 'List all features in the current project',
-      },
-      {
-        path: '/api/auto-mode/start',
-        method: 'POST',
-        purpose: 'Start autonomous mode for a feature',
-        request: { featureId: 'string' },
-      },
-    ],
-  });
-});
-
-// Serve UI static files
-const UI_DIST_PATH = path.resolve(__dirname, '../../ui/dist');
-app.use(express.static(UI_DIST_PATH));
-
-// SPA catch-all route (should be after all other routes)
+// SPA Routing: Serve index.html for all non-API routes
 app.use((req, res, next) => {
-  if (
-    req.path.startsWith('/api') ||
-    req.path === '/health' ||
-    req.path === '/api-docs' ||
-    req.path === '/api/health'
-  ) {
+  if (req.path.startsWith('/api/') || req.path === '/health' || req.path === '/api-docs') {
     return next();
   }
-  res.sendFile(path.join(UI_DIST_PATH, 'index.html'), (err) => {
-    if (err) {
-      // If index.html is missing or other error, don't loop
-      next();
-    }
-  });
+  res.sendFile(path.join(UI_DIST_PATH, 'index.html'));
 });
 
 // Create HTTP server

@@ -6,8 +6,7 @@ This file serves as a guide for further agents regarding deployment best practic
 The app is configured to run as a Docker container on port 7860.
 
 ### Target Spaces
-- **Main Internal:** `AUXteam/Web-Agent-Internal`
-- **Mistral Lotus:** `Leon4gr45/AnythingLLm_Ollama_LoTUs5494_mistral-small-3.1`
+- **Target:** `GraziePrego/automaker`
 - **Frontend Port:** `7860`
 
 ### Mandatory Endpoints
@@ -40,11 +39,8 @@ The app is configured to run as a Docker container on port 7860.
 
 To redeploy, use:
 ```bash
-# Deploy to Main Internal
-hf upload AUXteam/Web-Agent-Internal . --repo-type=space
-
-# Deploy to Mistral Lotus
-hf upload Leon4gr45/AnythingLLm_Ollama_LoTUs5494_mistral-small-3.1 . --repo-type=space
+# Deploy to GraziePrego/automaker
+hf upload GraziePrego/automaker . --repo-type=space
 ```
 
 ### OpenCode CLI Authentication
@@ -52,13 +48,6 @@ The Space is configured to automatically log in to OpenCode if the `OPENCODE_AUT
 
 ### GitHub CLI Authentication
 To enable GitHub operations (like PR creation), provide a GitHub Personal Access Token (PAT) via the `GITHUB_API_TOKEN` environment variable in the Space secrets.
-
-#### How to get OPENCODE_AUTH_TOKEN
-1. Visit [https://opencode.ai/auth](https://opencode.ai/auth).
-2. Sign in with your account.
-3. If you haven't already, add your billing details or ensure you have access to OpenCode Zen.
-4. Copy your **API Key** from the dashboard.
-5. This API Key is what you should use as the `OPENCODE_AUTH_TOKEN` secret in your Hugging Face Space settings.
 
 Monitor logs via:
 - Build logs: `curl -N -H "Authorization: Bearer <TOKEN>" "https://huggingface.co/api/spaces/<SPACE_ID>/logs/build"`

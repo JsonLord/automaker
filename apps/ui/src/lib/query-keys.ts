@@ -189,8 +189,6 @@ export const queryKeys = {
     copilot: () => ['cli', 'copilot'] as const,
     /** GitHub CLI status */
     github: () => ['cli', 'github'] as const,
-    /** Jules CLI status */
-    jules: () => ['cli', 'jules'] as const,
     /** API keys status */
     apiKeys: () => ['cli', 'apiKeys'] as const,
     /** Platform info */

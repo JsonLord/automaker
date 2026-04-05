@@ -45,7 +45,7 @@ WORKDIR /app
 
 # Install git, curl, bash, python3 and tools
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    git curl bash ca-certificates openssh-client jq python3 \
+    git curl bash ca-certificates openssh-client jq python3 wget \
     # Playwright/Chromium dependencies
     libglib2.0-0 libnss3 libnspr4 libdbus-1-3 libatk1.0-0 libatk-bridge2.0-0 \
     libcups2 libdrm2 libxkbcommon0 libatspi2.0-0 libxcomposite1 libxdamage1 \
@@ -67,6 +67,17 @@ ENV PATH="/home/node/.local/bin:${PATH}"
 
 # Install OpenCode CLI
 RUN curl -fsSL https://opencode.ai/install | bash
+
+# Install GitHub CLI (gh)
+USER root
+RUN mkdir -p -m 755 /etc/apt/keyrings && \
+    wget -qO- https://cli.github.com/packages/githubcli-archive-keyring.gpg | tee /etc/apt/keyrings/githubcli-archive-keyring.gpg > /dev/null && \
+    chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg && \
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null && \
+    apt-get update && \
+    apt-get install -y gh && \
+    rm -rf /var/lib/apt/lists/*
+USER node
 
 # Copy built artifacts and dependencies from builder
 COPY --from=builder --chown=node:node /app/node_modules ./node_modules

@@ -253,6 +253,21 @@ initAllowedPaths();
 // Create Express app
 const app = express();
 
+// Move health checks to the top but DON'T intercept the root '/' which serves the UI
+app.get('/health', (_req, res) => res.status(200).json({ status: 'ok' }));
+app.get('/api-docs', (_req, res) => res.status(200).json({
+  message: 'Automaker API Documentation',
+  endpoints: [
+    { method: 'GET', path: '/health', purpose: 'Health Check' },
+    { method: 'GET', path: '/api-docs', purpose: 'API Documentation' },
+    { method: 'POST', path: '/api/auth/login', purpose: 'Login' },
+    { method: 'GET', path: '/api/projects', purpose: 'List projects' },
+    { method: 'GET', path: '/api/agent/chat', purpose: 'Chat with agent' },
+    { method: 'POST', path: '/api/features', purpose: 'Create feature' },
+    { method: 'GET', path: '/api/settings', purpose: 'Get settings' }
+  ]
+}));
+
 // Middleware
 // Custom colored logger showing only endpoint and status code (dynamically configurable)
 morgan.token('status-colored', (_req, res) => {
@@ -487,15 +502,6 @@ app.use('/api', requireJsonContentType);
 const UI_DIST_PATH = path.resolve(__dirname, '../../../apps/ui/dist');
 app.use(express.static(UI_DIST_PATH));
 
-// Mandatory Hugging Face health checks
-app.get('/health', (_req, res) => res.status(200).json({ status: 'ok' }));
-app.get('/api-docs', (_req, res) => res.status(200).json({
-  message: 'Automaker API Documentation',
-  endpoints: [
-    { method: 'GET', path: '/api/health', purpose: 'Health Check' },
-    { method: 'POST', path: '/api/auth/login', purpose: 'Login' }
-  ]
-}));
 
 // Mount API routes - health, auth, and setup are unauthenticated
 app.use('/api/health', createHealthRoutes());

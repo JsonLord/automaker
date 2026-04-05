@@ -15,7 +15,7 @@ The app is configured to run as a Docker container on port 7860.
 
 ## 2. API Documentation
 
-### /api/health
+### /health
 - **Method:** GET
 - **Purpose:** Check server health
 - **Response:**
@@ -27,12 +27,13 @@ The app is configured to run as a Docker container on port 7860.
   }
   ```
 
-### /api/auth/session
+### /api-docs
 - **Method:** GET
-- **Purpose:** Check current session status
+- **Purpose:** Document all available API endpoints
 
-### /api/agent/chat
+### Functional Endpoints (Example)
 - **Method:** POST
+- **Path:** `/api/agent/chat`
 - **Purpose:** Send message to AI agent
 
 ## 3. Deployment Workflow
@@ -40,20 +41,21 @@ The app is configured to run as a Docker container on port 7860.
 To redeploy, use:
 ```bash
 # Deploy to GraziePrego/automaker
-hf upload GraziePrego/automaker . --repo-type=space
+hf upload GraziePrego/automaker . --repo-type=space --token <YOUR_TOKEN>
 ```
 
 ### OpenCode CLI Authentication
-The Space is configured to automatically log in to OpenCode if the `OPENCODE_AUTH_TOKEN` environment variable is set in the Space secrets.
+The Space is configured to automatically log in to OpenCode if the `OPENCODE_API_KEY` or `JULES_API_KEY` environment variables are set in the Space secrets.
 
 ### GitHub CLI Authentication
 To enable GitHub operations (like PR creation), provide a GitHub Personal Access Token (PAT) via the `GITHUB_API_TOKEN` environment variable in the Space secrets.
 
 Monitor logs via:
-- Build logs: `curl -N -H "Authorization: Bearer <TOKEN>" "https://huggingface.co/api/spaces/<SPACE_ID>/logs/build"`
-- Run logs: `curl -N -H "Authorization: Bearer <TOKEN>" "https://huggingface.co/api/spaces/<SPACE_ID>/logs/run"`
+- Build logs: `curl -N -H "Authorization: Bearer <YOUR_TOKEN>" "https://huggingface.co/api/spaces/GraziePrego/automaker/logs/build"`
+- Run logs: `curl -N -H "Authorization: Bearer <YOUR_TOKEN>" "https://huggingface.co/api/spaces/GraziePrego/automaker/logs/run"`
 
 ## Tips
 - Ensure the Dockerfile builds both the UI and Server.
 - The server must serve the UI static files and provide a catch-all route for SPA.
 - Data is stored in `/app/data` inside the container.
+- The repository is cloned from `https://github.com/JsonLord/automaker.git` in the Dockerfile.

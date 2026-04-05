@@ -6,7 +6,7 @@ This file serves as a guide for further agents regarding deployment best practic
 The app is configured to run as a Docker container on port 7860.
 
 ### Target Spaces
-- **Target:** `GraziePrego/automaker`
+- **Target:** `Leon4gr45/hyp`
 - **Frontend Port:** `7860`
 
 ### Mandatory Endpoints
@@ -40,8 +40,8 @@ The app is configured to run as a Docker container on port 7860.
 
 To redeploy, use:
 ```bash
-# Deploy to GraziePrego/automaker
-hf upload GraziePrego/automaker . --repo-type=space --token <YOUR_TOKEN>
+# Deploy to Leon4gr45/hyp
+hf upload Leon4gr45/hyp . --repo-type=space --token <YOUR_TOKEN>
 ```
 
 ### OpenCode CLI Authentication
@@ -51,8 +51,8 @@ The Space is configured to automatically log in to OpenCode if the `OPENCODE_API
 To enable GitHub operations (like PR creation), provide a GitHub Personal Access Token (PAT) via the `GITHUB_API_TOKEN` environment variable in the Space secrets.
 
 Monitor logs via:
-- Build logs: `curl -N -H "Authorization: Bearer <YOUR_TOKEN>" "https://huggingface.co/api/spaces/GraziePrego/automaker/logs/build"`
-- Run logs: `curl -N -H "Authorization: Bearer <YOUR_TOKEN>" "https://huggingface.co/api/spaces/GraziePrego/automaker/logs/run"`
+- Build logs: `curl -N -H "Authorization: Bearer <YOUR_TOKEN>" "https://huggingface.co/api/spaces/Leon4gr45/hyp/logs/build"`
+- Run logs: `curl -N -H "Authorization: Bearer <YOUR_TOKEN>" "https://huggingface.co/api/spaces/Leon4gr45/hyp/logs/run"`
 
 ## Tips
 - Ensure the Dockerfile builds both the UI and Server.

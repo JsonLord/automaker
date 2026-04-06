@@ -11,17 +11,20 @@ if [ -n "$OPENCODE_API_KEY" ] || [ -n "$JULES_API_KEY" ]; then
     echo "Configuring OpenCode authentication..."
     mkdir -p "$HOME/.local/share/opencode"
 
-    # Start with a base auth object
+    # Start with a base auth object and use jq safely
     AUTH_JSON="{}"
 
-    # Add opencode provider if OPENCODE_API_KEY is present
+    # Add opencode and anthropic providers if OPENCODE_API_KEY is present
     if [ -n "$OPENCODE_API_KEY" ]; then
-        AUTH_JSON=$(echo "$AUTH_JSON" | jq ". + {\"api_key\": \"$OPENCODE_API_KEY\", \"opencode\": {\"type\": \"api_key\", \"key\": \"$OPENCODE_API_KEY\"}}")
+        AUTH_JSON=$(echo "$AUTH_JSON" | jq --arg key "$OPENCODE_API_KEY" '. + {api_key: $key, opencode: {type: "api_key", key: $key}, anthropic: {type: "api_key", key: $key}}')
+        # Export as environment variables for CLI fallback
+        export ANTHROPIC_API_KEY="$OPENCODE_API_KEY"
+        export OPENAI_API_KEY="$OPENCODE_API_KEY"
     fi
 
-    # Add helmholtz provider if JULES_API_KEY is present
+    # Add helmholtz and copilot providers if JULES_API_KEY is present
     if [ -n "$JULES_API_KEY" ]; then
-        AUTH_JSON=$(echo "$AUTH_JSON" | jq ". + {\"helmholtz\": {\"type\": \"api_key\", \"key\": \"$JULES_API_KEY\", \"baseURL\": \"https://api.helmholtz-blablador.fz-juelich.de/v1\"}}")
+        AUTH_JSON=$(echo "$AUTH_JSON" | jq --arg key "$JULES_API_KEY" '. + {helmholtz: {type: "api_key", key: $key, baseURL: "https://api.helmholtz-blablador.fz-juelich.de/v1"}, copilot: {type: "api_key", key: $key}}')
 
         # Also set helmholtz/alias-code as default model using update_settings.py
         if [ -f "/usr/local/bin/update_settings.py" ]; then
@@ -43,7 +46,15 @@ fi
 if [ -n "$GITHUB_API_KEY" ]; then
     echo "GITHUB_API_KEY detected, configuring GitHub CLI..."
     export GH_TOKEN="$GITHUB_API_KEY"
-    echo "GitHub CLI token exported."
+
+    # Create gh hosts.yml for persistent authentication status
+    mkdir -p "$HOME/.config/gh"
+    echo "github.com:" > "$HOME/.config/gh/hosts.yml"
+    echo "    user: automaker" >> "$HOME/.config/gh/hosts.yml"
+    echo "    oauth_token: $GITHUB_API_KEY" >> "$HOME/.config/gh/hosts.yml"
+    echo "    git_protocol: https" >> "$HOME/.config/gh/hosts.yml"
+
+    echo "GitHub CLI token exported and hosts.yml created."
 else
     echo "GITHUB_API_KEY not found."
 fi
@@ -53,8 +64,15 @@ echo "Environment Info:"
 echo "  UID: $(id -u)"
 echo "  HOME: $HOME"
 echo "  PWD: $(pwd)"
+echo "  PATH: $PATH"
 echo "  PORT: $PORT"
 echo "  DATA_DIR: $DATA_DIR"
+
+echo "CLI Detection Check:"
+which gh || echo "gh not in PATH"
+which opencode || echo "opencode not in PATH"
+ls -la "$HOME/.local/share/opencode/auth.json" || echo "opencode auth.json missing"
+ls -la "$HOME/.config/gh/hosts.yml" || echo "gh hosts.yml missing"
 
 # Start the application
 echo "Starting application on port $PORT..."

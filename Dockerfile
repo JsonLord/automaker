@@ -63,7 +63,7 @@ RUN mkdir -p /home/node/.local/bin && \
 
 USER node
 ENV HOME=/home/node
-ENV PATH="/home/node/.local/bin:${PATH}"
+ENV PATH="/home/node/.local/bin:/home/node/.opencode/bin:${PATH}"
 
 # Install OpenCode CLI
 RUN curl -fsSL https://opencode.ai/install | bash

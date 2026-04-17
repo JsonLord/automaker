@@ -14,6 +14,11 @@ import cookie from 'cookie';
 import { WebSocketServer, WebSocket } from 'ws';
 import { createServer } from 'http';
 import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 import { createEventEmitter, type EventEmitter } from './lib/events.js';
 import { initAllowedPaths, getClaudeAuthIndicators } from '@automaker/platform';
@@ -248,6 +253,21 @@ initAllowedPaths();
 // Create Express app
 const app = express();
 
+// Move health checks to the top but DON'T intercept the root '/' which serves the UI
+app.get('/health', (_req, res) => res.status(200).json({ status: 'ok' }));
+app.get('/api-docs', (_req, res) => res.status(200).json({
+  message: 'Automaker API Documentation',
+  endpoints: [
+    { method: 'GET', path: '/health', purpose: 'Health Check' },
+    { method: 'GET', path: '/api-docs', purpose: 'API Documentation' },
+    { method: 'POST', path: '/api/auth/login', purpose: 'Login' },
+    { method: 'GET', path: '/api/projects', purpose: 'List projects' },
+    { method: 'GET', path: '/api/agent/chat', purpose: 'Chat with agent' },
+    { method: 'POST', path: '/api/features', purpose: 'Create feature' },
+    { method: 'GET', path: '/api/settings', purpose: 'Get settings' }
+  ]
+}));
+
 // Middleware
 // Custom colored logger showing only endpoint and status code (dynamically configurable)
 morgan.token('status-colored', (_req, res) => {
@@ -283,7 +303,9 @@ function isLocalOrigin(origin: string): boolean {
       hostname === '0.0.0.0' ||
       hostname.startsWith('192.168.') ||
       hostname.startsWith('10.') ||
-      /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(hostname)
+      /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(hostname) ||
+      hostname.endsWith('.hf.space') ||
+      hostname.endsWith('.huggingface.co')
     );
   } catch {
     return false;
@@ -476,6 +498,11 @@ setInterval(() => {
 // This helps prevent CSRF and content-type confusion attacks
 app.use('/api', requireJsonContentType);
 
+// Serve static files from UI build
+const UI_DIST_PATH = path.resolve(__dirname, '../../../apps/ui/dist');
+app.use(express.static(UI_DIST_PATH));
+
+
 // Mount API routes - health, auth, and setup are unauthenticated
 app.use('/api/health', createHealthRoutes());
 app.use('/api/auth', createAuthRoutes());
@@ -521,6 +548,14 @@ app.use(
   '/api/projects',
   createProjectsRoutes(featureLoader, autoModeService, settingsService, notificationService)
 );
+
+// SPA Routing: Serve index.html for all non-API routes
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api/') || req.path === '/health' || req.path === '/api-docs') {
+    return next();
+  }
+  res.sendFile(path.join(UI_DIST_PATH, 'index.html'));
+});
 
 // Create HTTP server
 const server = createServer(app);

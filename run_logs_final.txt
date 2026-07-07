@@ -1,0 +1,300 @@
+data: {"data":"===== Application Startup at 2026-04-06 21:38:44 =====\n","timestamp":"2026-04-06T21:38:44Z"}
+
+data: {"data":"Starting Automaker entrypoint script...","timestamp":"2026-04-06T21:39:06.954Z"}
+
+data: {"data":"--- Initial Environment Diagnostics ---","timestamp":"2026-04-06T21:39:06.976Z"}
+
+data: {"data":"User ID: 1000","timestamp":"2026-04-06T21:39:06.978Z"}
+
+data: {"data":"Home: /home/node","timestamp":"2026-04-06T21:39:06.978Z"}
+
+data: {"data":"Path: /home/node/.local/bin:/home/node/.opencode/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin","timestamp":"2026-04-06T21:39:06.978Z"}
+
+data: {"data":"Data Dir: /app/data","timestamp":"2026-04-06T21:39:06.978Z"}
+
+data: {"data":"Available secret-like environment variables (keys only):","timestamp":"2026-04-06T21:39:06.978Z"}
+
+data: {"data":"PWD","timestamp":"2026-04-06T21:39:06.983Z"}
+
+data: {"data":"----------------------------------------","timestamp":"2026-04-06T21:39:06.983Z"}
+
+data: {"data":"Warning: No OpenCode API key found (tried OPENCODE_API_KEY, OPENCODE_TOKEN, HF_TOKEN)","timestamp":"2026-04-06T21:39:06.983Z"}
+
+data: {"data":"Warning: No Jules API key found (tried JULES_API_KEY, JULES_TOKEN, BLABLADOR_API_KEY)","timestamp":"2026-04-06T21:39:06.983Z"}
+
+data: {"data":"Warning: No GitHub API key found (tried GITHUB_API_KEY, GH_TOKEN)","timestamp":"2026-04-06T21:39:06.983Z"}
+
+data: {"data":"--- Post-Config Diagnostics ---","timestamp":"2026-04-06T21:39:06.983Z"}
+
+data: {"data":"CLI Detection:","timestamp":"2026-04-06T21:39:06.983Z"}
+
+data: {"data":"/usr/bin/gh","timestamp":"2026-04-06T21:39:06.987Z"}
+
+data: {"data":"/home/node/.opencode/bin/opencode","timestamp":"2026-04-06T21:39:06.987Z"}
+
+data: {"data":"Config File Verification:","timestamp":"2026-04-06T21:39:06.988Z"}
+
+data: {"data":"✗ OpenCode auth.json is missing!","timestamp":"2026-04-06T21:39:06.988Z"}
+
+data: {"data":"✓ GitHub config directory exists","timestamp":"2026-04-06T21:39:06.988Z"}
+
+data: {"data":"total 0","timestamp":"2026-04-06T21:39:06.991Z"}
+
+data: {"data":"drwxr-xr-x. 2 node node  6 Apr  6 21:39 .","timestamp":"2026-04-06T21:39:06.991Z"}
+
+data: {"data":"drwxr-xr-x. 3 node node 16 Apr  6 21:39 ..","timestamp":"2026-04-06T21:39:06.991Z"}
+
+data: {"data":"CLI Auth Verification:","timestamp":"2026-04-06T21:39:06.991Z"}
+
+data: {"data":"GitHub Status:","timestamp":"2026-04-06T21:39:06.992Z"}
+
+data: {"data":"You are not logged into any GitHub hosts. To log in, run: gh auth login","timestamp":"2026-04-06T21:39:07.024Z"}
+
+data: {"data":"gh auth status reported failure","timestamp":"2026-04-06T21:39:07.026Z"}
+
+data: {"data":"OpenCode Status:","timestamp":"2026-04-06T21:39:07.027Z"}
+
+data: {"data":"Performing one time database migration, may take a few minutes...","timestamp":"2026-04-06T21:39:08.684Z"}
+
+data: {"data":"sqlite-migration:done","timestamp":"2026-04-06T21:39:08.705Z"}
+
+data: {"data":"Database migration complete.","timestamp":"2026-04-06T21:39:08.705Z"}
+
+data: {"data":"\u001b[0m","timestamp":"2026-04-06T21:39:08.706Z"}
+
+data: {"data":"┌  Credentials \u001b[90m~/.local/share/opencode/auth.json","timestamp":"2026-04-06T21:39:08.706Z"}
+
+data: {"data":"│","timestamp":"2026-04-06T21:39:08.777Z"}
+
+data: {"data":"└  0 credentials","timestamp":"2026-04-06T21:39:08.777Z"}
+
+data: {"data":"","timestamp":"2026-04-06T21:39:08.777Z"}
+
+data: {"data":"--- End Diagnostics ---","timestamp":"2026-04-06T21:39:08.811Z"}
+
+data: {"data":"Starting application on port 7860...","timestamp":"2026-04-06T21:39:08.811Z"}
+
+data: {"data":"\u001b[36mINFO \u001b[0m \u001b[34m[Auth]\u001b[0m Generated new API key","timestamp":"2026-04-06T21:39:09.267Z"}
+
+data: {"data":"\u001b[36mINFO \u001b[0m \u001b[34m[Auth]\u001b[0m ","timestamp":"2026-04-06T21:39:09.267Z"}
+
+data: {"data":"╔═════════════════════════════════════════════════════════════════════╗","timestamp":"2026-04-06T21:39:09.267Z"}
+
+data: {"data":"║  🔐 API Key for Web Mode Authentication                             ║","timestamp":"2026-04-06T21:39:09.267Z"}
+
+data: {"data":"╠═════════════════════════════════════════════════════════════════════╣","timestamp":"2026-04-06T21:39:09.267Z"}
+
+data: {"data":"║                                                                     ║","timestamp":"2026-04-06T21:39:09.267Z"}
+
+data: {"data":"║  When accessing via browser, you'll be prompted to enter this key:  ║","timestamp":"2026-04-06T21:39:09.267Z"}
+
+data: {"data":"║                                                                     ║","timestamp":"2026-04-06T21:39:09.267Z"}
+
+data: {"data":"║  0d15d97f-7089-43b8-9062-c0bfd53dc260                               ║","timestamp":"2026-04-06T21:39:09.267Z"}
+
+data: {"data":"║                                                                     ║","timestamp":"2026-04-06T21:39:09.267Z"}
+
+data: {"data":"║  In Electron mode, authentication is handled automatically.         ║","timestamp":"2026-04-06T21:39:09.267Z"}
+
+data: {"data":"║                                                                     ║","timestamp":"2026-04-06T21:39:09.267Z"}
+
+data: {"data":"║  Auto-login (AUTOMAKER_AUTO_LOGIN): enabled (auto-login active)     ║","timestamp":"2026-04-06T21:39:09.267Z"}
+
+data: {"data":"║                                                                     ║","timestamp":"2026-04-06T21:39:09.267Z"}
+
+data: {"data":"╠═════════════════════════════════════════════════════════════════════╣","timestamp":"2026-04-06T21:39:09.267Z"}
+
+data: {"data":"║  💡 Tips                                                            ║","timestamp":"2026-04-06T21:39:09.267Z"}
+
+data: {"data":"╠═════════════════════════════════════════════════════════════════════╣","timestamp":"2026-04-06T21:39:09.267Z"}
+
+data: {"data":"║  Set AUTOMAKER_API_KEY env var to use a fixed key                   ║","timestamp":"2026-04-06T21:39:09.267Z"}
+
+data: {"data":"║  Set AUTOMAKER_AUTO_LOGIN=true to skip the login prompt             ║","timestamp":"2026-04-06T21:39:09.267Z"}
+
+data: {"data":"╚═════════════════════════════════════════════════════════════════════╝","timestamp":"2026-04-06T21:39:09.267Z"}
+
+data: {"data":"","timestamp":"2026-04-06T21:39:09.267Z"}
+
+data: {"data":"[dotenv@17.2.3] injecting env (0) from .env -- tip: ⚙️  specify custom .env file path with { path: '/custom/path/.env' }","timestamp":"2026-04-06T21:39:09.426Z"}
+
+data: {"data":"\u001b[36mINFO \u001b[0m \u001b[34m[Server]\u001b[0m [SERVER_STARTUP] process.env.DATA_DIR: /app/data","timestamp":"2026-04-06T21:39:09.426Z"}
+
+data: {"data":"\u001b[36mINFO \u001b[0m \u001b[34m[Server]\u001b[0m [SERVER_STARTUP] Resolved DATA_DIR: /app/data","timestamp":"2026-04-06T21:39:09.426Z"}
+
+data: {"data":"\u001b[36mINFO \u001b[0m \u001b[34m[Server]\u001b[0m [SERVER_STARTUP] process.cwd(): /app","timestamp":"2026-04-06T21:39:09.426Z"}
+
+data: {"data":"[Security] ⚠️  ALLOWED_ROOT_DIRECTORY not set - allowing access to all paths","timestamp":"2026-04-06T21:39:09.428Z"}
+
+data: {"data":"[Security] ✓ DATA_DIR configured: /app/data","timestamp":"2026-04-06T21:39:09.428Z"}
+
+data: {"data":"\u001b[36mINFO \u001b[0m \u001b[34m[EventHooks]\u001b[0m Event hook service initialized","timestamp":"2026-04-06T21:39:09.431Z"}
+
+data: {"data":"\u001b[36mINFO \u001b[0m \u001b[34m[SettingsService]\u001b[0m Checking for legacy data migration from: /home/node/.config/Automaker","timestamp":"2026-04-06T21:39:09.432Z"}
+
+data: {"data":"\u001b[36mINFO \u001b[0m \u001b[34m[SettingsService]\u001b[0m Current data directory: /app/data","timestamp":"2026-04-06T21:39:09.432Z"}
+
+data: {"data":"\u001b[36mINFO \u001b[0m \u001b[34m[Server]\u001b[0m ","timestamp":"2026-04-06T21:39:09.456Z"}
+
+data: {"data":"╔═════════════════════════════════════════════════════════════════════╗","timestamp":"2026-04-06T21:39:09.456Z"}
+
+data: {"data":"║  🚀 Automaker Backend Server                                        ║","timestamp":"2026-04-06T21:39:09.456Z"}
+
+data: {"data":"╠═════════════════════════════════════════════════════════════════════╣","timestamp":"2026-04-06T21:39:09.456Z"}
+
+data: {"data":"║                                                                     ║","timestamp":"2026-04-06T21:39:09.456Z"}
+
+data: {"data":"║  Listening:    0.0.0.0:7860                                         ║","timestamp":"2026-04-06T21:39:09.456Z"}
+
+data: {"data":"║  HTTP API:     http://r-leon4gr45-hyp-41mz1xii-0cbe8-slqzg:7860     ║","timestamp":"2026-04-06T21:39:09.456Z"}
+
+data: {"data":"║  WebSocket:    ws://r-leon4gr45-hyp-41mz1xii-0cbe8-slqzg:7860/api/events║","timestamp":"2026-04-06T21:39:09.456Z"}
+
+data: {"data":"║  Terminal WS:  ws://r-leon4gr45-hyp-41mz1xii-0cbe8-slqzg:7860/api/terminal/ws║","timestamp":"2026-04-06T21:39:09.456Z"}
+
+data: {"data":"║  Health:       http://r-leon4gr45-hyp-41mz1xii-0cbe8-slqzg:7860/api/health║","timestamp":"2026-04-06T21:39:09.456Z"}
+
+data: {"data":"║  Terminal:     enabled                                              ║","timestamp":"2026-04-06T21:39:09.456Z"}
+
+data: {"data":"║                                                                     ║","timestamp":"2026-04-06T21:39:09.456Z"}
+
+data: {"data":"╚═════════════════════════════════════════════════════════════════════╝","timestamp":"2026-04-06T21:39:09.456Z"}
+
+data: {"data":"","timestamp":"2026-04-06T21:39:09.456Z"}
+
+data: {"data":"\u001b[36mINFO \u001b[0m \u001b[34m[Server]\u001b[0m Server log level set to: info","timestamp":"2026-04-06T21:39:09.462Z"}
+
+data: {"data":"\u001b[36mINFO \u001b[0m \u001b[34m[Server]\u001b[0m HTTP request logging: enabled","timestamp":"2026-04-06T21:39:09.462Z"}
+
+data: {"data":"\u001b[36mINFO \u001b[0m \u001b[34m[Server]\u001b[0m Agent service initialized","timestamp":"2026-04-06T21:39:09.463Z"}
+
+data: {"data":"\u001b[33mWARN \u001b[0m \u001b[34m[Server]\u001b[0m ","timestamp":"2026-04-06T21:39:09.463Z"}
+
+data: {"data":"╔═════════════════════════════════════════════════════════════════════╗","timestamp":"2026-04-06T21:39:09.463Z"}
+
+data: {"data":"║  ⚠️  WARNING: No Claude authentication configured                   ║","timestamp":"2026-04-06T21:39:09.463Z"}
+
+data: {"data":"╠═════════════════════════════════════════════════════════════════════╣","timestamp":"2026-04-06T21:39:09.463Z"}
+
+data: {"data":"║                                                                     ║","timestamp":"2026-04-06T21:39:09.463Z"}
+
+data: {"data":"║  The Claude Agent SDK requires authentication to function.          ║","timestamp":"2026-04-06T21:39:09.463Z"}
+
+data: {"data":"║                                                                     ║","timestamp":"2026-04-06T21:39:09.463Z"}
+
+data: {"data":"║  Options:                                                           ║","timestamp":"2026-04-06T21:39:09.463Z"}
+
+data: {"data":"║  1. Install Claude Code CLI and authenticate with subscription      ║","timestamp":"2026-04-06T21:39:09.463Z"}
+
+data: {"data":"║  2. Set your Anthropic API key:                                     ║","timestamp":"2026-04-06T21:39:09.463Z"}
+
+data: {"data":"║     export ANTHROPIC_API_KEY=\"sk-ant-...\"                           ║","timestamp":"2026-04-06T21:39:09.463Z"}
+
+data: {"data":"║  3. Use the setup wizard in Settings to configure authentication.   ║","timestamp":"2026-04-06T21:39:09.463Z"}
+
+data: {"data":"║                                                                     ║","timestamp":"2026-04-06T21:39:09.463Z"}
+
+data: {"data":"║  Paths checked:                                                     ║","timestamp":"2026-04-06T21:39:09.463Z"}
+
+data: {"data":"║    Settings: /home/node/.claude/settings.json                       ║","timestamp":"2026-04-06T21:39:09.463Z"}
+
+data: {"data":"║    Stats cache: /home/node/.claude/stats-cache.json                 ║","timestamp":"2026-04-06T21:39:09.463Z"}
+
+data: {"data":"║    Projects dir: /home/node/.claude/projects                        ║","timestamp":"2026-04-06T21:39:09.463Z"}
+
+data: {"data":"║    Credentials: /home/node/.claude/.credentials.json                ║","timestamp":"2026-04-06T21:39:09.463Z"}
+
+data: {"data":"║    Credentials: /home/node/.claude/credentials.json                 ║","timestamp":"2026-04-06T21:39:09.463Z"}
+
+data: {"data":"║                                                                     ║","timestamp":"2026-04-06T21:39:09.463Z"}
+
+data: {"data":"╚═════════════════════════════════════════════════════════════════════╝","timestamp":"2026-04-06T21:39:09.463Z"}
+
+data: {"data":"","timestamp":"2026-04-06T21:39:09.463Z"}
+
+data: {"data":"GET /api/auth/token \u001b[33m401\u001b[0m","timestamp":"2026-04-06T21:39:20.515Z"}
+
+data: {"data":"GET /api/setup/claude-status \u001b[32m200\u001b[0m","timestamp":"2026-04-06T21:39:20.758Z"}
+
+data: {"data":"GET /api/setup/opencode-status \u001b[32m200\u001b[0m","timestamp":"2026-04-06T21:39:20.828Z"}
+
+data: {"data":"POST /api/auth/logout \u001b[32m200\u001b[0m","timestamp":"2026-04-06T21:39:20.861Z"}
+
+data: {"data":"\u001b[36mINFO \u001b[0m \u001b[34m[CodexAuth]\u001b[0m CLI not found","timestamp":"2026-04-06T21:39:20.936Z"}
+
+data: {"data":"GET /api/setup/codex-status \u001b[32m200\u001b[0m","timestamp":"2026-04-06T21:39:20.936Z"}
+
+data: {"data":"GET /api/setup/copilot-status \u001b[32m200\u001b[0m","timestamp":"2026-04-06T21:39:20.978Z"}
+
+data: {"data":"GET /api/setup/cursor-status \u001b[32m200\u001b[0m","timestamp":"2026-04-06T21:39:20.997Z"}
+
+data: {"data":"GET /api/setup/gemini-status \u001b[32m200\u001b[0m","timestamp":"2026-04-06T21:39:21.014Z"}
+
+data: {"data":"GET /api/setup/claude-status \u001b[32m200\u001b[0m","timestamp":"2026-04-06T21:39:21.017Z"}
+
+data: {"data":"\u001b[36mINFO \u001b[0m \u001b[34m[Server]\u001b[0m Authentication failed, rejecting connection","timestamp":"2026-04-06T21:39:21.040Z"}
+
+data: {"data":"GET /api/auth/token \u001b[33m401\u001b[0m","timestamp":"2026-04-06T21:39:22.622Z"}
+
+data: {"data":"POST /api/auth/logout \u001b[32m200\u001b[0m","timestamp":"2026-04-06T21:39:22.758Z"}
+
+data: {"data":"\u001b[36mINFO \u001b[0m \u001b[34m[Server]\u001b[0m Authentication failed, rejecting connection","timestamp":"2026-04-06T21:39:22.831Z"}
+
+data: {"data":"GET /api/auth/token \u001b[33m401\u001b[0m","timestamp":"2026-04-06T21:39:24.623Z"}
+
+data: {"data":"POST /api/auth/logout \u001b[32m200\u001b[0m","timestamp":"2026-04-06T21:39:24.819Z"}
+
+data: {"data":"\u001b[36mINFO \u001b[0m \u001b[34m[Server]\u001b[0m Authentication failed, rejecting connection","timestamp":"2026-04-06T21:39:24.889Z"}
+
+data: {"data":"GET /api/auth/token \u001b[33m401\u001b[0m","timestamp":"2026-04-06T21:39:27.639Z"}
+
+data: {"data":"POST /api/auth/logout \u001b[32m200\u001b[0m","timestamp":"2026-04-06T21:39:27.852Z"}
+
+data: {"data":"\u001b[36mINFO \u001b[0m \u001b[34m[Server]\u001b[0m Authentication failed, rejecting connection","timestamp":"2026-04-06T21:39:28.019Z"}
+
+data: {"data":"GET /api/auth/token \u001b[33m401\u001b[0m","timestamp":"2026-04-06T21:39:33.699Z"}
+
+data: {"data":"POST /api/auth/logout \u001b[32m200\u001b[0m","timestamp":"2026-04-06T21:39:33.895Z"}
+
+data: {"data":"\u001b[36mINFO \u001b[0m \u001b[34m[Server]\u001b[0m Authentication failed, rejecting connection","timestamp":"2026-04-06T21:39:33.910Z"}
+
+data: {"data":"GET /api/auth/token \u001b[33m401\u001b[0m","timestamp":"2026-04-06T21:39:39.688Z"}
+
+data: {"data":"POST /api/auth/logout \u001b[32m200\u001b[0m","timestamp":"2026-04-06T21:39:39.883Z"}
+
+data: {"data":"\u001b[36mINFO \u001b[0m \u001b[34m[Server]\u001b[0m Authentication failed, rejecting connection","timestamp":"2026-04-06T21:39:39.973Z"}
+
+data: {"data":"GET /api/auth/token \u001b[33m401\u001b[0m","timestamp":"2026-04-06T21:39:45.711Z"}
+
+data: {"data":"POST /api/auth/logout \u001b[32m200\u001b[0m","timestamp":"2026-04-06T21:39:45.942Z"}
+
+data: {"data":"\u001b[36mINFO \u001b[0m \u001b[34m[Server]\u001b[0m Authentication failed, rejecting connection","timestamp":"2026-04-06T21:39:46.031Z"}
+
+data: {"data":"GET /api/auth/token \u001b[33m401\u001b[0m","timestamp":"2026-04-06T21:39:51.695Z"}
+
+data: {"data":"POST /api/auth/logout \u001b[32m200\u001b[0m","timestamp":"2026-04-06T21:39:51.889Z"}
+
+data: {"data":"\u001b[36mINFO \u001b[0m \u001b[34m[Server]\u001b[0m Authentication failed, rejecting connection","timestamp":"2026-04-06T21:39:51.958Z"}
+
+data: {"data":"GET /api/auth/token \u001b[33m401\u001b[0m","timestamp":"2026-04-06T21:39:57.702Z"}
+
+data: {"data":"POST /api/auth/logout \u001b[32m200\u001b[0m","timestamp":"2026-04-06T21:39:57.900Z"}
+
+data: {"data":"\u001b[36mINFO \u001b[0m \u001b[34m[Server]\u001b[0m Authentication failed, rejecting connection","timestamp":"2026-04-06T21:39:58.055Z"}
+
+data: {"data":"GET /api/auth/token \u001b[33m401\u001b[0m","timestamp":"2026-04-06T21:40:03.702Z"}
+
+data: {"data":"POST /api/auth/logout \u001b[32m200\u001b[0m","timestamp":"2026-04-06T21:40:03.895Z"}
+
+data: {"data":"\u001b[36mINFO \u001b[0m \u001b[34m[Server]\u001b[0m Authentication failed, rejecting connection","timestamp":"2026-04-06T21:40:04.035Z"}
+
+data: {"data":"GET /api/auth/token \u001b[33m401\u001b[0m","timestamp":"2026-04-06T21:40:09.693Z"}
+
+data: {"data":"POST /api/auth/logout \u001b[32m200\u001b[0m","timestamp":"2026-04-06T21:40:09.887Z"}
+
+data: {"data":"\u001b[36mINFO \u001b[0m \u001b[34m[Server]\u001b[0m Authentication failed, rejecting connection","timestamp":"2026-04-06T21:40:09.955Z"}
+
+data: {"data":"GET /api/auth/token \u001b[33m401\u001b[0m","timestamp":"2026-04-06T21:40:15.715Z"}
+
+data: {"data":"POST /api/auth/logout \u001b[32m200\u001b[0m","timestamp":"2026-04-06T21:40:15.947Z"}
+

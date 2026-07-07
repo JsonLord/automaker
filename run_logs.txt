@@ -1,0 +1,200 @@
+data: {"data":"===== Application Startup at 2026-04-06 21:02:20 =====\n","timestamp":"2026-04-06T21:02:20Z"}
+
+data: {"data":"Starting Automaker entrypoint script...","timestamp":"2026-04-06T21:02:47.311Z"}
+
+data: {"data":"--- Environment Diagnostics (Start) ---","timestamp":"2026-04-06T21:02:47.326Z"}
+
+data: {"data":"User ID: 1000","timestamp":"2026-04-06T21:02:47.328Z"}
+
+data: {"data":"Home: /home/node","timestamp":"2026-04-06T21:02:47.328Z"}
+
+data: {"data":"Path: /home/node/.local/bin:/home/node/.opencode/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin","timestamp":"2026-04-06T21:02:47.328Z"}
+
+data: {"data":"Data Dir: /app/data","timestamp":"2026-04-06T21:02:47.328Z"}
+
+data: {"data":"Neither OPENCODE_API_KEY nor JULES_API_KEY found.","timestamp":"2026-04-06T21:02:47.328Z"}
+
+data: {"data":"GITHUB_API_KEY not found.","timestamp":"2026-04-06T21:02:47.328Z"}
+
+data: {"data":"Checking CLI presence:","timestamp":"2026-04-06T21:02:47.328Z"}
+
+data: {"data":"/usr/bin/gh","timestamp":"2026-04-06T21:02:47.331Z"}
+
+data: {"data":"/home/node/.opencode/bin/opencode","timestamp":"2026-04-06T21:02:47.332Z"}
+
+data: {"data":"Checking config files:","timestamp":"2026-04-06T21:02:47.332Z"}
+
+data: {"data":"ls: cannot access '/home/node/.local/share/opencode/auth.json': No such file or directory","timestamp":"2026-04-06T21:02:47.335Z"}
+
+data: {"data":"opencode auth.json missing","timestamp":"2026-04-06T21:02:47.335Z"}
+
+data: {"data":"total 0","timestamp":"2026-04-06T21:02:47.338Z"}
+
+data: {"data":"drwxr-xr-x. 2 node node  6 Apr  6 21:02 .","timestamp":"2026-04-06T21:02:47.338Z"}
+
+data: {"data":"drwxr-xr-x. 3 node node 16 Apr  6 21:02 ..","timestamp":"2026-04-06T21:02:47.338Z"}
+
+data: {"data":"CLI Auth Status:","timestamp":"2026-04-06T21:02:47.338Z"}
+
+data: {"data":"You are not logged into any GitHub hosts. To log in, run: gh auth login","timestamp":"2026-04-06T21:02:47.394Z"}
+
+data: {"data":"gh auth status failed","timestamp":"2026-04-06T21:02:47.398Z"}
+
+data: {"data":"Performing one time database migration, may take a few minutes...","timestamp":"2026-04-06T21:02:49.610Z"}
+
+data: {"data":"sqlite-migration:done","timestamp":"2026-04-06T21:02:49.642Z"}
+
+data: {"data":"Database migration complete.","timestamp":"2026-04-06T21:02:49.642Z"}
+
+data: {"data":"\u001b[0m","timestamp":"2026-04-06T21:02:49.643Z"}
+
+data: {"data":"┌  Credentials \u001b[90m~/.local/share/opencode/auth.json","timestamp":"2026-04-06T21:02:49.643Z"}
+
+data: {"data":"│","timestamp":"2026-04-06T21:02:49.729Z"}
+
+data: {"data":"└  0 credentials","timestamp":"2026-04-06T21:02:49.729Z"}
+
+data: {"data":"","timestamp":"2026-04-06T21:02:49.729Z"}
+
+data: {"data":"--- Environment Diagnostics (End) ---","timestamp":"2026-04-06T21:02:49.757Z"}
+
+data: {"data":"Starting application on port 7860...","timestamp":"2026-04-06T21:02:49.757Z"}
+
+data: {"data":"\u001b[36mINFO \u001b[0m \u001b[34m[Auth]\u001b[0m Generated new API key","timestamp":"2026-04-06T21:02:50.276Z"}
+
+data: {"data":"\u001b[36mINFO \u001b[0m \u001b[34m[Auth]\u001b[0m ","timestamp":"2026-04-06T21:02:50.277Z"}
+
+data: {"data":"╔═════════════════════════════════════════════════════════════════════╗","timestamp":"2026-04-06T21:02:50.277Z"}
+
+data: {"data":"║  🔐 API Key for Web Mode Authentication                             ║","timestamp":"2026-04-06T21:02:50.277Z"}
+
+data: {"data":"╠═════════════════════════════════════════════════════════════════════╣","timestamp":"2026-04-06T21:02:50.277Z"}
+
+data: {"data":"║                                                                     ║","timestamp":"2026-04-06T21:02:50.277Z"}
+
+data: {"data":"║  When accessing via browser, you'll be prompted to enter this key:  ║","timestamp":"2026-04-06T21:02:50.277Z"}
+
+data: {"data":"║                                                                     ║","timestamp":"2026-04-06T21:02:50.277Z"}
+
+data: {"data":"║  7bb62127-c713-4337-ab5e-7bf5edcab7a0                               ║","timestamp":"2026-04-06T21:02:50.277Z"}
+
+data: {"data":"║                                                                     ║","timestamp":"2026-04-06T21:02:50.277Z"}
+
+data: {"data":"║  In Electron mode, authentication is handled automatically.         ║","timestamp":"2026-04-06T21:02:50.277Z"}
+
+data: {"data":"║                                                                     ║","timestamp":"2026-04-06T21:02:50.277Z"}
+
+data: {"data":"║  Auto-login (AUTOMAKER_AUTO_LOGIN): enabled (auto-login active)     ║","timestamp":"2026-04-06T21:02:50.277Z"}
+
+data: {"data":"║                                                                     ║","timestamp":"2026-04-06T21:02:50.277Z"}
+
+data: {"data":"╠═════════════════════════════════════════════════════════════════════╣","timestamp":"2026-04-06T21:02:50.277Z"}
+
+data: {"data":"║  💡 Tips                                                            ║","timestamp":"2026-04-06T21:02:50.277Z"}
+
+data: {"data":"╠═════════════════════════════════════════════════════════════════════╣","timestamp":"2026-04-06T21:02:50.277Z"}
+
+data: {"data":"║  Set AUTOMAKER_API_KEY env var to use a fixed key                   ║","timestamp":"2026-04-06T21:02:50.277Z"}
+
+data: {"data":"║  Set AUTOMAKER_AUTO_LOGIN=true to skip the login prompt             ║","timestamp":"2026-04-06T21:02:50.277Z"}
+
+data: {"data":"╚═════════════════════════════════════════════════════════════════════╝","timestamp":"2026-04-06T21:02:50.277Z"}
+
+data: {"data":"","timestamp":"2026-04-06T21:02:50.277Z"}
+
+data: {"data":"[dotenv@17.2.3] injecting env (0) from .env -- tip: ⚙️  enable debug logging with { debug: true }","timestamp":"2026-04-06T21:02:50.452Z"}
+
+data: {"data":"\u001b[36mINFO \u001b[0m \u001b[34m[Server]\u001b[0m [SERVER_STARTUP] process.env.DATA_DIR: /app/data","timestamp":"2026-04-06T21:02:50.452Z"}
+
+data: {"data":"\u001b[36mINFO \u001b[0m \u001b[34m[Server]\u001b[0m [SERVER_STARTUP] Resolved DATA_DIR: /app/data","timestamp":"2026-04-06T21:02:50.452Z"}
+
+data: {"data":"\u001b[36mINFO \u001b[0m \u001b[34m[Server]\u001b[0m [SERVER_STARTUP] process.cwd(): /app","timestamp":"2026-04-06T21:02:50.452Z"}
+
+data: {"data":"[Security] ⚠️  ALLOWED_ROOT_DIRECTORY not set - allowing access to all paths","timestamp":"2026-04-06T21:02:50.454Z"}
+
+data: {"data":"[Security] ✓ DATA_DIR configured: /app/data","timestamp":"2026-04-06T21:02:50.454Z"}
+
+data: {"data":"\u001b[36mINFO \u001b[0m \u001b[34m[EventHooks]\u001b[0m Event hook service initialized","timestamp":"2026-04-06T21:02:50.457Z"}
+
+data: {"data":"\u001b[36mINFO \u001b[0m \u001b[34m[SettingsService]\u001b[0m Checking for legacy data migration from: /home/node/.config/Automaker","timestamp":"2026-04-06T21:02:50.458Z"}
+
+data: {"data":"\u001b[36mINFO \u001b[0m \u001b[34m[SettingsService]\u001b[0m Current data directory: /app/data","timestamp":"2026-04-06T21:02:50.458Z"}
+
+data: {"data":"\u001b[36mINFO \u001b[0m \u001b[34m[Server]\u001b[0m ","timestamp":"2026-04-06T21:02:50.491Z"}
+
+data: {"data":"╔═════════════════════════════════════════════════════════════════════╗","timestamp":"2026-04-06T21:02:50.491Z"}
+
+data: {"data":"║  🚀 Automaker Backend Server                                        ║","timestamp":"2026-04-06T21:02:50.491Z"}
+
+data: {"data":"╠═════════════════════════════════════════════════════════════════════╣","timestamp":"2026-04-06T21:02:50.491Z"}
+
+data: {"data":"║                                                                     ║","timestamp":"2026-04-06T21:02:50.491Z"}
+
+data: {"data":"║  Listening:    0.0.0.0:7860                                         ║","timestamp":"2026-04-06T21:02:50.491Z"}
+
+data: {"data":"║  HTTP API:     http://r-leon4gr45-hyp-yfa3z031-42cc7-4fvwf:7860     ║","timestamp":"2026-04-06T21:02:50.491Z"}
+
+data: {"data":"║  WebSocket:    ws://r-leon4gr45-hyp-yfa3z031-42cc7-4fvwf:7860/api/events║","timestamp":"2026-04-06T21:02:50.491Z"}
+
+data: {"data":"║  Terminal WS:  ws://r-leon4gr45-hyp-yfa3z031-42cc7-4fvwf:7860/api/terminal/ws║","timestamp":"2026-04-06T21:02:50.491Z"}
+
+data: {"data":"║  Health:       http://r-leon4gr45-hyp-yfa3z031-42cc7-4fvwf:7860/api/health║","timestamp":"2026-04-06T21:02:50.491Z"}
+
+data: {"data":"║  Terminal:     enabled                                              ║","timestamp":"2026-04-06T21:02:50.491Z"}
+
+data: {"data":"║                                                                     ║","timestamp":"2026-04-06T21:02:50.491Z"}
+
+data: {"data":"╚═════════════════════════════════════════════════════════════════════╝","timestamp":"2026-04-06T21:02:50.491Z"}
+
+data: {"data":"","timestamp":"2026-04-06T21:02:50.491Z"}
+
+data: {"data":"\u001b[36mINFO \u001b[0m \u001b[34m[Server]\u001b[0m Server log level set to: info","timestamp":"2026-04-06T21:02:50.494Z"}
+
+data: {"data":"\u001b[36mINFO \u001b[0m \u001b[34m[Server]\u001b[0m HTTP request logging: enabled","timestamp":"2026-04-06T21:02:50.494Z"}
+
+data: {"data":"\u001b[36mINFO \u001b[0m \u001b[34m[Server]\u001b[0m Agent service initialized","timestamp":"2026-04-06T21:02:50.495Z"}
+
+data: {"data":"\u001b[33mWARN \u001b[0m \u001b[34m[Server]\u001b[0m ","timestamp":"2026-04-06T21:02:50.495Z"}
+
+data: {"data":"╔═════════════════════════════════════════════════════════════════════╗","timestamp":"2026-04-06T21:02:50.495Z"}
+
+data: {"data":"║  ⚠️  WARNING: No Claude authentication configured                   ║","timestamp":"2026-04-06T21:02:50.495Z"}
+
+data: {"data":"╠═════════════════════════════════════════════════════════════════════╣","timestamp":"2026-04-06T21:02:50.495Z"}
+
+data: {"data":"║                                                                     ║","timestamp":"2026-04-06T21:02:50.495Z"}
+
+data: {"data":"║  The Claude Agent SDK requires authentication to function.          ║","timestamp":"2026-04-06T21:02:50.495Z"}
+
+data: {"data":"║                                                                     ║","timestamp":"2026-04-06T21:02:50.495Z"}
+
+data: {"data":"║  Options:                                                           ║","timestamp":"2026-04-06T21:02:50.495Z"}
+
+data: {"data":"║  1. Install Claude Code CLI and authenticate with subscription      ║","timestamp":"2026-04-06T21:02:50.495Z"}
+
+data: {"data":"║  2. Set your Anthropic API key:                                     ║","timestamp":"2026-04-06T21:02:50.495Z"}
+
+data: {"data":"║     export ANTHROPIC_API_KEY=\"sk-ant-...\"                           ║","timestamp":"2026-04-06T21:02:50.495Z"}
+
+data: {"data":"║  3. Use the setup wizard in Settings to configure authentication.   ║","timestamp":"2026-04-06T21:02:50.495Z"}
+
+data: {"data":"║                                                                     ║","timestamp":"2026-04-06T21:02:50.495Z"}
+
+data: {"data":"║  Paths checked:                                                     ║","timestamp":"2026-04-06T21:02:50.495Z"}
+
+data: {"data":"║    Settings: /home/node/.claude/settings.json                       ║","timestamp":"2026-04-06T21:02:50.495Z"}
+
+data: {"data":"║    Stats cache: /home/node/.claude/stats-cache.json                 ║","timestamp":"2026-04-06T21:02:50.495Z"}
+
+data: {"data":"║    Projects dir: /home/node/.claude/projects                        ║","timestamp":"2026-04-06T21:02:50.495Z"}
+
+data: {"data":"║    Credentials: /home/node/.claude/.credentials.json                ║","timestamp":"2026-04-06T21:02:50.495Z"}
+
+data: {"data":"║    Credentials: /home/node/.claude/credentials.json                 ║","timestamp":"2026-04-06T21:02:50.495Z"}
+
+data: {"data":"║                                                                     ║","timestamp":"2026-04-06T21:02:50.495Z"}
+
+data: {"data":"╚═════════════════════════════════════════════════════════════════════╝","timestamp":"2026-04-06T21:02:50.495Z"}
+
+data: {"data":"","timestamp":"2026-04-06T21:02:50.495Z"}
+

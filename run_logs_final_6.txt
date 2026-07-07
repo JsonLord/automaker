@@ -1,0 +1,226 @@
+data: {"data":"===== Application Startup at 2026-04-06 22:51:53 =====\n","timestamp":"2026-04-06T22:51:53Z"}
+
+data: {"data":"Starting Automaker entrypoint script...","timestamp":"2026-04-06T22:52:17.123Z"}
+
+data: {"data":"--- Environment Diagnostics ---","timestamp":"2026-04-06T22:52:17.136Z"}
+
+data: {"data":"Available env var names:","timestamp":"2026-04-06T22:52:17.136Z"}
+
+data: {"data":"ACCELERATOR","timestamp":"2026-04-06T22:52:17.138Z"}
+
+data: {"data":"AUTOMAKER_AUTO_LOGIN","timestamp":"2026-04-06T22:52:17.138Z"}
+
+data: {"data":"COMMIT_SHA","timestamp":"2026-04-06T22:52:17.138Z"}
+
+data: {"data":"CPU_CORES","timestamp":"2026-04-06T22:52:17.138Z"}
+
+data: {"data":"DATA_DIR","timestamp":"2026-04-06T22:52:17.138Z"}
+
+data: {"data":"GITHUB_API_KEY","timestamp":"2026-04-06T22:52:17.138Z"}
+
+data: {"data":"HF_DATASETS_TRUST_REMOTE_CODE","timestamp":"2026-04-06T22:52:17.138Z"}
+
+data: {"data":"HOME","timestamp":"2026-04-06T22:52:17.138Z"}
+
+data: {"data":"HOSTNAME","timestamp":"2026-04-06T22:52:17.138Z"}
+
+data: {"data":"IMAGE_SHA","timestamp":"2026-04-06T22:52:17.138Z"}
+
+data: {"data":"KUBERNETES_PORT","timestamp":"2026-04-06T22:52:17.138Z"}
+
+data: {"data":"KUBERNETES_PORT_443_TCP","timestamp":"2026-04-06T22:52:17.138Z"}
+
+data: {"data":"KUBERNETES_PORT_443_TCP_ADDR","timestamp":"2026-04-06T22:52:17.138Z"}
+
+data: {"data":"KUBERNETES_PORT_443_TCP_PORT","timestamp":"2026-04-06T22:52:17.138Z"}
+
+data: {"data":"KUBERNETES_PORT_443_TCP_PROTO","timestamp":"2026-04-06T22:52:17.138Z"}
+
+data: {"data":"KUBERNETES_SERVICE_HOST","timestamp":"2026-04-06T22:52:17.138Z"}
+
+data: {"data":"KUBERNETES_SERVICE_PORT","timestamp":"2026-04-06T22:52:17.138Z"}
+
+data: {"data":"KUBERNETES_SERVICE_PORT_HTTPS","timestamp":"2026-04-06T22:52:17.138Z"}
+
+data: {"data":"MEMORY","timestamp":"2026-04-06T22:52:17.138Z"}
+
+data: {"data":"NODE_ENV","timestamp":"2026-04-06T22:52:17.138Z"}
+
+data: {"data":"NODE_VERSION","timestamp":"2026-04-06T22:52:17.138Z"}
+
+data: {"data":"OMP_NUM_THREADS","timestamp":"2026-04-06T22:52:17.138Z"}
+
+data: {"data":"OPENCODE_API_KEY","timestamp":"2026-04-06T22:52:17.138Z"}
+
+data: {"data":"PATH","timestamp":"2026-04-06T22:52:17.138Z"}
+
+data: {"data":"PORT","timestamp":"2026-04-06T22:52:17.138Z"}
+
+data: {"data":"PWD","timestamp":"2026-04-06T22:52:17.138Z"}
+
+data: {"data":"SPACE_AUTHOR_NAME","timestamp":"2026-04-06T22:52:17.138Z"}
+
+data: {"data":"SPACE_CREATOR_USER_ID","timestamp":"2026-04-06T22:52:17.138Z"}
+
+data: {"data":"SPACE_HOST","timestamp":"2026-04-06T22:52:17.138Z"}
+
+data: {"data":"SPACE_ID","timestamp":"2026-04-06T22:52:17.138Z"}
+
+data: {"data":"SPACE_REPO_NAME","timestamp":"2026-04-06T22:52:17.138Z"}
+
+data: {"data":"SPACE_SUBDOMAIN","timestamp":"2026-04-06T22:52:17.138Z"}
+
+data: {"data":"SPACE_TITLE","timestamp":"2026-04-06T22:52:17.138Z"}
+
+data: {"data":"YARN_VERSION","timestamp":"2026-04-06T22:52:17.138Z"}
+
+data: {"data":"-------------------------------","timestamp":"2026-04-06T22:52:17.138Z"}
+
+data: {"data":"Resolved keys (Presence Check):","timestamp":"2026-04-06T22:52:17.148Z"}
+
+data: {"data":"OC_KEY: FOUND","timestamp":"2026-04-06T22:52:17.148Z"}
+
+data: {"data":"J_KEY: MISSING","timestamp":"2026-04-06T22:52:17.148Z"}
+
+data: {"data":"GH_KEY: FOUND","timestamp":"2026-04-06T22:52:17.148Z"}
+
+data: {"data":"Configuring OpenCode authentication...","timestamp":"2026-04-06T22:52:17.148Z"}
+
+data: {"data":"jq: error (at <stdin>:39): Cannot index string with string \"key\"","timestamp":"2026-04-06T22:52:17.171Z"}
+
+data: {"data":"OpenCode configuration finished.","timestamp":"2026-04-06T22:52:17.174Z"}
+
+data: {"data":"Configuring GitHub CLI authentication...","timestamp":"2026-04-06T22:52:17.174Z"}
+
+data: {"data":"unknown flag: --host","timestamp":"2026-04-06T22:52:17.206Z"}
+
+data: {"data":"","timestamp":"2026-04-06T22:52:17.206Z"}
+
+data: {"data":"Usage:  gh auth login [flags]","timestamp":"2026-04-06T22:52:17.206Z"}
+
+data: {"data":"","timestamp":"2026-04-06T22:52:17.206Z"}
+
+data: {"data":"Flags:","timestamp":"2026-04-06T22:52:17.206Z"}
+
+data: {"data":"  -c, --clipboard             Copy one-time OAuth device code to clipboard","timestamp":"2026-04-06T22:52:17.206Z"}
+
+data: {"data":"  -p, --git-protocol string   The protocol to use for git operations on this host: {ssh|https}","timestamp":"2026-04-06T22:52:17.206Z"}
+
+data: {"data":"  -h, --hostname string       The hostname of the GitHub instance to authenticate with","timestamp":"2026-04-06T22:52:17.206Z"}
+
+data: {"data":"      --insecure-storage      Save authentication credentials in plain text instead of credential store","timestamp":"2026-04-06T22:52:17.206Z"}
+
+data: {"data":"  -s, --scopes strings        Additional authentication scopes to request","timestamp":"2026-04-06T22:52:17.206Z"}
+
+data: {"data":"      --skip-ssh-key          Skip generate/upload SSH key prompt","timestamp":"2026-04-06T22:52:17.206Z"}
+
+data: {"data":"  -w, --web                   Open a browser to authenticate","timestamp":"2026-04-06T22:52:17.206Z"}
+
+data: {"data":"      --with-token            Read token from standard input","timestamp":"2026-04-06T22:52:17.206Z"}
+
+data: {"data":"  ","timestamp":"2026-04-06T22:52:17.206Z"}
+
+data: {"data":"GitHub CLI configuration finished.","timestamp":"2026-04-06T22:52:17.208Z"}
+
+data: {"data":"Starting application on port 7860...","timestamp":"2026-04-06T22:52:17.208Z"}
+
+data: {"data":"\u001b[36mINFO \u001b[0m \u001b[34m[Auth]\u001b[0m Generated new API key","timestamp":"2026-04-06T22:52:17.791Z"}
+
+data: {"data":"\u001b[36mINFO \u001b[0m \u001b[34m[Auth]\u001b[0m ","timestamp":"2026-04-06T22:52:17.792Z"}
+
+data: {"data":"╔═════════════════════════════════════════════════════════════════════╗","timestamp":"2026-04-06T22:52:17.792Z"}
+
+data: {"data":"║  🔐 API Key for Web Mode Authentication                             ║","timestamp":"2026-04-06T22:52:17.792Z"}
+
+data: {"data":"╠═════════════════════════════════════════════════════════════════════╣","timestamp":"2026-04-06T22:52:17.792Z"}
+
+data: {"data":"║                                                                     ║","timestamp":"2026-04-06T22:52:17.792Z"}
+
+data: {"data":"║  When accessing via browser, you'll be prompted to enter this key:  ║","timestamp":"2026-04-06T22:52:17.792Z"}
+
+data: {"data":"║                                                                     ║","timestamp":"2026-04-06T22:52:17.792Z"}
+
+data: {"data":"║  388f23b3-c037-40b4-b808-ca9ff26f914a                               ║","timestamp":"2026-04-06T22:52:17.792Z"}
+
+data: {"data":"║                                                                     ║","timestamp":"2026-04-06T22:52:17.792Z"}
+
+data: {"data":"║  In Electron mode, authentication is handled automatically.         ║","timestamp":"2026-04-06T22:52:17.792Z"}
+
+data: {"data":"║                                                                     ║","timestamp":"2026-04-06T22:52:17.792Z"}
+
+data: {"data":"║  Auto-login (AUTOMAKER_AUTO_LOGIN): enabled (auto-login active)     ║","timestamp":"2026-04-06T22:52:17.792Z"}
+
+data: {"data":"║                                                                     ║","timestamp":"2026-04-06T22:52:17.792Z"}
+
+data: {"data":"╠═════════════════════════════════════════════════════════════════════╣","timestamp":"2026-04-06T22:52:17.792Z"}
+
+data: {"data":"║  💡 Tips                                                            ║","timestamp":"2026-04-06T22:52:17.792Z"}
+
+data: {"data":"╠═════════════════════════════════════════════════════════════════════╣","timestamp":"2026-04-06T22:52:17.792Z"}
+
+data: {"data":"║  Set AUTOMAKER_API_KEY env var to use a fixed key                   ║","timestamp":"2026-04-06T22:52:17.792Z"}
+
+data: {"data":"║  Set AUTOMAKER_AUTO_LOGIN=true to skip the login prompt             ║","timestamp":"2026-04-06T22:52:17.792Z"}
+
+data: {"data":"╚═════════════════════════════════════════════════════════════════════╝","timestamp":"2026-04-06T22:52:17.792Z"}
+
+data: {"data":"","timestamp":"2026-04-06T22:52:17.792Z"}
+
+data: {"data":"[dotenv@17.2.3] injecting env (0) from .env -- tip: 🔐 encrypt with Dotenvx: https://dotenvx.com","timestamp":"2026-04-06T22:52:17.957Z"}
+
+data: {"data":"\u001b[36mINFO \u001b[0m \u001b[34m[Server]\u001b[0m [SERVER_STARTUP] process.env.DATA_DIR: /app/data","timestamp":"2026-04-06T22:52:17.957Z"}
+
+data: {"data":"\u001b[36mINFO \u001b[0m \u001b[34m[Server]\u001b[0m [SERVER_STARTUP] Resolved DATA_DIR: /app/data","timestamp":"2026-04-06T22:52:17.957Z"}
+
+data: {"data":"\u001b[36mINFO \u001b[0m \u001b[34m[Server]\u001b[0m [SERVER_STARTUP] process.cwd(): /app","timestamp":"2026-04-06T22:52:17.957Z"}
+
+data: {"data":"\u001b[36mINFO \u001b[0m \u001b[34m[Server]\u001b[0m ✓ ANTHROPIC_API_KEY detected","timestamp":"2026-04-06T22:52:17.957Z"}
+
+data: {"data":"[Security] ⚠️  ALLOWED_ROOT_DIRECTORY not set - allowing access to all paths","timestamp":"2026-04-06T22:52:17.957Z"}
+
+data: {"data":"[Security] ✓ DATA_DIR configured: /app/data","timestamp":"2026-04-06T22:52:17.957Z"}
+
+data: {"data":"\u001b[36mINFO \u001b[0m \u001b[34m[EventHooks]\u001b[0m Event hook service initialized","timestamp":"2026-04-06T22:52:17.961Z"}
+
+data: {"data":"\u001b[36mINFO \u001b[0m \u001b[34m[SettingsService]\u001b[0m Checking for legacy data migration from: /home/node/.config/Automaker","timestamp":"2026-04-06T22:52:17.961Z"}
+
+data: {"data":"\u001b[36mINFO \u001b[0m \u001b[34m[SettingsService]\u001b[0m Current data directory: /app/data","timestamp":"2026-04-06T22:52:17.962Z"}
+
+data: {"data":"/app/node_modules/path-to-regexp/dist/index.js:96","timestamp":"2026-04-06T22:52:17.981Z"}
+
+data: {"data":"            throw new PathError(`Missing parameter name at index ${index}`, str);","timestamp":"2026-04-06T22:52:17.981Z"}
+
+data: {"data":"                  ^","timestamp":"2026-04-06T22:52:17.981Z"}
+
+data: {"data":"","timestamp":"2026-04-06T22:52:17.981Z"}
+
+data: {"data":"PathError [TypeError]: Missing parameter name at index 1: *; visit https://git.new/pathToRegexpError for info","timestamp":"2026-04-06T22:52:17.981Z"}
+
+data: {"data":"    at name (/app/node_modules/path-to-regexp/dist/index.js:96:19)","timestamp":"2026-04-06T22:52:17.981Z"}
+
+data: {"data":"    at parse (/app/node_modules/path-to-regexp/dist/index.js:113:68)","timestamp":"2026-04-06T22:52:17.981Z"}
+
+data: {"data":"    at pathToRegexp (/app/node_modules/path-to-regexp/dist/index.js:267:58)","timestamp":"2026-04-06T22:52:17.981Z"}
+
+data: {"data":"    at Object.match (/app/node_modules/path-to-regexp/dist/index.js:237:30)","timestamp":"2026-04-06T22:52:17.981Z"}
+
+data: {"data":"    at matcher (/app/node_modules/router/lib/layer.js:86:23)","timestamp":"2026-04-06T22:52:17.981Z"}
+
+data: {"data":"    at new Layer (/app/node_modules/router/lib/layer.js:93:62)","timestamp":"2026-04-06T22:52:17.981Z"}
+
+data: {"data":"    at Function.route (/app/node_modules/router/index.js:428:17)","timestamp":"2026-04-06T22:52:17.981Z"}
+
+data: {"data":"    at Function.route (/app/node_modules/express/lib/application.js:257:22)","timestamp":"2026-04-06T22:52:17.981Z"}
+
+data: {"data":"    at app.<computed> [as get] (/app/node_modules/express/lib/application.js:478:22)","timestamp":"2026-04-06T22:52:17.981Z"}
+
+data: {"data":"    at file:///app/apps/server/dist/index.js:472:5 {","timestamp":"2026-04-06T22:52:17.981Z"}
+
+data: {"data":"  originalPath: '*'","timestamp":"2026-04-06T22:52:17.981Z"}
+
+data: {"data":"}","timestamp":"2026-04-06T22:52:17.981Z"}
+
+data: {"data":"","timestamp":"2026-04-06T22:52:17.981Z"}
+
+data: {"data":"Node.js v22.22.2","timestamp":"2026-04-06T22:52:17.981Z"}
+

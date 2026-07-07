@@ -51,6 +51,7 @@ export function getGitHubCliPaths(): string[] {
   return [
     '/opt/homebrew/bin/gh',
     '/usr/local/bin/gh',
+    '/usr/bin/gh',
     path.join(os.homedir(), '.local', 'bin', 'gh'),
     '/home/linuxbrew/.linuxbrew/bin/gh',
   ];

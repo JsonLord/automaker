@@ -80,10 +80,11 @@ RUN mkdir -p -m 755 /etc/apt/keyrings && \
 USER node
 
 # Copy built artifacts and dependencies from builder
+COPY --from=builder --chown=node:node /app/package*.json ./
+COPY --from=builder --chown=node:node /app/vitest.config.ts ./
 COPY --from=builder --chown=node:node /app/node_modules ./node_modules
 COPY --from=builder --chown=node:node /app/libs ./libs
-COPY --from=builder --chown=node:node /app/apps/server/dist ./apps/server/dist
-COPY --from=builder --chown=node:node /app/apps/server/package*.json ./apps/server/
+COPY --from=builder --chown=node:node /app/apps/server ./apps/server
 COPY --from=builder --chown=node:node /app/apps/ui/dist ./apps/ui/dist
 
 # Install Playwright Chromium

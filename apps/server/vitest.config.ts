@@ -7,7 +7,7 @@ export default defineConfig({
     reporters: ['verbose'],
     globals: true,
     environment: 'node',
-    setupFiles: ['./tests/setup.ts'],
+    setupFiles: ['./apps/server/tests/setup.ts'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html', 'lcov'],
@@ -35,7 +35,7 @@ export default defineConfig({
         statements: 60,
       },
     },
-    include: ['tests/**/*.test.ts', 'tests/**/*.spec.ts'],
+    include: ['apps/server/tests/**/*.test.ts', 'apps/server/tests/**/*.spec.ts'],
     exclude: ['**/node_modules/**', '**/dist/**'],
     mockReset: true,
     restoreMocks: true,

@@ -8,6 +8,7 @@
 import { Router } from 'express';
 import { createIndexHandler } from './routes/index.js';
 import { createEnvironmentHandler } from './routes/environment.js';
+import { createRunTestsHandler } from './routes/run-tests.js';
 
 /**
  * Create unauthenticated health routes (basic check only)

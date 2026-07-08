@@ -24,16 +24,27 @@ def main():
     # Set default feature model
     settings["defaultFeatureModel"] = {"model": model, "provider": "opencode"}
     
+    # Set phase models
+    if "phaseModels" not in settings:
+        settings["phaseModels"] = {}
+
+    settings["phaseModels"]["specGenerationModel"] = model
+    settings["phaseModels"]["planningModel"] = model
+    settings["phaseModels"]["implementationModel"] = model
+    settings["phaseModels"]["reviewModel"] = model
+    settings["phaseModels"]["ideationModel"] = model
+
     # Update active model in profiles if they exist
     if "profiles" in settings:
         for profile in settings["profiles"]:
             profile["model"] = model
+            profile["provider"] = "opencode"
 
     try:
         os.makedirs(data_dir, exist_ok=True)
         with open(settings_file, "w") as f:
             json.dump(settings, f, indent=2)
-        print(f"Updated settings with model {model}")
+        print(f"Updated settings with model {model} and forced all phases/profiles to use it via OpenCode")
     except Exception as e:
         print(f"Error writing settings: {e}")
 

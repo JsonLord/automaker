@@ -514,6 +514,10 @@ app.use('/api', authMiddleware);
 // Protected health endpoint with detailed info
 app.get('/api/health/detailed', createDetailedHandler());
 
+// Run tests on the deployment (protected)
+import { createRunTestsHandler } from './routes/health/routes/run-tests.js';
+app.get('/api/health/run-tests', createRunTestsHandler());
+
 app.use('/api/fs', createFsRoutes(events));
 app.use('/api/agent', createAgentRoutes(agentService, events));
 app.use('/api/sessions', createSessionsRoutes(agentService));

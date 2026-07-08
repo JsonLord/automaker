@@ -88,29 +88,9 @@ export class ProviderFactory {
     if (process.env.AUTOMAKER_MOCK_AGENT === 'true') {
       return 'claude' as ModelProvider; // Name only; getProviderForModel returns MockProvider
     }
-    const lowerModel = model.toLowerCase();
 
-    // Get all registered providers sorted by priority (descending)
-    const registrations = Array.from(providerRegistry.entries()).sort(
-      ([, a], [, b]) => (b.priority ?? 0) - (a.priority ?? 0)
-    );
-
-    // Check each provider's canHandleModel function
-    for (const [name, reg] of registrations) {
-      if (reg.canHandleModel?.(lowerModel)) {
-        return name as ModelProvider;
-      }
-    }
-
-    // Fallback: Check for explicit prefixes
-    for (const [name] of registrations) {
-      if (lowerModel.startsWith(`${name}-`)) {
-        return name as ModelProvider;
-      }
-    }
-
-    // Default to claude (first registered provider or claude)
-    return 'claude';
+    // Stick to opencode cli only as requested
+    return 'opencode' as ModelProvider;
   }
 
   /**
@@ -143,10 +123,10 @@ export class ProviderFactory {
     const provider = this.getProviderByName(providerName);
 
     if (!provider) {
-      // Fallback to claude if provider not found
-      const claudeReg = providerRegistry.get('claude');
-      if (claudeReg) {
-        return claudeReg.factory();
+      // Fallback to opencode if provider not found
+      const opencodeReg = providerRegistry.get('opencode');
+      if (opencodeReg) {
+        return opencodeReg.factory();
       }
       throw new Error(`No provider found for model: ${modelId}`);
     }
@@ -161,29 +141,9 @@ export class ProviderFactory {
     if (process.env.AUTOMAKER_MOCK_AGENT === 'true') {
       return 'claude';
     }
-    const lowerModel = modelId.toLowerCase();
 
-    // Get all registered providers sorted by priority (descending)
-    const registrations = Array.from(providerRegistry.entries()).sort(
-      ([, a], [, b]) => (b.priority ?? 0) - (a.priority ?? 0)
-    );
-
-    // Check each provider's canHandleModel function
-    for (const [name, reg] of registrations) {
-      if (reg.canHandleModel?.(lowerModel)) {
-        return name;
-      }
-    }
-
-    // Fallback: Check for explicit prefixes
-    for (const [name] of registrations) {
-      if (lowerModel.startsWith(`${name}-`)) {
-        return name;
-      }
-    }
-
-    // Default to claude (first registered provider or claude)
-    return 'claude';
+    // Stick to opencode cli only as requested
+    return 'opencode';
   }
 
   /**

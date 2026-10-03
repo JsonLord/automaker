@@ -32,13 +32,24 @@ export function createCloneHandler() {
       );
 
       // Validate repo URL is a valid GitHub URL
-      const githubUrlPattern = /^https:\/\/github\.com\/[\w-]+\/[\w.-]+$/;
+      const githubUrlPattern = /^https:\/\/github\.com\/[\w-]+\/[\w.-]+(\/tree\/[\w.-]+)?$/;
       if (!githubUrlPattern.test(repoUrl)) {
         res.status(400).json({
           success: false,
           error: 'Invalid GitHub repository URL',
         });
         return;
+      }
+
+      // Parse repo URL for branch information
+      let actualRepoUrl = repoUrl;
+      let branchName: string | null = null;
+
+      if (repoUrl.includes('/tree/')) {
+        const parts = repoUrl.split('/tree/');
+        actualRepoUrl = parts[0];
+        branchName = parts[1];
+        logger.info(`[Templates] Detected branch "${branchName}" from URL`);
       }
 
       // Sanitize project name (allow alphanumeric, dash, underscore)
@@ -118,14 +129,19 @@ export function createCloneHandler() {
         return;
       }
 
-      logger.info(`[Templates] Cloning ${repoUrl} to ${projectPath}`);
+      logger.info(`[Templates] Cloning ${actualRepoUrl} to ${projectPath}${branchName ? ` (branch: ${branchName})` : ''}`);
 
       // Clone the repository
       const cloneResult = await new Promise<{
         success: boolean;
         error?: string;
       }>((resolve) => {
-        const gitProcess = spawn('git', ['clone', repoUrl, projectPath], {
+        const cloneArgs = ['clone', actualRepoUrl, projectPath];
+        if (branchName) {
+          cloneArgs.push('-b', branchName);
+        }
+
+        const gitProcess = spawn('git', cloneArgs, {
           cwd: parentDir,
         });
 

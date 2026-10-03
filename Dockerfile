@@ -13,12 +13,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# Clone the repository
-ARG BRANCH_NAME=add-jules-cli-provider-5092951037381118710
-RUN git clone https://github.com/JsonLord/automaker.git . && \
-    git checkout $BRANCH_NAME
-
-# Copy local changes to include iterative fixes
+# Build exactly the checked-out source supplied as the Docker build context.
 COPY . .
 
 # Install all dependencies using the root package-lock.json
@@ -45,7 +40,7 @@ WORKDIR /app
 
 # Install git, curl, bash, python3 and tools
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    git curl bash ca-certificates openssh-client jq python3 wget \
+    git curl bash ca-certificates openssh-client jq python3 python3-venv python3-pip wget \
     # Playwright/Chromium dependencies
     libglib2.0-0 libnss3 libnspr4 libdbus-1-3 libatk1.0-0 libatk-bridge2.0-0 \
     libcups2 libdrm2 libxkbcommon0 libatspi2.0-0 libxcomposite1 libxdamage1 \
@@ -63,10 +58,20 @@ RUN mkdir -p /home/node/.local/bin && \
 
 USER node
 ENV HOME=/home/node
-ENV PATH="/home/node/.local/bin:/home/node/.opencode/bin:${PATH}"
+ENV PATH="/opt/argus/bin:/home/node/.local/bin:/home/node/.opencode/bin:${PATH}"
 
 # Install OpenCode CLI
 RUN curl -fsSL https://opencode.ai/install | bash
+
+# Microsoft ArgusAgent source release. Upgrade only by deliberately changing this immutable pin.
+ARG ARGUS_REVISION=v0.1.1
+USER root
+RUN python3 -m venv /opt/argus && \
+    /opt/argus/bin/pip install --no-cache-dir --upgrade pip && \
+    /opt/argus/bin/pip install --no-cache-dir \
+      "argus-skill @ https://github.com/microsoft/ArgusAgent/archive/${ARGUS_REVISION}.zip" && \
+    chown -R node:node /opt/argus
+USER node
 
 # Install GitHub CLI (gh)
 USER root
@@ -86,6 +91,7 @@ COPY --from=builder --chown=node:node /app/node_modules ./node_modules
 COPY --from=builder --chown=node:node /app/libs ./libs
 COPY --from=builder --chown=node:node /app/apps/server ./apps/server
 COPY --from=builder --chown=node:node /app/apps/ui/dist ./apps/ui/dist
+COPY --from=builder --chown=node:node /app/scripts ./scripts
 
 # Install Playwright Chromium
 RUN ./node_modules/.bin/playwright install chromium

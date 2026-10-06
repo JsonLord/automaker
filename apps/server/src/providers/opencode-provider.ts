@@ -1528,9 +1528,9 @@ export class OpencodeProvider extends CliProvider {
     this.ensureCliDetected();
 
     const installed = await this.isInstalled();
-    const compUrl = process.env.COMPATIBLE_URL;
-    const compModel = process.env.COMPATIBLE_MODEL;
-    const compApiKey = process.env.COMPATIBLE_API_KEY;
+    const compUrl = process.env.COMPATIBLE_URL || process.env.OPENAI_COMPATIBLE_URL || process.env.openai_compatible_url;
+    const compModel = process.env.COMPATIBLE_MODEL || process.env.OPENAI_COMPATIBLE_MODEL || process.env.openai_compatible_model;
+    const compApiKey = process.env.COMPATIBLE_API_KEY || process.env.OPENAI_COMPATIBLE_API_KEY || process.env.openai_compatible_api_key;
 
     const hasCompUrl = !!compUrl;
     const hasCompModel = !!compModel;

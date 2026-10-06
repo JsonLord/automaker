@@ -16,6 +16,11 @@ import { streamingQuery } from '../../providers/simple-query-service.js';
 import { generateFeaturesFromSpec } from './generate-features-from-spec.js';
 import { ensureAutomakerDir, getAppSpecPath } from '@automaker/platform';
 import type { SettingsService } from '../../services/settings-service.js';
+import { ensureArgusControlFiles } from '../../services/argus/project-lifecycle.js';
+import { argusService } from '../../services/argus/runtime.js';
+import { ArgusOrchestrator } from '../../services/argus/orchestrator.js';
+import { wakeAutonomousProject } from '../../services/argus/autonomy-runtime.js';
+import { FeatureLoader } from '../../services/feature-loader.js';
 import {
   getAutoLoadClaudeMdSetting,
   getPromptCustomization,
@@ -261,6 +266,20 @@ Your entire response should be valid JSON starting with { and ending with }. No 
   logger.info(`Content to save (${xmlContent.length} chars)`);
 
   await secureFs.writeFile(specPath, xmlContent);
+
+  // The legacy XML remains the UI/parser source; spec.md is the autonomous campaign source.
+  await ensureArgusControlFiles(projectPath, xmlContent, projectOverview);
+  const argusModel = process.env.COMPATIBLE_MODEL || 'opencode-default';
+  await argusService.start();
+  await argusService.createOrResolveProject({
+    projectId: projectPath,
+    projectPath,
+    model: argusModel,
+  });
+  await argusService.resumeProject(projectPath);
+  const wake = wakeAutonomousProject(projectPath, 'spec-generated');
+  if (wake) await wake;
+  else await new ArgusOrchestrator(argusService, new FeatureLoader()).reconcileProject(projectPath);
 
   // Verify the file was written
   const savedContent = await secureFs.readFile(specPath, 'utf-8');

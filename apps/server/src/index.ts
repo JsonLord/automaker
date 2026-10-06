@@ -93,6 +93,22 @@ import { createEventHistoryRoutes } from './routes/event-history/index.js';
 import { getEventHistoryService } from './services/event-history-service.js';
 import { getTestRunnerService } from './services/test-runner-service.js';
 import { createProjectsRoutes } from './routes/projects/index.js';
+import { argusService } from './services/argus/runtime.js';
+import { configureOpenCode } from './services/argus/opencode-config.js';
+import { discoverAndResumeArgusProjects } from './services/argus/startup.js';
+import { createArgusRoutes } from './routes/argus/index.js';
+import { JulesClient } from './services/argus/jules-client.js';
+import { JulesDeveloperAdapter } from './services/argus/jules-executor.js';
+import { GitHubCiObserver } from './services/argus/github-ci-observer.js';
+import { OpenCodeRoleRunner } from './services/argus/opencode-role-runner.js';
+import { MilestoneDOrchestrator } from './services/argus/milestone-d-orchestrator.js';
+import { GitSeniorWorktreeAdapter } from './services/argus/senior-worktree.js';
+import { GitIntegrationService } from './services/argus/git-integration-service.js';
+import { MilestoneEOrchestrator } from './services/argus/milestone-e-orchestrator.js';
+import { SpecRenewalService } from './services/argus/spec-renewal-service.js';
+import { ArgusOrchestrator } from './services/argus/orchestrator.js';
+import { ArgusAutonomyRunner } from './services/argus/autonomy-runner.js';
+import { setArgusAutonomyRunner } from './services/argus/autonomy-runtime.js';
 
 // Load environment variables
 dotenv.config();
@@ -105,6 +121,7 @@ logger.info('[SERVER_STARTUP] process.env.DATA_DIR:', process.env.DATA_DIR);
 logger.info('[SERVER_STARTUP] Resolved DATA_DIR:', DATA_DIR);
 logger.info('[SERVER_STARTUP] process.cwd():', process.cwd());
 const ENABLE_REQUEST_LOGGING_DEFAULT = process.env.ENABLE_REQUEST_LOGGING !== 'false'; // Default to true
+let argusAutonomyRunner: ArgusAutonomyRunner | undefined;
 
 // Runtime-configurable request logging flag (can be changed via settings)
 let requestLoggingEnabled = ENABLE_REQUEST_LOGGING_DEFAULT;
@@ -255,18 +272,20 @@ const app = express();
 
 // Move health checks to the top but DON'T intercept the root '/' which serves the UI
 app.get('/health', (_req, res) => res.status(200).json({ status: 'ok' }));
-app.get('/api-docs', (_req, res) => res.status(200).json({
-  message: 'Automaker API Documentation',
-  endpoints: [
-    { method: 'GET', path: '/health', purpose: 'Health Check' },
-    { method: 'GET', path: '/api-docs', purpose: 'API Documentation' },
-    { method: 'POST', path: '/api/auth/login', purpose: 'Login' },
-    { method: 'GET', path: '/api/projects', purpose: 'List projects' },
-    { method: 'GET', path: '/api/agent/chat', purpose: 'Chat with agent' },
-    { method: 'POST', path: '/api/features', purpose: 'Create feature' },
-    { method: 'GET', path: '/api/settings', purpose: 'Get settings' }
-  ]
-}));
+app.get('/api-docs', (_req, res) =>
+  res.status(200).json({
+    message: 'Automaker API Documentation',
+    endpoints: [
+      { method: 'GET', path: '/health', purpose: 'Health Check' },
+      { method: 'GET', path: '/api-docs', purpose: 'API Documentation' },
+      { method: 'POST', path: '/api/auth/login', purpose: 'Login' },
+      { method: 'GET', path: '/api/projects', purpose: 'List projects' },
+      { method: 'GET', path: '/api/agent/chat', purpose: 'Chat with agent' },
+      { method: 'POST', path: '/api/features', purpose: 'Create feature' },
+      { method: 'GET', path: '/api/settings', purpose: 'Get settings' },
+    ],
+  })
+);
 
 // Middleware
 // Custom colored logger showing only endpoint and status code (dynamically configurable)
@@ -502,7 +521,6 @@ app.use('/api', requireJsonContentType);
 const UI_DIST_PATH = path.resolve(__dirname, '../../../apps/ui/dist');
 app.use(express.static(UI_DIST_PATH));
 
-
 // Mount API routes - health, auth, and setup are unauthenticated
 app.use('/api/health', createHealthRoutes());
 app.use('/api/auth', createAuthRoutes());
@@ -552,12 +570,21 @@ app.use(
   '/api/projects',
   createProjectsRoutes(featureLoader, autoModeService, settingsService, notificationService)
 );
+app.use(
+  '/api/argus',
+  createArgusRoutes(argusService, async () => argusAutonomyRunner?.health())
+);
 
 // SPA Routing: Serve index.html for all non-API routes
 // Note: Express 5 requires named parameters for wildcards (e.g., :path*)
 app.use((req, res, next) => {
   // Skip API, health, and static files
-  if (req.path.startsWith('/api/') || req.path === '/health' || req.path === '/api-docs' || path.extname(req.path)) {
+  if (
+    req.path.startsWith('/api/') ||
+    req.path === '/health' ||
+    req.path === '/api-docs' ||
+    path.extname(req.path)
+  ) {
     return next();
   }
   res.sendFile(path.join(UI_DIST_PATH, 'index.html'));
@@ -963,7 +990,67 @@ const startServer = (port: number, host: string) => {
   });
 };
 
-startServer(PORT, HOST);
+async function startAutomaker() {
+  try {
+    await configureOpenCode();
+    await argusService.start();
+    const settings = await settingsService.getGlobalSettings();
+    const julesClient = process.env.JULES_API_KEY
+      ? new JulesClient(process.env.JULES_API_KEY)
+      : undefined;
+    const milestoneD = julesClient
+      ? new MilestoneDOrchestrator(
+          argusService,
+          featureLoader,
+          new GitHubCiObserver(),
+          julesClient,
+          new OpenCodeRoleRunner(),
+          new GitSeniorWorktreeAdapter()
+        )
+      : undefined;
+    const milestoneE = new MilestoneEOrchestrator(
+      argusService,
+      featureLoader,
+      new GitIntegrationService(new GitHubCiObserver()),
+      new SpecRenewalService(),
+      new ArgusOrchestrator(argusService, featureLoader)
+    );
+    const postPrReconcile = {
+      reconcile: async (projectPath: string) => {
+        await milestoneD?.reconcile(projectPath);
+        await milestoneE.reconcile(projectPath);
+      },
+    };
+    const julesExecutor = julesClient
+      ? new JulesDeveloperAdapter(julesClient, argusService, featureLoader, {
+          onPullRequest: (projectPath) =>
+            argusAutonomyRunner?.wake(projectPath, 'pull-request-created') ||
+            postPrReconcile.reconcile(projectPath),
+        })
+      : undefined;
+    await discoverAndResumeArgusProjects(
+      settings.projects || [],
+      argusService,
+      process.env.COMPATIBLE_MODEL || 'opencode-default'
+    );
+    argusAutonomyRunner = new ArgusAutonomyRunner(
+      argusService,
+      new ArgusOrchestrator(argusService, featureLoader),
+      julesExecutor,
+      milestoneD,
+      milestoneE
+    );
+    setArgusAutonomyRunner(argusAutonomyRunner);
+    for (const project of settings.projects || []) argusAutonomyRunner.register(project.path);
+    await argusAutonomyRunner.start();
+  } catch (error) {
+    // Argus failure is visible but must not make the existing interactive server unavailable.
+    logger.error('Argus startup failed:', error instanceof Error ? error.message : String(error));
+  }
+  startServer(PORT, HOST);
+}
+
+void startAutomaker();
 
 // Global error handlers to prevent crashes from uncaught errors
 process.on('unhandledRejection', (reason: unknown, _promise: Promise<unknown>) => {
@@ -1002,6 +1089,9 @@ const gracefulShutdown = async (signal: string) => {
   // This ensures they can be resumed when the server restarts
   // Note: markAllRunningFeaturesInterrupted handles errors internally and never rejects
   await autoModeService.markAllRunningFeaturesInterrupted(`${signal} signal received`);
+  argusAutonomyRunner?.stop();
+  setArgusAutonomyRunner(undefined);
+  await argusService.stop();
 
   terminalService.cleanup();
   server.close(() => {

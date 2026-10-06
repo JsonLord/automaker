@@ -38,6 +38,7 @@ function getProviderDisplayName(provider: OpenCodeProviderInfo): string {
 }
 
 export type OpencodeAuthMethod =
+  | 'compatible-provider' // COMPATIBLE_* environment variables
   | 'api_key_env' // ANTHROPIC_API_KEY or other provider env vars
   | 'api_key' // Manually stored API key
   | 'oauth' // OAuth authentication
@@ -55,6 +56,8 @@ export interface OpencodeAuthStatus {
 
 function getAuthMethodLabel(method: OpencodeAuthMethod): string {
   switch (method) {
+    case 'compatible-provider':
+      return 'Environment API Key (automaker-compatible)';
     case 'api_key':
       return 'API Key';
     case 'api_key_env':
@@ -255,8 +258,30 @@ export function OpencodeCliStatus({
               </div>
             </div>
 
-            {/* Authentication Status - consider both direct auth and provider auth */}
-            {authStatus?.authenticated || authenticatedProviders.length > 0 ? (
+            {/* Authentication Status - consider compatible-provider, direct auth, and dynamic providers */}
+            {status.authMode === 'compatible-provider' || authStatus?.method === 'compatible-provider' ? (
+              <div className="flex items-center gap-3 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+                <div className="w-10 h-10 rounded-xl bg-emerald-500/15 flex items-center justify-center border border-emerald-500/20 shrink-0">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-emerald-400">Ready</p>
+                  <div className="text-xs text-emerald-400/70 mt-1.5 space-y-0.5">
+                    <p>
+                      Provider: <span className="font-mono">{status.provider || 'automaker-compatible'}</span>
+                    </p>
+                    {status.model && (
+                      <p>
+                        Model: <span className="font-mono">{status.model}</span>
+                      </p>
+                    )}
+                    <p>
+                      Authentication: <span className="font-mono">Environment API key</span>
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : authStatus?.authenticated || authenticatedProviders.length > 0 ? (
               <div className="flex items-center gap-3 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
                 <div className="w-10 h-10 rounded-xl bg-emerald-500/15 flex items-center justify-center border border-emerald-500/20 shrink-0">
                   <CheckCircle2 className="w-5 h-5 text-emerald-500" />
@@ -276,6 +301,16 @@ export function OpencodeCliStatus({
                       </p>
                     ) : null}
                   </div>
+                </div>
+              </div>
+            ) : status.reason ? (
+              <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20">
+                <div className="w-10 h-10 rounded-xl bg-amber-500/15 flex items-center justify-center border border-amber-500/20 shrink-0 mt-0.5">
+                  <AlertCircle className="w-5 h-5 text-amber-500" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-amber-400">OpenCode Compatible Provider Incomplete</p>
+                  <p className="text-xs text-amber-400/70 mt-1">{status.reason}</p>
                 </div>
               </div>
             ) : (

@@ -284,6 +284,11 @@ export interface ProviderMessage {
  */
 export interface InstallationStatus {
   installed: boolean;
+  ready?: boolean;
+  authMode?: 'native' | 'compatible-provider' | 'none';
+  provider?: string;
+  model?: string;
+  reason?: string;
   path?: string;
   version?: string;
   /**

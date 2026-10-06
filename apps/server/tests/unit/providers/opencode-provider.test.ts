@@ -819,9 +819,15 @@ describe('opencode-provider.ts', () => {
   // detectInstallation Tests
   // ==========================================================================
 
-  describe('detectInstallation', () => {
+  describe('detectInstallation and auth modes', () => {
+    const originalEnv = process.env;
+
     beforeEach(() => {
-      // Ensure the mock implementation is set up for each test
+      process.env = { ...originalEnv };
+      delete process.env.COMPATIBLE_URL;
+      delete process.env.COMPATIBLE_MODEL;
+      delete process.env.COMPATIBLE_API_KEY;
+
       vi.mocked(getOpenCodeAuthIndicators).mockResolvedValue({
         hasAuthFile: false,
         hasOAuthToken: false,
@@ -829,43 +835,115 @@ describe('opencode-provider.ts', () => {
       });
     });
 
-    it('should return installed true when CLI is found', async () => {
-      (provider as unknown as { cliPath: string }).cliPath = '/usr/local/bin/opencode';
-      (provider as unknown as { detectedStrategy: string }).detectedStrategy = 'native';
-
-      const result = await provider.detectInstallation();
-
-      expect(result.installed).toBe(true);
-      expect(result.path).toBe('/usr/local/bin/opencode');
+    afterEach(() => {
+      process.env = originalEnv;
     });
 
-    it('should return installed false when CLI is not found', async () => {
-      // Set both cliPath to null and detectedStrategy to something other than 'native'
-      // to prevent ensureCliDetected from re-detecting
+    it('should handle CLI absent', async () => {
       (provider as unknown as { cliPath: string | null }).cliPath = null;
       (provider as unknown as { detectedStrategy: string }).detectedStrategy = 'npx';
 
       const result = await provider.detectInstallation();
 
       expect(result.installed).toBe(false);
+      expect(result.ready).toBe(false);
+      expect(result.authMode).toBe('none');
     });
 
-    it('should return method as npm when using npx strategy', async () => {
-      (provider as unknown as { cliPath: string }).cliPath = 'npx';
-      (provider as unknown as { detectedStrategy: string }).detectedStrategy = 'npx';
-
-      const result = await provider.detectInstallation();
-
-      expect(result.method).toBe('npm');
-    });
-
-    it('should return method as cli when using native strategy', async () => {
+    it('should handle CLI installed with no auth', async () => {
       (provider as unknown as { cliPath: string }).cliPath = '/usr/local/bin/opencode';
       (provider as unknown as { detectedStrategy: string }).detectedStrategy = 'native';
 
       const result = await provider.detectInstallation();
 
-      expect(result.method).toBe('cli');
+      expect(result.installed).toBe(true);
+      expect(result.ready).toBe(false);
+      expect(result.authMode).toBe('none');
+      expect(result.authenticated).toBe(false);
+    });
+
+    it('should handle native auth available', async () => {
+      (provider as unknown as { cliPath: string }).cliPath = '/usr/local/bin/opencode';
+      (provider as unknown as { detectedStrategy: string }).detectedStrategy = 'native';
+
+      vi.mocked(getOpenCodeAuthIndicators).mockResolvedValue({
+        hasAuthFile: true,
+        hasOAuthToken: true,
+        hasApiKey: false,
+      });
+
+      const result = await provider.detectInstallation();
+
+      expect(result.installed).toBe(true);
+      expect(result.ready).toBe(true);
+      expect(result.authMode).toBe('native');
+      expect(result.authenticated).toBe(true);
+    });
+
+    it('should handle compatible provider complete', async () => {
+      (provider as unknown as { cliPath: string }).cliPath = '/usr/local/bin/opencode';
+      (provider as unknown as { detectedStrategy: string }).detectedStrategy = 'native';
+
+      process.env.COMPATIBLE_URL = 'https://api.example.com/v1';
+      process.env.COMPATIBLE_MODEL = 'glm-4.7';
+      process.env.COMPATIBLE_API_KEY = 'secret-token-12345';
+
+      const result = await provider.detectInstallation();
+
+      expect(result.installed).toBe(true);
+      expect(result.ready).toBe(true);
+      expect(result.authMode).toBe('compatible-provider');
+      expect(result.provider).toBe('automaker-compatible');
+      expect(result.model).toBe('glm-4.7');
+      expect(result.authenticated).toBe(true);
+
+      // Verify secrets are never exposed in status object
+      expect(JSON.stringify(result)).not.toContain('secret-token-12345');
+    });
+
+    it('should handle compatible provider missing URL', async () => {
+      (provider as unknown as { cliPath: string }).cliPath = '/usr/local/bin/opencode';
+      (provider as unknown as { detectedStrategy: string }).detectedStrategy = 'native';
+
+      process.env.COMPATIBLE_MODEL = 'glm-4.7';
+      process.env.COMPATIBLE_API_KEY = 'secret-token-12345';
+
+      const result = await provider.detectInstallation();
+
+      expect(result.installed).toBe(true);
+      expect(result.ready).toBe(false);
+      expect(result.authMode).toBe('none');
+      expect(result.reason).toContain('COMPATIBLE_URL');
+    });
+
+    it('should handle compatible provider missing model', async () => {
+      (provider as unknown as { cliPath: string }).cliPath = '/usr/local/bin/opencode';
+      (provider as unknown as { detectedStrategy: string }).detectedStrategy = 'native';
+
+      process.env.COMPATIBLE_URL = 'https://api.example.com/v1';
+      process.env.COMPATIBLE_API_KEY = 'secret-token-12345';
+
+      const result = await provider.detectInstallation();
+
+      expect(result.installed).toBe(true);
+      expect(result.ready).toBe(false);
+      expect(result.authMode).toBe('none');
+      expect(result.reason).toContain('COMPATIBLE_MODEL');
+    });
+
+    it('should handle compatible provider missing API key', async () => {
+      (provider as unknown as { cliPath: string }).cliPath = '/usr/local/bin/opencode';
+      (provider as unknown as { detectedStrategy: string }).detectedStrategy = 'native';
+
+      process.env.COMPATIBLE_URL = 'https://api.example.com/v1';
+      process.env.COMPATIBLE_MODEL = 'glm-4.7';
+
+      const result = await provider.detectInstallation();
+
+      expect(result.installed).toBe(true);
+      expect(result.ready).toBe(false);
+      expect(result.authMode).toBe('none');
+      expect(result.reason).toContain('COMPATIBLE_API_KEY');
     });
   });
 

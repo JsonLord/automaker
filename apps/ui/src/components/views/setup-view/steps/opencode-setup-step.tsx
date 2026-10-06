@@ -30,6 +30,11 @@ interface OpencodeSetupStepProps {
 
 interface OpencodeCliStatus {
   installed: boolean;
+  ready?: boolean;
+  authMode?: string;
+  provider?: string;
+  model?: string;
+  reason?: string;
   version?: string | null;
   path?: string | null;
   auth?: {
@@ -62,11 +67,16 @@ export function OpencodeSetupStep({ onNext, onBack, onSkip }: OpencodeSetupStepP
           result.installCommands?.linux;
         const status: OpencodeCliStatus = {
           installed: result.installed ?? false,
+          ready: result.ready ?? (result.installed && (result.auth?.authenticated || false)),
+          authMode: result.authMode,
+          provider: result.provider,
+          model: result.model,
+          reason: result.reason,
           version: result.version ?? null,
           path: result.path ?? null,
           auth: result.auth,
           installCommand,
-          loginCommand: 'opencode auth login',
+          loginCommand: result.loginCommand,
         };
         setOpencodeCliStatus(status);
 
@@ -154,17 +164,17 @@ export function OpencodeSetupStep({ onNext, onBack, onSkip }: OpencodeSetupStepP
     }
   };
 
-  const isReady = opencodeCliStatus?.installed && opencodeCliStatus?.auth?.authenticated;
+  const isReady = opencodeCliStatus?.installed && (opencodeCliStatus?.ready ?? opencodeCliStatus?.auth?.authenticated);
 
   const getStatusBadge = () => {
     if (isChecking) {
       return <StatusBadge status="checking" label="Checking..." />;
     }
-    if (opencodeCliStatus?.auth?.authenticated) {
+    if (isReady) {
       return <StatusBadge status="authenticated" label="Ready" />;
     }
     if (opencodeCliStatus?.installed) {
-      return <StatusBadge status="unverified" label="Not Logged In" />;
+      return <StatusBadge status="unverified" label={opencodeCliStatus.reason ? "Incomplete" : "Not Logged In"} />;
     }
     return <StatusBadge status="not_installed" label="Not Installed" />;
   };
@@ -215,9 +225,13 @@ export function OpencodeSetupStep({ onNext, onBack, onSkip }: OpencodeSetupStepP
           </div>
           <CardDescription>
             {opencodeCliStatus?.installed
-              ? opencodeCliStatus.auth?.authenticated
-                ? `Authenticated via ${opencodeCliStatus.auth.method === 'api_key' ? 'API Key' : 'Browser Login'}${opencodeCliStatus.version ? ` (v${opencodeCliStatus.version})` : ''}`
-                : 'Installed but not authenticated'
+              ? opencodeCliStatus.authMode === 'compatible-provider'
+                ? `Ready via Automaker Compatible Provider (${opencodeCliStatus.model || 'configured'})`
+                : isReady
+                  ? `Authenticated via ${opencodeCliStatus.auth?.method === 'api_key' ? 'API Key' : opencodeCliStatus.auth?.method === 'compatible-provider' ? 'Environment API Key' : 'Browser Login'}${opencodeCliStatus.version ? ` (v${opencodeCliStatus.version})` : ''}`
+                  : opencodeCliStatus.reason
+                    ? opencodeCliStatus.reason
+                    : 'Installed but not authenticated'
               : 'Not installed on your system'}
           </CardDescription>
         </CardHeader>
@@ -280,55 +294,59 @@ export function OpencodeSetupStep({ onNext, onBack, onSkip }: OpencodeSetupStepP
             </div>
           )}
 
-          {/* Installed but not authenticated */}
+          {/* Installed but not ready */}
           {opencodeCliStatus?.installed &&
-            !opencodeCliStatus?.auth?.authenticated &&
+            !isReady &&
             !isChecking && (
               <div className="space-y-4">
                 <div className="flex items-start gap-3 p-4 rounded-lg bg-amber-500/10 border border-amber-500/20">
                   <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
                   <div className="flex-1">
-                    <p className="font-medium text-foreground">OpenCode CLI not authenticated</p>
+                    <p className="font-medium text-foreground">
+                      {opencodeCliStatus.reason ? 'OpenCode Compatible Provider Incomplete' : 'OpenCode CLI not authenticated'}
+                    </p>
                     <p className="text-sm text-muted-foreground mt-1">
-                      Run the login command to authenticate with OpenCode.
+                      {opencodeCliStatus.reason || 'Run the login command to authenticate with OpenCode.'}
                     </p>
                   </div>
                 </div>
 
-                <div className="space-y-3 p-4 rounded-lg bg-muted/30 border border-border">
-                  <p className="text-sm text-muted-foreground">
-                    Run the login command in your terminal, then complete authentication in your
-                    browser:
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <code className="flex-1 bg-muted px-3 py-2 rounded text-sm font-mono text-foreground">
-                      {opencodeCliStatus?.loginCommand || 'opencode auth login'}
-                    </code>
+                {opencodeCliStatus.loginCommand && (
+                  <div className="space-y-3 p-4 rounded-lg bg-muted/30 border border-border">
+                    <p className="text-sm text-muted-foreground">
+                      Run the login command in your terminal, then complete authentication in your
+                      browser:
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <code className="flex-1 bg-muted px-3 py-2 rounded text-sm font-mono text-foreground">
+                        {opencodeCliStatus.loginCommand}
+                      </code>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() =>
+                          copyCommand(opencodeCliStatus.loginCommand!)
+                        }
+                      >
+                        <Copy className="w-4 h-4" />
+                      </Button>
+                    </div>
                     <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() =>
-                        copyCommand(opencodeCliStatus?.loginCommand || 'opencode auth login')
-                      }
+                      onClick={handleLogin}
+                      disabled={isLoggingIn}
+                      className="w-full bg-brand-500 hover:bg-brand-600 text-white"
                     >
-                      <Copy className="w-4 h-4" />
+                      {isLoggingIn ? (
+                        <>
+                          <Spinner size="sm" variant="foreground" className="mr-2" />
+                          Waiting for login...
+                        </>
+                      ) : (
+                        'Copy Command & Wait for Login'
+                      )}
                     </Button>
                   </div>
-                  <Button
-                    onClick={handleLogin}
-                    disabled={isLoggingIn}
-                    className="w-full bg-brand-500 hover:bg-brand-600 text-white"
-                  >
-                    {isLoggingIn ? (
-                      <>
-                        <Spinner size="sm" variant="foreground" className="mr-2" />
-                        Waiting for login...
-                      </>
-                    ) : (
-                      'Copy Command & Wait for Login'
-                    )}
-                  </Button>
-                </div>
+                )}
               </div>
             )}
 

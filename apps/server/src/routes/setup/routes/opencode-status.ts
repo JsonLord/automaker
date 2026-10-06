@@ -4,6 +4,7 @@
 
 import type { Request, Response } from 'express';
 import { OpencodeProvider } from '../../../providers/opencode-provider.js';
+import { configureOpenCode } from '../../../services/argus/opencode-config.js';
 import { getErrorMessage, logError } from '../common.js';
 
 /**
@@ -16,32 +17,43 @@ export function createOpencodeStatusHandler() {
 
   return async (_req: Request, res: Response): Promise<void> => {
     try {
+      // Ensure managed OpenCode configuration is written before checking status
+      await configureOpenCode().catch(() => {});
+
       const provider = new OpencodeProvider();
       const status = await provider.detectInstallation();
 
-      // Derive auth method from authenticated status and API key presence
       let authMethod = 'none';
-      if (status.authenticated) {
+      if (status.authMode === 'compatible-provider') {
+        authMethod = 'compatible-provider';
+      } else if (status.authenticated) {
         authMethod = status.hasApiKey ? 'api_key_env' : 'cli_authenticated';
       }
+
+      const isManagedMode = status.authMode === 'compatible-provider' || !!status.reason;
 
       res.json({
         success: true,
         installed: status.installed,
+        ready: status.ready ?? (status.installed && (status.authenticated || false)),
+        authMode: status.authMode || 'none',
+        provider: status.provider || null,
+        model: status.model || null,
+        reason: status.reason || null,
         version: status.version || null,
         path: status.path || null,
         auth: {
           authenticated: status.authenticated || false,
           method: authMethod,
           hasApiKey: status.hasApiKey || false,
-          hasEnvApiKey: !!process.env.ANTHROPIC_API_KEY || !!process.env.OPENAI_API_KEY,
+          hasEnvApiKey: status.authMode === 'compatible-provider' || !!process.env.ANTHROPIC_API_KEY || !!process.env.OPENAI_API_KEY,
           hasOAuthToken: status.hasOAuthToken || false,
         },
-        recommendation: status.installed
-          ? undefined
-          : 'Install OpenCode CLI to use multi-provider AI models.',
+        recommendation: !status.installed
+          ? 'Install OpenCode CLI to use multi-provider AI models.'
+          : status.reason || undefined,
         installCommand,
-        loginCommand,
+        loginCommand: isManagedMode ? undefined : loginCommand,
         installCommands: {
           macos: installCommand,
           linux: installCommand,

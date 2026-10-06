@@ -4,6 +4,38 @@ import App from './app';
 import { AppErrorBoundary } from './components/ui/app-error-boundary';
 import { isMobileDevice, isPwaStandalone } from './lib/mobile-detect';
 
+// Automatically reload the page when Vite fails to preload a dynamic chunk
+// (e.g. when a new deployment updates asset hashes while a client session is active)
+if (typeof window !== 'undefined') {
+  window.addEventListener('vite:preloadError', (event) => {
+    event.preventDefault();
+    const reloadKey = 'automaker-chunk-reload-timestamp';
+    const lastReload = Number(sessionStorage.getItem(reloadKey) || 0);
+    const now = Date.now();
+    if (now - lastReload > 10_000) {
+      sessionStorage.setItem(reloadKey, String(now));
+      window.location.reload();
+    }
+  });
+
+  window.addEventListener('unhandledrejection', (event) => {
+    const reason = event.reason;
+    const message = reason instanceof Error ? reason.message : String(reason || '');
+    if (
+      message.includes('dynamically imported module') ||
+      message.includes('Importing a module script failed')
+    ) {
+      const reloadKey = 'automaker-chunk-reload-timestamp';
+      const lastReload = Number(sessionStorage.getItem(reloadKey) || 0);
+      const now = Date.now();
+      if (now - lastReload > 10_000) {
+        sessionStorage.setItem(reloadKey, String(now));
+        window.location.reload();
+      }
+    }
+  });
+}
+
 // Defensive fallback: index.html's inline script already applies data-pwa="standalone"
 // before first paint. This re-applies it in case the inline script failed (e.g.
 // CSP restrictions or unexpected errors). setAttribute is a no-op if already set.

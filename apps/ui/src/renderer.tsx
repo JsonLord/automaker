@@ -34,6 +34,20 @@ if (typeof window !== 'undefined') {
       }
     }
   });
+
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.addEventListener('message', (event) => {
+      if (event.data?.type === 'CHUNK_LOAD_ERROR') {
+        const reloadKey = 'automaker-chunk-reload-timestamp';
+        const lastReload = Number(sessionStorage.getItem(reloadKey) || 0);
+        const now = Date.now();
+        if (now - lastReload > 10_000) {
+          sessionStorage.setItem(reloadKey, String(now));
+          window.location.reload();
+        }
+      }
+    });
+  }
 }
 
 // Defensive fallback: index.html's inline script already applies data-pwa="standalone"

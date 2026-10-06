@@ -276,13 +276,56 @@ app.get('/api-docs', (_req, res) =>
   res.status(200).json({
     message: 'Automaker API Documentation',
     endpoints: [
-      { method: 'GET', path: '/health', purpose: 'Health Check' },
-      { method: 'GET', path: '/api-docs', purpose: 'API Documentation' },
-      { method: 'POST', path: '/api/auth/login', purpose: 'Login' },
-      { method: 'GET', path: '/api/projects', purpose: 'List projects' },
-      { method: 'GET', path: '/api/agent/chat', purpose: 'Chat with agent' },
-      { method: 'POST', path: '/api/features', purpose: 'Create feature' },
-      { method: 'GET', path: '/api/settings', purpose: 'Get settings' },
+      {
+        method: 'GET',
+        path: '/health',
+        purpose: 'Check server health and readiness',
+        request: {},
+        response: { status: 'ok' },
+      },
+      {
+        method: 'GET',
+        path: '/api-docs',
+        purpose: 'Document all available API endpoints',
+        request: {},
+        response: { message: 'Automaker API Documentation', endpoints: [] },
+      },
+      {
+        method: 'GET',
+        path: '/api/projects',
+        purpose: 'List all configured projects',
+        request: {},
+        response: {
+          projects: [
+            { id: 'project-1', name: 'My Project', path: '/app/data/projects/my-project' },
+          ],
+        },
+      },
+      {
+        method: 'POST',
+        path: '/api/agent/chat',
+        purpose: 'Send a message to the AI agent',
+        request: { message: 'Hello agent', projectPath: '/app/data/projects/my-project' },
+        response: { sessionId: 'session-123', status: 'started' },
+      },
+      {
+        method: 'POST',
+        path: '/api/features',
+        purpose: 'Create a new feature card on the Kanban board',
+        request: {
+          title: 'New Feature',
+          description: 'Implement feature details',
+          projectPath: '/app/data/projects/my-project',
+        },
+        response: { id: 'feat-123', title: 'New Feature', status: 'backlog' },
+      },
+      {
+        method: 'GET',
+        path: '/api/settings',
+        purpose: 'Get global application settings',
+        request: {},
+        response: { theme: 'dark', concurrentAgents: 3 },
+      },
     ],
   })
 );

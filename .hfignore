@@ -1,0 +1,13 @@
+.git/
+.planning/
+.claude/
+node_modules/
+apps/*/node_modules/
+libs/*/node_modules/
+apps/ui/dist/
+apps/server/dist/
+libs/*/dist/
+data/
+*.log
+run_logs*.txt
+diag_logs.txt

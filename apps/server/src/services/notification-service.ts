@@ -180,21 +180,23 @@ export class NotificationService {
    */
   async markAsRead(projectPath: string, notificationId: string): Promise<Notification | null> {
     const notificationsPath = getNotificationsPath(projectPath);
-    const file = await readJsonFile<NotificationsFile>(
-      notificationsPath,
-      DEFAULT_NOTIFICATIONS_FILE
-    );
+    return withFileLock(notificationsPath, async () => {
+      const file = await readJsonFile<NotificationsFile>(
+        notificationsPath,
+        DEFAULT_NOTIFICATIONS_FILE
+      );
 
-    const notification = file.notifications.find((n) => n.id === notificationId);
-    if (!notification) {
-      return null;
-    }
+      const notification = file.notifications.find((n) => n.id === notificationId);
+      if (!notification) {
+        return null;
+      }
 
-    notification.read = true;
-    await atomicWriteJson(notificationsPath, file);
+      notification.read = true;
+      await atomicWriteJson(notificationsPath, file);
 
-    logger.info(`Marked notification ${notificationId} as read`);
-    return notification;
+      logger.info(`Marked notification ${notificationId} as read`);
+      return notification;
+    });
   }
 
   /**
@@ -205,25 +207,27 @@ export class NotificationService {
    */
   async markAllAsRead(projectPath: string): Promise<number> {
     const notificationsPath = getNotificationsPath(projectPath);
-    const file = await readJsonFile<NotificationsFile>(
-      notificationsPath,
-      DEFAULT_NOTIFICATIONS_FILE
-    );
+    return withFileLock(notificationsPath, async () => {
+      const file = await readJsonFile<NotificationsFile>(
+        notificationsPath,
+        DEFAULT_NOTIFICATIONS_FILE
+      );
 
-    let count = 0;
-    for (const notification of file.notifications) {
-      if (!notification.read && !notification.dismissed) {
-        notification.read = true;
-        count++;
+      let count = 0;
+      for (const notification of file.notifications) {
+        if (!notification.read && !notification.dismissed) {
+          notification.read = true;
+          count++;
+        }
       }
-    }
 
-    if (count > 0) {
-      await atomicWriteJson(notificationsPath, file);
-      logger.info(`Marked ${count} notifications as read`);
-    }
+      if (count > 0) {
+        await atomicWriteJson(notificationsPath, file);
+        logger.info(`Marked ${count} notifications as read`);
+      }
 
-    return count;
+      return count;
+    });
   }
 
   /**
@@ -235,21 +239,23 @@ export class NotificationService {
    */
   async dismissNotification(projectPath: string, notificationId: string): Promise<boolean> {
     const notificationsPath = getNotificationsPath(projectPath);
-    const file = await readJsonFile<NotificationsFile>(
-      notificationsPath,
-      DEFAULT_NOTIFICATIONS_FILE
-    );
+    return withFileLock(notificationsPath, async () => {
+      const file = await readJsonFile<NotificationsFile>(
+        notificationsPath,
+        DEFAULT_NOTIFICATIONS_FILE
+      );
 
-    const notification = file.notifications.find((n) => n.id === notificationId);
-    if (!notification) {
-      return false;
-    }
+      const notification = file.notifications.find((n) => n.id === notificationId);
+      if (!notification) {
+        return false;
+      }
 
-    notification.dismissed = true;
-    await atomicWriteJson(notificationsPath, file);
+      notification.dismissed = true;
+      await atomicWriteJson(notificationsPath, file);
 
-    logger.info(`Dismissed notification ${notificationId}`);
-    return true;
+      logger.info(`Dismissed notification ${notificationId}`);
+      return true;
+    });
   }
 
   /**
@@ -260,25 +266,27 @@ export class NotificationService {
    */
   async dismissAll(projectPath: string): Promise<number> {
     const notificationsPath = getNotificationsPath(projectPath);
-    const file = await readJsonFile<NotificationsFile>(
-      notificationsPath,
-      DEFAULT_NOTIFICATIONS_FILE
-    );
+    return withFileLock(notificationsPath, async () => {
+      const file = await readJsonFile<NotificationsFile>(
+        notificationsPath,
+        DEFAULT_NOTIFICATIONS_FILE
+      );
 
-    let count = 0;
-    for (const notification of file.notifications) {
-      if (!notification.dismissed) {
-        notification.dismissed = true;
-        count++;
+      let count = 0;
+      for (const notification of file.notifications) {
+        if (!notification.dismissed) {
+          notification.dismissed = true;
+          count++;
+        }
       }
-    }
 
-    if (count > 0) {
-      await atomicWriteJson(notificationsPath, file);
-      logger.info(`Dismissed ${count} notifications`);
-    }
+      if (count > 0) {
+        await atomicWriteJson(notificationsPath, file);
+        logger.info(`Dismissed ${count} notifications`);
+      }
 
-    return count;
+      return count;
+    });
   }
 }
 

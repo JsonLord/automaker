@@ -369,7 +369,7 @@ export class OpencodeProvider extends CliProvider {
       let cliModel = model;
 
       if (!model.includes('/')) {
-        const compModel = process.env.COMPATIBLE_MODEL || process.env.OPENAI_COMPATIBLE_MODEL || process.env.openai_compatible_model;
+        const compModel = process.env.COMPATIBLE_MODEL;
         if (compModel && (model === compModel || model === `automaker-compatible/${compModel}`)) {
           cliModel = `automaker-compatible/${compModel}`;
         } else {
@@ -1548,9 +1548,9 @@ export class OpencodeProvider extends CliProvider {
     this.ensureCliDetected();
 
     const installed = await this.isInstalled();
-    const compUrl = process.env.COMPATIBLE_URL || process.env.OPENAI_COMPATIBLE_URL || process.env.openai_compatible_url;
-    const compModel = process.env.COMPATIBLE_MODEL || process.env.OPENAI_COMPATIBLE_MODEL || process.env.openai_compatible_model;
-    const compApiKey = process.env.COMPATIBLE_API_KEY || process.env.OPENAI_COMPATIBLE_API_KEY || process.env.openai_compatible_api_key;
+    const compUrl = process.env.COMPATIBLE_URL;
+    const compModel = process.env.COMPATIBLE_MODEL;
+    const compApiKey = process.env.COMPATIBLE_API_KEY;
 
     const hasCompUrl = !!compUrl;
     const hasCompModel = !!compModel;

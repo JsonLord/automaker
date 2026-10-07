@@ -36,6 +36,8 @@ fi
 
 [ -z "$COMPATIBLE_API_KEY" ] && [ -n "$OPENAI_COMPATIBLE_API_KEY" ] && export COMPATIBLE_API_KEY="$OPENAI_COMPATIBLE_API_KEY"
 [ -z "$COMPATIBLE_API_KEY" ] && [ -n "$openai_compatible_api_key" ] && export COMPATIBLE_API_KEY="$openai_compatible_api_key"
+[ -z "$COMPATIBLE_API_KEY" ] && [ -n "$OPENAI_COMPATIBLE_API" ] && export COMPATIBLE_API_KEY="$OPENAI_COMPATIBLE_API"
+[ -z "$COMPATIBLE_API_KEY" ] && [ -n "$openai_compatible_api" ] && export COMPATIBLE_API_KEY="$openai_compatible_api"
 
 export COMPATIBLE_URL COMPATIBLE_MODEL COMPATIBLE_API_KEY
 

@@ -8,14 +8,19 @@ import path from 'path';
 import * as secureFs from '../../../lib/secure-fs.js';
 import { PathNotAllowedError } from '@automaker/platform';
 import { logger, getErrorMessage, logError } from '../common.js';
+import { bootstrapStarterProject } from '../../../services/bootstrap-starter-project.js';
+import { argusService } from '../../../services/argus/runtime.js';
+import { getArgusAutonomyRunner } from '../../../services/argus/autonomy-runtime.js';
+import type { SettingsService } from '../../../services/settings-service.js';
 
-export function createCloneHandler() {
+export function createCloneHandler(settingsService?: SettingsService) {
   return async (req: Request, res: Response): Promise<void> => {
     try {
-      const { repoUrl, projectName, parentDir } = req.body as {
+      const { repoUrl, projectName, parentDir, overview } = req.body as {
         repoUrl: string;
         projectName: string;
         parentDir: string;
+        overview?: string;
       };
 
       // Validate inputs
@@ -207,10 +212,30 @@ export function createCloneHandler() {
 
       logger.info(`[Templates] Successfully cloned template to ${projectPath}`);
 
+      // Bootstrap starter project (spec.md, ARGUS.md, argus.yaml, baseline commit, Argus registration & wake)
+      const projectId = `project-${sanitizedName}-${Date.now()}`;
+      try {
+        await bootstrapStarterProject({
+          projectPath,
+          projectId,
+          projectName: sanitizedName,
+          projectOverview: overview,
+          templateSource: actualRepoUrl,
+          templateBranch: branchName || undefined,
+          argusService,
+          autonomyRunner: getArgusAutonomyRunner(),
+          settingsService,
+        });
+      } catch (bootstrapError) {
+        logger.error('[Templates] Error during starter project bootstrap:', bootstrapError);
+        // Continue and return project info even if bootstrap experienced partial error
+      }
+
       res.json({
         success: true,
         projectPath,
         projectName: sanitizedName,
+        projectId,
       });
     } catch (error) {
       logError(error, 'Clone template failed');

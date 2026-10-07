@@ -208,16 +208,20 @@ export class JulesDeveloperAdapter implements DeveloperExecutor {
   }
   private prompt(task: ArgusTaskState, git: GitDispatchContext) {
     return [
-      `Objective: ${task.objective}`,
+      `Stable objective:\n${task.objective}`,
+      `Current bounded task:\n${task.title} - ${task.description}`,
       `Repository: ${git.repository}`,
       `Starting branch: ${git.baseBranch}`,
       `Base remote SHA: ${git.baseRemoteSha}`,
-      `Description: ${task.description}`,
       `Acceptance criteria:\n- ${task.acceptanceCriteria.join('\n- ')}`,
       `Evidence required:\n- ${task.evidenceRequired.join('\n- ')}`,
-      'Respect the repository architecture and ARGUS.md constraints.',
-      'Commit the implementation and create a pull request.',
-      'Do not deploy, release, or publish anything. Do not modify ARGUS.md.',
+      'Instructions for Executor:',
+      '- Do not redefine ARGUS.md.',
+      '- Do not edit .automaker/argus-state.json.',
+      '- Only change spec.md if the orchestration task explicitly grants spec authority.',
+      '- Respect the repository architecture and ARGUS.md constraints.',
+      '- Commit the implementation and create a pull request.',
+      '- Do not deploy, release, or publish anything.',
     ].join('\n\n');
   }
 }

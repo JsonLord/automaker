@@ -678,11 +678,28 @@ class DevServerService {
    * Detect the package manager used in a directory
    */
   private async detectPackageManager(dir: string): Promise<'npm' | 'yarn' | 'pnpm' | 'bun' | null> {
-    if (await this.fileExists(path.join(dir, 'bun.lockb'))) return 'bun';
+    const pkgJsonPath = path.join(dir, 'package.json');
+    if (await this.fileExists(pkgJsonPath)) {
+      try {
+        const raw = (await secureFs.readFile(pkgJsonPath, 'utf8')).toString();
+        const pkg = JSON.parse(raw);
+        if (typeof pkg.packageManager === 'string') {
+          const pm = pkg.packageManager.toLowerCase();
+          if (pm.startsWith('pnpm')) return 'pnpm';
+          if (pm.startsWith('yarn')) return 'yarn';
+          if (pm.startsWith('bun')) return 'bun';
+          if (pm.startsWith('npm')) return 'npm';
+        }
+      } catch {
+        // Fall through to lockfile detection
+      }
+    }
+
     if (await this.fileExists(path.join(dir, 'pnpm-lock.yaml'))) return 'pnpm';
     if (await this.fileExists(path.join(dir, 'yarn.lock'))) return 'yarn';
+    if (await this.fileExists(path.join(dir, 'bun.lockb'))) return 'bun';
     if (await this.fileExists(path.join(dir, 'package-lock.json'))) return 'npm';
-    if (await this.fileExists(path.join(dir, 'package.json'))) return 'npm'; // Default
+    if (await this.fileExists(pkgJsonPath)) return 'npm'; // Default
     return null;
   }
 
@@ -690,19 +707,38 @@ class DevServerService {
    * Get the dev script command for a directory
    */
   private async getDevCommand(dir: string): Promise<{ cmd: string; args: string[] } | null> {
+    const pkgJsonPath = path.join(dir, 'package.json');
+    let scriptName = 'dev';
+
+    if (await this.fileExists(pkgJsonPath)) {
+      try {
+        const raw = (await secureFs.readFile(pkgJsonPath, 'utf8')).toString();
+        const pkg = JSON.parse(raw);
+        const scripts = pkg.scripts || {};
+        if (!scripts.dev && scripts.start) {
+          scriptName = 'start';
+        } else if (!scripts.dev && !scripts.start && Object.keys(scripts).length === 0) {
+          logger.info(`[DevServer] No dev or start script found in package.json at ${dir}`);
+          return null;
+        }
+      } catch {
+        // Continue with default 'dev'
+      }
+    }
+
     const pm = await this.detectPackageManager(dir);
     if (!pm) return null;
 
     switch (pm) {
       case 'bun':
-        return { cmd: 'bun', args: ['run', 'dev'] };
+        return { cmd: 'bun', args: ['run', scriptName] };
       case 'pnpm':
-        return { cmd: 'pnpm', args: ['run', 'dev'] };
+        return { cmd: 'pnpm', args: ['run', scriptName] };
       case 'yarn':
-        return { cmd: 'yarn', args: ['dev'] };
+        return { cmd: 'yarn', args: [scriptName] };
       case 'npm':
       default:
-        return { cmd: 'npm', args: ['run', 'dev'] };
+        return { cmd: 'npm', args: ['run', scriptName] };
     }
   }
 

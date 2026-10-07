@@ -38,9 +38,9 @@ FROM node:22-slim
 
 WORKDIR /app
 
-# Install git, curl, bash, python3 and tools
+# Install git, curl, bash, python3, lsof, procps and tools
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    git curl bash ca-certificates openssh-client jq python3 python3-venv python3-pip wget \
+    git curl bash ca-certificates openssh-client jq python3 python3-venv python3-pip wget lsof procps \
     # Playwright/Chromium dependencies
     libglib2.0-0 libnss3 libnspr4 libdbus-1-3 libatk1.0-0 libatk-bridge2.0-0 \
     libcups2 libdrm2 libxkbcommon0 libatspi2.0-0 libxcomposite1 libxdamage1 \
@@ -49,6 +49,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxshmfence1 libgtk-3-0 libexpat1 libfontconfig1 fonts-liberation \
     xdg-utils libpangocairo-1.0-0 libpangoft2-1.0-0 libu2f-udev libvulkan1 \
     && rm -rf /var/lib/apt/lists/*
+
+# Enable corepack and prepare pnpm
+RUN corepack enable && (corepack prepare pnpm@latest --activate || npm install -g pnpm --force)
 
 # node:slim image already has a 'node' user with UID 1000
 # Ensure node user can write to /app and has a proper home

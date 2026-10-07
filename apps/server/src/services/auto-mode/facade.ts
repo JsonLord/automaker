@@ -97,6 +97,15 @@ export class AutoModeServiceFacade {
     branchName: string | null,
     primaryBranch: string | null
   ): boolean {
+    // Skip features owned by Argus autonomy to prevent generic Auto Mode double-execution
+    if (
+      feature.category === 'Argus' ||
+      feature.orchestrator === 'argus' ||
+      feature.executionOwner === 'argus-autonomy'
+    ) {
+      return false;
+    }
+
     const isEligibleStatus =
       feature.status === 'backlog' ||
       feature.status === 'ready' ||

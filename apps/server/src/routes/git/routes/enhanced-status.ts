@@ -69,11 +69,26 @@ export function createEnhancedStatusHandler() {
       }
 
       try {
-        // Get current branch
-        const { stdout: branchRaw } = await execAsync('git rev-parse --abbrev-ref HEAD', {
-          cwd: projectPath,
-        });
-        const branch = branchRaw.trim();
+        let branch = 'main';
+        let hasHead = false;
+
+        try {
+          const { stdout: branchRaw } = await execAsync('git symbolic-ref --short HEAD', {
+            cwd: projectPath,
+          }).catch(async () => {
+            return await execAsync('git rev-parse --abbrev-ref HEAD', { cwd: projectPath });
+          });
+          branch = branchRaw.trim();
+        } catch {
+          branch = 'main';
+        }
+
+        try {
+          await execAsync('git rev-parse --verify HEAD', { cwd: projectPath });
+          hasHead = true;
+        } catch {
+          hasHead = false;
+        }
 
         // Get porcelain status for all files
         const { stdout: statusOutput } = await execAsync('git status --porcelain', {
@@ -82,21 +97,23 @@ export function createEnhancedStatusHandler() {
 
         // Get diff numstat for working tree changes
         let workTreeStats: Record<string, { added: number; removed: number }> = {};
-        try {
-          const { stdout: numstatRaw } = await execAsync('git diff --numstat', {
-            cwd: projectPath,
-            maxBuffer: 10 * 1024 * 1024,
-          });
-          for (const line of numstatRaw.trim().split('\n').filter(Boolean)) {
-            const parts = line.split('\t');
-            if (parts.length >= 3) {
-              const added = parseInt(parts[0], 10) || 0;
-              const removed = parseInt(parts[1], 10) || 0;
-              workTreeStats[parts[2]] = { added, removed };
+        if (hasHead) {
+          try {
+            const { stdout: numstatRaw } = await execAsync('git diff --numstat', {
+              cwd: projectPath,
+              maxBuffer: 10 * 1024 * 1024,
+            });
+            for (const line of numstatRaw.trim().split('\n').filter(Boolean)) {
+              const parts = line.split('\t');
+              if (parts.length >= 3) {
+                const added = parseInt(parts[0], 10) || 0;
+                const removed = parseInt(parts[1], 10) || 0;
+                workTreeStats[parts[2]] = { added, removed };
+              }
             }
+          } catch {
+            // Ignore
           }
-        } catch {
-          // Ignore
         }
 
         // Get diff numstat for staged changes
@@ -162,11 +179,13 @@ export function createEnhancedStatusHandler() {
         res.json({
           success: true,
           branch,
+          hasHead,
+          initialized: true,
           files,
         });
       } catch (innerError) {
-        logError(innerError, 'Git enhanced status failed');
-        res.json({ success: true, branch: '', files: [] });
+        logError(innerError, 'Git status on fresh or non-standard repo');
+        res.json({ success: true, branch: 'main', hasHead: false, initialized: true, files: [] });
       }
     } catch (error) {
       logError(error, 'Get enhanced status failed');

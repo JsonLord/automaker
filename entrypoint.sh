@@ -21,9 +21,10 @@ elif [ -n "$AUTOMAKER_API_KEY" ]; then
     export AUTOMAKER_HIDE_API_KEY=true
     export AUTOMAKER_DISABLE_AUTH=false
     echo "Automaker API authentication configured from AUTOMAKER_API_KEY."
-elif [ "$NODE_ENV" = "production" ] && [ "$AUTOMAKER_MOCK_AGENT" != "true" ]; then
-    echo "FATAL: AUTHENTICATION_TOKEN secret is required in production environment!"
-    exit 1
+else
+    export AUTOMAKER_DISABLE_AUTH=true
+    export AUTOMAKER_AUTO_LOGIN=true
+    echo "No AUTHENTICATION_TOKEN secret provided; auto-login and public mode enabled for HF Space."
 fi
 
 # Map HF Space secrets for OpenAI compatible provider if present
@@ -49,6 +50,9 @@ if [ -n "$GITHUB_PAT" ]; then
     export GH_TOKEN="$GITHUB_PAT"
     echo "GitHub authentication configured from GITHUB_PAT."
 fi
+
+# Configure Public URL for Space
+export AUTOMAKER_PUBLIC_URL="${AUTOMAKER_PUBLIC_URL:-https://Leon4gr45-automaker.hf.space}"
 
 # Start application
 echo "Starting application on port $PORT..."

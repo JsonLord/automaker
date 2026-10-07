@@ -272,8 +272,10 @@ const app = express();
 
 // Move health checks to the top but DON'T intercept the root '/' which serves the UI
 app.get('/health', (_req, res) => res.status(200).json({ status: 'ok' }));
-app.get('/api-docs', (_req, res) => {
-  const publicUrl = process.env.AUTOMAKER_PUBLIC_URL || 'https://leon4gr45-twenty.hf.space';
+app.get('/api-docs', (req, res) => {
+  const host = req.get('host');
+  const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+  const publicUrl = process.env.AUTOMAKER_PUBLIC_URL || (host ? `${protocol}://${host}` : 'https://Leon4gr45-automaker.hf.space');
   res.status(200).json({
     message: 'Automaker API Documentation',
     baseUrl: publicUrl,

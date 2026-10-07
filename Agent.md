@@ -6,8 +6,8 @@ This file serves as a guide for further agents regarding deployment best practic
 
 ### Target Space
 - **Profile:** `Leon4gr45`
-- **Space:** `twenty`
-- **Full Identifier:** `Leon4gr45/twenty`
+- **Space:** `automaker`
+- **Full Identifier:** `Leon4gr45/automaker`
 - **Frontend Port:** `7860` (mandatory for all Hugging Face Spaces)
 
 ### Deployment Method
@@ -37,7 +37,7 @@ This file serves as a guide for further agents regarding deployment best practic
 
 ### Mandatory Endpoints
 - **`/health`**: Returns HTTP 200 when ready. Required for Hugging Face to transition the Space from starting to running.
-- **`/api-docs`**: Documents all available API endpoints. Reachable at: `https://Leon4gr45-twenty.hf.space/api-docs`
+- **`/api-docs`**: Documents all available API endpoints. Reachable at: `https://Leon4gr45-automaker.hf.space/api-docs`
 
 ### Functional Endpoints
 
@@ -164,18 +164,18 @@ Precondition: Use the huggingface hub cli `hf` to check that the space is empty 
 ### Standard Deployment Command
 After any code change, run:
 ```bash
-hf upload Leon4gr45/twenty . --repo-type=space --token <HF_TOKEN>
+hf upload Leon4gr45/automaker . --repo-type=space --token <HF_TOKEN>
 ```
 
 ### Monitoring Logs
 Scan build and run logs:
 - Get build logs (SSE):
 ```bash
-curl -N -H "Authorization: Bearer <HF_TOKEN>" "https://huggingface.co/api/spaces/Leon4gr45/twenty/logs/build"
+curl -N -H "Authorization: Bearer <HF_TOKEN>" "https://huggingface.co/api/spaces/Leon4gr45/automaker/logs/build"
 ```
 - Get run logs (SSE) once the build logs succeed:
 ```bash
-curl -N -H "Authorization: Bearer <HF_TOKEN>" "https://huggingface.co/api/spaces/Leon4gr45/twenty/logs/run"
+curl -N -H "Authorization: Bearer <HF_TOKEN>" "https://huggingface.co/api/spaces/Leon4gr45/automaker/logs/run"
 ```
 
 Monitor for 300 seconds to see if the deployment has been successful. If any logs indicate failure, fix these issues in the codebase via code modifications, redeploy, and monitor again until the space is running and reacts to API endpoints.

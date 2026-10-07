@@ -71,6 +71,12 @@ export function resolveModelString(
     console.log(`[ModelResolver] Migrated legacy ID: "${modelKey}" -> "${canonicalKey}"`);
   }
 
+  // Automaker Compatible model (e.g., "automaker-compatible/MiniMax-M2.7")
+  if (canonicalKey.startsWith('automaker-compatible/')) {
+    console.log(`[ModelResolver] Using Automaker Compatible model: ${canonicalKey}`);
+    return canonicalKey;
+  }
+
   // Cursor model with explicit prefix (e.g., "cursor-auto", "cursor-composer-1")
   // Pass through unchanged - provider will extract bare ID for CLI
   if (canonicalKey.startsWith(PROVIDER_PREFIXES.cursor)) {

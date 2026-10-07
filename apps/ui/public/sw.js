@@ -393,6 +393,18 @@ self.addEventListener('fetch', (event) => {
           return fetch(event.request).then((networkResponse) => {
             if (networkResponse.ok) {
               cache.put(event.request, networkResponse.clone());
+            } else if (networkResponse.status === 404) {
+              // Asset from old deployment not found — purge stale cached app shell
+              caches.open(CACHE_NAME).then((c) => {
+                c.delete('/');
+                c.delete('/index.html');
+              });
+              // Notify active clients to reload
+              self.clients.matchAll().then((clients) => {
+                clients.forEach((client) => {
+                  client.postMessage({ type: 'CHUNK_LOAD_ERROR', url: event.request.url });
+                });
+              });
             }
             return networkResponse;
           });

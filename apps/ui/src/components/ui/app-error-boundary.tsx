@@ -51,6 +51,25 @@ export class AppErrorBoundary extends Component<Props, State> {
       componentStack: errorInfo.componentStack,
     });
 
+    // Handle dynamic import / chunk load failures caused by deployment updates (stale asset hashes)
+    const isChunkLoadError =
+      /dynamically imported module/i.test(error.message) ||
+      /failed to fetch/i.test(error.message) && /assets/i.test(error.message) ||
+      /importing a module script failed/i.test(error.message);
+
+    if (isChunkLoadError) {
+      const reloadKey = 'automaker-chunk-reload-timestamp';
+      const lastReload = Number(sessionStorage.getItem(reloadKey) || 0);
+      const now = Date.now();
+      // Rate-limit auto-reload to once per 10 seconds to avoid infinite loops if network is offline
+      if (now - lastReload > 10_000) {
+        sessionStorage.setItem(reloadKey, String(now));
+        logger.warn('Dynamic module import failed (new deployment detected) — reloading page');
+        window.location.reload();
+        return;
+      }
+    }
+
     // Track crash timestamps to detect crash loops.
     // If the app crashes multiple times in quick succession, it's likely due to
     // stale cached data (e.g., worktree paths that no longer exist on disk).

@@ -60,6 +60,36 @@ describe('auth.ts', () => {
       expect(res.status).not.toHaveBeenCalled();
     });
 
+    it('should call next() with valid Bearer token', async () => {
+      process.env.AUTOMAKER_API_KEY = 'test-secret-key';
+
+      const { authMiddleware } = await import('@/lib/auth.js');
+      const { req, res, next } = createMockExpressContext();
+      req.headers['authorization'] = 'Bearer test-secret-key';
+
+      authMiddleware(req, res, next);
+
+      expect(next).toHaveBeenCalled();
+      expect(res.status).not.toHaveBeenCalled();
+    });
+
+    it('should reject invalid Bearer token', async () => {
+      process.env.AUTOMAKER_API_KEY = 'test-secret-key';
+
+      const { authMiddleware } = await import('@/lib/auth.js');
+      const { req, res, next } = createMockExpressContext();
+      req.headers['authorization'] = 'Bearer wrong-secret-key';
+
+      authMiddleware(req, res, next);
+
+      expect(res.status).toHaveBeenCalledWith(403);
+      expect(res.json).toHaveBeenCalledWith({
+        success: false,
+        error: 'Invalid API key.',
+      });
+      expect(next).not.toHaveBeenCalled();
+    });
+
     it('should authenticate with session token in header', async () => {
       const { authMiddleware, createSession } = await import('@/lib/auth.js');
       const token = await createSession();

@@ -326,8 +326,22 @@ function checkAuthentication(
   query: Record<string, string | undefined>,
   cookies: Record<string, string | undefined>
 ): AuthResult {
+  // Check Authorization: Bearer <token> header
+  const rawAuthHeader = headers['authorization'];
+  const authHeader = Array.isArray(rawAuthHeader) ? rawAuthHeader[0] : rawAuthHeader;
+  if (authHeader && authHeader.trim().toLowerCase().startsWith('bearer ')) {
+    const bearerToken = authHeader.trim().substring(7).trim();
+    if (bearerToken) {
+      if (validateApiKey(bearerToken) || validateSession(bearerToken)) {
+        return { authenticated: true };
+      }
+      return { authenticated: false, errorType: 'invalid_api_key' };
+    }
+  }
+
   // Check for API key in header (Electron mode)
-  const headerKey = headers['x-api-key'] as string | undefined;
+  const rawHeaderKey = headers['x-api-key'];
+  const headerKey = Array.isArray(rawHeaderKey) ? rawHeaderKey[0] : rawHeaderKey;
   if (headerKey) {
     if (validateApiKey(headerKey)) {
       return { authenticated: true };

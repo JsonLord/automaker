@@ -53,116 +53,14 @@ describe('provider-factory.ts', () => {
   });
 
   describe('getProviderForModel', () => {
-    describe('Claude models (claude-* prefix)', () => {
-      it('should return ClaudeProvider for claude-opus-4-6', () => {
-        const provider = ProviderFactory.getProviderForModel('claude-opus-4-6');
-        expect(provider).toBeInstanceOf(ClaudeProvider);
-      });
+    it('should route all model requests to OpencodeProvider when enforcing opencode CLI', () => {
+      const p1 = ProviderFactory.getProviderForModel('claude-opus-4-6');
+      const p2 = ProviderFactory.getProviderForModel('cursor-auto');
+      const p3 = ProviderFactory.getProviderForModel('gpt-5.2');
 
-      it('should return ClaudeProvider for claude-sonnet-4-6', () => {
-        const provider = ProviderFactory.getProviderForModel('claude-sonnet-4-6');
-        expect(provider).toBeInstanceOf(ClaudeProvider);
-      });
-
-      it('should return ClaudeProvider for claude-haiku-4-5', () => {
-        const provider = ProviderFactory.getProviderForModel('claude-haiku-4-5');
-        expect(provider).toBeInstanceOf(ClaudeProvider);
-      });
-
-      it('should be case-insensitive for claude models', () => {
-        const provider = ProviderFactory.getProviderForModel('CLAUDE-OPUS-4-6');
-        expect(provider).toBeInstanceOf(ClaudeProvider);
-      });
-    });
-
-    describe('Claude aliases', () => {
-      it("should return ClaudeProvider for 'haiku'", () => {
-        const provider = ProviderFactory.getProviderForModel('haiku');
-        expect(provider).toBeInstanceOf(ClaudeProvider);
-      });
-
-      it("should return ClaudeProvider for 'sonnet'", () => {
-        const provider = ProviderFactory.getProviderForModel('sonnet');
-        expect(provider).toBeInstanceOf(ClaudeProvider);
-      });
-
-      it("should return ClaudeProvider for 'opus'", () => {
-        const provider = ProviderFactory.getProviderForModel('opus');
-        expect(provider).toBeInstanceOf(ClaudeProvider);
-      });
-
-      it('should be case-insensitive for aliases', () => {
-        const provider1 = ProviderFactory.getProviderForModel('HAIKU');
-        const provider2 = ProviderFactory.getProviderForModel('Sonnet');
-        const provider3 = ProviderFactory.getProviderForModel('Opus');
-
-        expect(provider1).toBeInstanceOf(ClaudeProvider);
-        expect(provider2).toBeInstanceOf(ClaudeProvider);
-        expect(provider3).toBeInstanceOf(ClaudeProvider);
-      });
-    });
-
-    describe('Cursor models (cursor-* prefix)', () => {
-      it('should return CursorProvider for cursor-auto', () => {
-        const provider = ProviderFactory.getProviderForModel('cursor-auto');
-        expect(provider).toBeInstanceOf(CursorProvider);
-      });
-
-      it('should return CursorProvider for cursor-sonnet-4.5', () => {
-        const provider = ProviderFactory.getProviderForModel('cursor-sonnet-4.5');
-        expect(provider).toBeInstanceOf(CursorProvider);
-      });
-
-      it('should return CursorProvider for cursor-gpt-5.2', () => {
-        const provider = ProviderFactory.getProviderForModel('cursor-gpt-5.2');
-        expect(provider).toBeInstanceOf(CursorProvider);
-      });
-
-      it('should be case-insensitive for cursor models', () => {
-        const provider = ProviderFactory.getProviderForModel('CURSOR-AUTO');
-        expect(provider).toBeInstanceOf(CursorProvider);
-      });
-
-      it('should return CursorProvider for known cursor model ID without prefix', () => {
-        const provider = ProviderFactory.getProviderForModel('auto');
-        expect(provider).toBeInstanceOf(CursorProvider);
-      });
-    });
-
-    describe('Unknown models', () => {
-      it('should default to ClaudeProvider for unknown model', () => {
-        const provider = ProviderFactory.getProviderForModel('unknown-model-123');
-        expect(provider).toBeInstanceOf(ClaudeProvider);
-      });
-
-      it('should handle empty string by defaulting to ClaudeProvider', () => {
-        const provider = ProviderFactory.getProviderForModel('');
-        expect(provider).toBeInstanceOf(ClaudeProvider);
-      });
-
-      it('should default to ClaudeProvider for completely unknown prefixes', () => {
-        const provider = ProviderFactory.getProviderForModel('random-xyz-model');
-        expect(provider).toBeInstanceOf(ClaudeProvider);
-      });
-    });
-
-    describe('Cursor models via model ID lookup', () => {
-      it('should return CodexProvider for gpt-5.2 (Codex model, not Cursor)', () => {
-        // gpt-5.2 is in both CURSOR_MODEL_MAP and CODEX_MODEL_CONFIG_MAP
-        // It should route to Codex since Codex models take priority
-        const provider = ProviderFactory.getProviderForModel('gpt-5.2');
-        expect(provider).toBeInstanceOf(CodexProvider);
-      });
-
-      it('should return CursorProvider for grok (valid Cursor model)', () => {
-        const provider = ProviderFactory.getProviderForModel('grok');
-        expect(provider).toBeInstanceOf(CursorProvider);
-      });
-
-      it('should return CursorProvider for gemini-3-pro (valid Cursor model)', () => {
-        const provider = ProviderFactory.getProviderForModel('gemini-3-pro');
-        expect(provider).toBeInstanceOf(CursorProvider);
-      });
+      expect(p1).toBeInstanceOf(OpencodeProvider);
+      expect(p2).toBeInstanceOf(OpencodeProvider);
+      expect(p3).toBeInstanceOf(OpencodeProvider);
     });
   });
 

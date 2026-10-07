@@ -5,6 +5,11 @@ export { type Theme } from '@/config/theme-options';
 export interface CliStatus {
   success: boolean;
   status?: string;
+  ready?: boolean;
+  authMode?: 'native' | 'compatible-provider' | 'none';
+  provider?: string;
+  model?: string;
+  reason?: string;
   method?: string;
   version?: string;
   path?: string;

@@ -366,8 +366,16 @@ export class OpencodeProvider extends CliProvider {
         ? options.model.slice('opencode-'.length)
         : options.model;
 
-      // If model has slash, it's already provider/model format; otherwise prepend opencode/
-      const cliModel = model.includes('/') ? model : `opencode/${model}`;
+      let cliModel = model;
+
+      if (!model.includes('/')) {
+        const compModel = process.env.COMPATIBLE_MODEL;
+        if (compModel && (model === compModel || model === `automaker-compatible/${compModel}`)) {
+          cliModel = `automaker-compatible/${compModel}`;
+        } else {
+          cliModel = `opencode/${model}`;
+        }
+      }
 
       args.push('--model', cliModel);
     }
@@ -496,9 +504,21 @@ export class OpencodeProvider extends CliProvider {
   private static cleanErrorMessage(text: string): string {
     let cleaned = OpencodeProvider.stripAnsiCodes(text).trim();
     // Remove leading "Error: " prefix (case-insensitive) if present.
-    // The CLI formats errors as: \x1b[91m\x1b[1mError: \x1b[0m<actual message>
-    // After ANSI stripping this becomes: "Error: <actual message>"
     cleaned = cleaned.replace(/^Error:\s*/i, '').trim();
+
+    // Scrub secret API keys if present in error message
+    const secrets = [
+      process.env.COMPATIBLE_API_KEY,
+      process.env.OPENAI_COMPATIBLE_API_KEY,
+      process.env.openai_compatible_api_key,
+      process.env.ANTHROPIC_API_KEY,
+      process.env.OPENAI_API_KEY,
+    ].filter((s): s is string => !!s && s.length > 3);
+
+    for (const secret of secrets) {
+      cleaned = cleaned.replaceAll(secret, '[REDACTED_API_KEY]');
+    }
+
     return cleaned || text;
   }
 
@@ -1512,21 +1532,77 @@ export class OpencodeProvider extends CliProvider {
   // ==========================================================================
 
   /**
-   * Detect OpenCode installation status
+   * Detect OpenCode installation and readiness status
    *
    * Checks if the opencode CLI is available either through:
    * - Direct installation (npm global)
    * - NPX (fallback on Windows)
-   * Also checks authentication status.
+   *
+   * Evaluates authentication/readiness mode:
+   * 1. 'compatible-provider': Activated when COMPATIBLE_URL, COMPATIBLE_MODEL, and COMPATIBLE_API_KEY are present.
+   * 2. Incomplete compatible provider: When some COMPATIBLE_* vars are present but not all required ones.
+   * 3. 'native': Native OpenCode credentials in auth.json.
+   * 4. 'none': Neither complete compatible provider nor native auth available.
    */
   async detectInstallation(): Promise<InstallationStatus> {
     this.ensureCliDetected();
 
     const installed = await this.isInstalled();
+    const compUrl = process.env.COMPATIBLE_URL;
+    const compModel = process.env.COMPATIBLE_MODEL;
+    const compApiKey = process.env.COMPATIBLE_API_KEY;
+
+    const hasCompUrl = !!compUrl;
+    const hasCompModel = !!compModel;
+    const hasCompApiKey = !!compApiKey;
+
+    const isCompatibleComplete = hasCompUrl && hasCompModel && hasCompApiKey;
+    const isCompatiblePartial = (hasCompUrl || hasCompModel || hasCompApiKey) && !isCompatibleComplete;
+
+    if (isCompatibleComplete) {
+      return {
+        installed,
+        ready: installed,
+        authMode: 'compatible-provider',
+        provider: 'automaker-compatible',
+        model: compModel,
+        path: this.cliPath || undefined,
+        method: this.detectedStrategy === 'npx' ? 'npm' : 'cli',
+        authenticated: true,
+        hasApiKey: true,
+        hasOAuthToken: false,
+      };
+    }
+
+    if (isCompatiblePartial) {
+      const missing: string[] = [];
+      if (!hasCompUrl) missing.push('COMPATIBLE_URL');
+      if (!hasCompModel) missing.push('COMPATIBLE_MODEL');
+      if (!hasCompApiKey) missing.push('COMPATIBLE_API_KEY');
+
+      const reason = `OpenCode compatible provider is not fully configured. Check ${missing.join(', ')}.`;
+
+      return {
+        installed,
+        ready: false,
+        authMode: 'none',
+        reason,
+        path: this.cliPath || undefined,
+        method: this.detectedStrategy === 'npx' ? 'npm' : 'cli',
+        authenticated: false,
+        hasApiKey: false,
+        hasOAuthToken: false,
+      };
+    }
+
+    // Fall back to native OpenCode authentication check
     const auth = await this.checkAuth();
+    const isNativeReady = installed && auth.authenticated;
 
     return {
       installed,
+      ready: isNativeReady,
+      authMode: auth.authenticated ? 'native' : 'none',
       path: this.cliPath || undefined,
       method: this.detectedStrategy === 'npx' ? 'npm' : 'cli',
       authenticated: auth.authenticated,

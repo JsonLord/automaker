@@ -1,0 +1,17 @@
+.git/
+**/.git/
+node_modules/
+**/node_modules/
+dist/
+**/dist/
+.planning/
+.claude/
+data/
+**/data/
+*.log
+run_logs*.txt
+diag_logs.txt
+.vite/
+**/.vite/
+coverage/
+**/coverage/

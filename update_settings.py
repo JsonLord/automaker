@@ -19,25 +19,31 @@ def main():
         except Exception as e:
             print(f"Error reading settings: {e}")
 
+    # Format canonical OpenCode model string for automaker-compatible provider
+    if "/" not in model and not model.startswith("automaker-compatible/"):
+        canonical_model = f"automaker-compatible/{model}"
+    else:
+        canonical_model = model
+
     # Set enhancement model
-    settings["enhancementModel"] = model
+    settings["enhancementModel"] = canonical_model
     # Set default feature model
-    settings["defaultFeatureModel"] = {"model": model, "provider": "opencode"}
+    settings["defaultFeatureModel"] = {"model": canonical_model, "provider": "opencode"}
     
     # Set phase models
     if "phaseModels" not in settings:
         settings["phaseModels"] = {}
 
-    settings["phaseModels"]["specGenerationModel"] = model
-    settings["phaseModels"]["planningModel"] = model
-    settings["phaseModels"]["implementationModel"] = model
-    settings["phaseModels"]["reviewModel"] = model
-    settings["phaseModels"]["ideationModel"] = model
+    settings["phaseModels"]["specGenerationModel"] = canonical_model
+    settings["phaseModels"]["planningModel"] = canonical_model
+    settings["phaseModels"]["implementationModel"] = canonical_model
+    settings["phaseModels"]["reviewModel"] = canonical_model
+    settings["phaseModels"]["ideationModel"] = canonical_model
 
     # Update active model in profiles if they exist
     if "profiles" in settings:
         for profile in settings["profiles"]:
-            profile["model"] = model
+            profile["model"] = canonical_model
             profile["provider"] = "opencode"
 
     try:

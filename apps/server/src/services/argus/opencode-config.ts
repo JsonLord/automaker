@@ -45,5 +45,20 @@ export async function configureOpenCode(
   }
   if (existing !== serialized) await fs.writeFile(configPath, serialized, { mode: 0o600 });
   await fs.chmod(configPath, 0o600);
+
+  // Validate configuration file was written and contains the managed provider
+  try {
+    const verified = JSON.parse(await fs.readFile(configPath, 'utf8')) as Record<string, any>;
+    if (verified?.provider?.[AUTOMAKER_PROVIDER_ID]) {
+      console.log(
+        `[OpenCodeConfig] Validated provider "${AUTOMAKER_PROVIDER_ID}" with model "${values.compatibleModel}" at baseURL "${values.compatibleUrl}"`
+      );
+    } else {
+      console.warn(`[OpenCodeConfig] Validation warning: "${AUTOMAKER_PROVIDER_ID}" missing from generated config`);
+    }
+  } catch (error) {
+    console.error(`[OpenCodeConfig] Failed to validate config at ${configPath}:`, error);
+  }
+
   return `${AUTOMAKER_PROVIDER_ID}/${values.compatibleModel}`;
 }

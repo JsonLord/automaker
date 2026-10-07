@@ -19,11 +19,24 @@ import { randomUUID } from 'crypto';
 
 const logger = createLogger('NotificationService');
 
+/** Per-file write queue to serialize concurrent writes */
+const writeQueues = new Map<string, Promise<unknown>>();
+
 /**
- * Atomic file write - write to temp file then rename
+ * Run a file operation sequentially for a specific file path
+ */
+function withFileLock<T>(filePath: string, fn: () => Promise<T>): Promise<T> {
+  const current = writeQueues.get(filePath) || Promise.resolve();
+  const next = current.then(fn, fn); // Continue queue even if previous failed
+  writeQueues.set(filePath, next);
+  return next as Promise<T>;
+}
+
+/**
+ * Atomic file write - write to unique temp file then rename
  */
 async function atomicWriteJson(filePath: string, data: unknown): Promise<void> {
-  const tempPath = `${filePath}.tmp.${Date.now()}`;
+  const tempPath = `${filePath}.tmp.${Date.now()}.${randomUUID()}`;
   const content = JSON.stringify(data, null, 2);
 
   try {
@@ -125,34 +138,37 @@ export class NotificationService {
     await ensureAutomakerDir(projectPath);
 
     const notificationsPath = getNotificationsPath(projectPath);
-    const file = await readJsonFile<NotificationsFile>(
-      notificationsPath,
-      DEFAULT_NOTIFICATIONS_FILE
-    );
 
-    const notification: Notification = {
-      id: randomUUID(),
-      type,
-      title,
-      message,
-      createdAt: new Date().toISOString(),
-      read: false,
-      dismissed: false,
-      featureId,
-      projectPath,
-    };
+    return withFileLock(notificationsPath, async () => {
+      const file = await readJsonFile<NotificationsFile>(
+        notificationsPath,
+        DEFAULT_NOTIFICATIONS_FILE
+      );
 
-    file.notifications.push(notification);
-    await atomicWriteJson(notificationsPath, file);
+      const notification: Notification = {
+        id: randomUUID(),
+        type,
+        title,
+        message,
+        createdAt: new Date().toISOString(),
+        read: false,
+        dismissed: false,
+        featureId,
+        projectPath,
+      };
 
-    logger.info(`Created notification: ${title} for project ${projectPath}`);
+      file.notifications.push(notification);
+      await atomicWriteJson(notificationsPath, file);
 
-    // Emit event for real-time updates
-    if (this.events) {
-      this.events.emit('notification:created', notification);
-    }
+      logger.info(`Created notification: ${title} for project ${projectPath}`);
 
-    return notification;
+      // Emit event for real-time updates
+      if (this.events) {
+        this.events.emit('notification:created', notification);
+      }
+
+      return notification;
+    });
   }
 
   /**

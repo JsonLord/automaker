@@ -222,6 +222,25 @@ describe('opencode-provider.ts', () => {
       expect(args).toContain('--model');
       expect(args).toContain('opencode/big-pickle');
     });
+
+    it('should format model as automaker-compatible/<model> when COMPATIBLE_MODEL is configured', () => {
+      const original = process.env.COMPATIBLE_MODEL;
+      process.env.COMPATIBLE_MODEL = 'MiniMax-M2.7';
+
+      try {
+        const args = provider.buildCliArgs({
+          prompt: 'Hello',
+          model: 'MiniMax-M2.7',
+          cwd: '/tmp/project',
+        });
+
+        const modelIndex = args.indexOf('--model');
+        expect(modelIndex).toBeGreaterThan(-1);
+        expect(args[modelIndex + 1]).toBe('automaker-compatible/MiniMax-M2.7');
+      } finally {
+        process.env.COMPATIBLE_MODEL = original;
+      }
+    });
   });
 
   // ==========================================================================

@@ -366,8 +366,16 @@ export class OpencodeProvider extends CliProvider {
         ? options.model.slice('opencode-'.length)
         : options.model;
 
-      // If model has slash, it's already provider/model format; otherwise prepend opencode/
-      const cliModel = model.includes('/') ? model : `opencode/${model}`;
+      let cliModel = model;
+
+      if (!model.includes('/')) {
+        const compModel = process.env.COMPATIBLE_MODEL || process.env.OPENAI_COMPATIBLE_MODEL || process.env.openai_compatible_model;
+        if (compModel && (model === compModel || model === `automaker-compatible/${compModel}`)) {
+          cliModel = `automaker-compatible/${compModel}`;
+        } else {
+          cliModel = `opencode/${model}`;
+        }
+      }
 
       args.push('--model', cliModel);
     }
@@ -496,9 +504,21 @@ export class OpencodeProvider extends CliProvider {
   private static cleanErrorMessage(text: string): string {
     let cleaned = OpencodeProvider.stripAnsiCodes(text).trim();
     // Remove leading "Error: " prefix (case-insensitive) if present.
-    // The CLI formats errors as: \x1b[91m\x1b[1mError: \x1b[0m<actual message>
-    // After ANSI stripping this becomes: "Error: <actual message>"
     cleaned = cleaned.replace(/^Error:\s*/i, '').trim();
+
+    // Scrub secret API keys if present in error message
+    const secrets = [
+      process.env.COMPATIBLE_API_KEY,
+      process.env.OPENAI_COMPATIBLE_API_KEY,
+      process.env.openai_compatible_api_key,
+      process.env.ANTHROPIC_API_KEY,
+      process.env.OPENAI_API_KEY,
+    ].filter((s): s is string => !!s && s.length > 3);
+
+    for (const secret of secrets) {
+      cleaned = cleaned.replaceAll(secret, '[REDACTED_API_KEY]');
+    }
+
     return cleaned || text;
   }
 

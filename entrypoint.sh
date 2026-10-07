@@ -11,6 +11,21 @@ mkdir -p "$HOME/.config/gh"
 export ARGUS_SKILL_HOME
 mkdir -p "$ARGUS_SKILL_HOME"
 
+# Configure Automaker API Authentication
+if [ -n "$AUTHENTICATION_TOKEN" ]; then
+    export AUTOMAKER_API_KEY="$AUTHENTICATION_TOKEN"
+    export AUTOMAKER_HIDE_API_KEY=true
+    export AUTOMAKER_DISABLE_AUTH=false
+    echo "Automaker API authentication configured from AUTHENTICATION_TOKEN."
+elif [ -n "$AUTOMAKER_API_KEY" ]; then
+    export AUTOMAKER_HIDE_API_KEY=true
+    export AUTOMAKER_DISABLE_AUTH=false
+    echo "Automaker API authentication configured from AUTOMAKER_API_KEY."
+elif [ "$NODE_ENV" = "production" ] && [ "$AUTOMAKER_MOCK_AGENT" != "true" ]; then
+    echo "FATAL: AUTHENTICATION_TOKEN secret is required in production environment!"
+    exit 1
+fi
+
 # Map HF Space secrets for OpenAI compatible provider if present
 [ -z "$COMPATIBLE_URL" ] && [ -n "$OPENAI_COMPATIBLE_URL" ] && export COMPATIBLE_URL="$OPENAI_COMPATIBLE_URL"
 [ -z "$COMPATIBLE_URL" ] && [ -n "$openai_compatible_url" ] && export COMPATIBLE_URL="$openai_compatible_url"

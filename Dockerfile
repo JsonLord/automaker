@@ -109,7 +109,6 @@ ENV DATA_DIR=/app/data
 ENV ARGUS_SKILL_HOME=/app/data/argus
 ENV NODE_ENV=production
 ENV AUTOMAKER_AUTO_LOGIN=true
-ENV AUTOMAKER_DISABLE_AUTH=true
 
 # Copy scripts
 COPY --chown=node:node entrypoint.sh ./entrypoint.sh

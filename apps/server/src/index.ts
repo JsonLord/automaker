@@ -272,9 +272,19 @@ const app = express();
 
 // Move health checks to the top but DON'T intercept the root '/' which serves the UI
 app.get('/health', (_req, res) => res.status(200).json({ status: 'ok' }));
-app.get('/api-docs', (_req, res) =>
+app.get('/api-docs', (_req, res) => {
+  const publicUrl = process.env.AUTOMAKER_PUBLIC_URL || 'https://leon4gr45-twenty.hf.space';
   res.status(200).json({
     message: 'Automaker API Documentation',
+    baseUrl: publicUrl,
+    apiBaseUrl: `${publicUrl}/api`,
+    authentication: {
+      bearer: true,
+      xApiKey: true,
+      sessionCookie: true,
+      queryParamApiKey: true,
+      envVarForApiKey: 'AUTHENTICATION_TOKEN',
+    },
     endpoints: [
       {
         method: 'GET',
@@ -327,8 +337,8 @@ app.get('/api-docs', (_req, res) =>
         response: { theme: 'dark', concurrentAgents: 3 },
       },
     ],
-  })
-);
+  });
+});
 
 // Middleware
 // Custom colored logger showing only endpoint and status code (dynamically configurable)

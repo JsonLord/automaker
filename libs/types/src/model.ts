@@ -127,7 +127,13 @@ export function getAllCodexModelIds(): CodexModelId[] {
  * Uses canonical prefixed IDs for consistent routing.
  */
 export const DEFAULT_MODELS = {
-  claude: 'claude-opus-4-6',
+  get claude(): string {
+    if (typeof process !== 'undefined' && process.env?.COMPATIBLE_MODEL) {
+      const m = process.env.COMPATIBLE_MODEL;
+      return m.startsWith('automaker-compatible/') ? m : `automaker-compatible/${m}`;
+    }
+    return 'claude-opus-4-6';
+  },
   cursor: 'cursor-auto', // Cursor's recommended default (with prefix)
   codex: CODEX_MODEL_MAP.gpt53Codex, // GPT-5.3-Codex is the latest frontier agentic coding model
 } as const;

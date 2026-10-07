@@ -59,6 +59,15 @@ export function resolveModelString(
     `[ModelResolver] resolveModelString called with modelKey: "${modelKey}", defaultModel: "${defaultModel}"`
   );
 
+  if (typeof process !== 'undefined' && process.env?.COMPATIBLE_MODEL) {
+    const compModel = process.env.COMPATIBLE_MODEL;
+    const compatibleFull = compModel.startsWith('automaker-compatible/') ? compModel : `automaker-compatible/${compModel}`;
+    if (!modelKey || modelKey.includes('claude') || modelKey === 'sonnet' || modelKey === 'opus' || modelKey === 'haiku') {
+      console.log(`[ModelResolver] Environment COMPATIBLE_MODEL active, overriding "${modelKey}" -> "${compatibleFull}"`);
+      return compatibleFull;
+    }
+  }
+
   // No model specified - use default
   if (!modelKey) {
     console.log(`[ModelResolver] No model specified, using default: ${defaultModel}`);

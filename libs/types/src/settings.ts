@@ -1790,29 +1790,35 @@ export interface ProjectSettings {
 /** Default phase model configuration - sensible defaults for each task type
  * Uses canonical prefixed model IDs for consistent routing.
  */
+const defaultCompatibleModel =
+  typeof process !== 'undefined' && process.env?.COMPATIBLE_MODEL
+    ? (process.env.COMPATIBLE_MODEL.startsWith('automaker-compatible/')
+        ? process.env.COMPATIBLE_MODEL
+        : `automaker-compatible/${process.env.COMPATIBLE_MODEL}`)
+    : 'automaker-compatible/auto';
+
 export const DEFAULT_PHASE_MODELS: PhaseModelConfig = {
-  // Quick tasks - use fast models for speed and cost
-  enhancementModel: { model: 'claude-sonnet' },
-  fileDescriptionModel: { model: 'claude-haiku' },
-  imageDescriptionModel: { model: 'claude-haiku' },
+  // Quick tasks - use automaker-compatible
+  enhancementModel: { model: defaultCompatibleModel, providerId: 'automaker-compatible' },
+  fileDescriptionModel: { model: defaultCompatibleModel, providerId: 'automaker-compatible' },
+  imageDescriptionModel: { model: defaultCompatibleModel, providerId: 'automaker-compatible' },
 
-  // Validation - use smart models for accuracy
-  validationModel: { model: 'claude-sonnet' },
+  // Validation - use automaker-compatible
+  validationModel: { model: defaultCompatibleModel, providerId: 'automaker-compatible' },
 
-  // Generation - use powerful models for quality
-  specGenerationModel: { model: 'claude-opus', thinkingLevel: 'adaptive' },
-  featureGenerationModel: { model: 'claude-sonnet' },
-  backlogPlanningModel: { model: 'claude-sonnet' },
-  projectAnalysisModel: { model: 'claude-sonnet' },
-  ideationModel: { model: 'claude-sonnet' },
+  // Generation - use automaker-compatible
+  specGenerationModel: { model: defaultCompatibleModel, providerId: 'automaker-compatible' },
+  featureGenerationModel: { model: defaultCompatibleModel, providerId: 'automaker-compatible' },
+  backlogPlanningModel: { model: defaultCompatibleModel, providerId: 'automaker-compatible' },
+  projectAnalysisModel: { model: defaultCompatibleModel, providerId: 'automaker-compatible' },
+  ideationModel: { model: defaultCompatibleModel, providerId: 'automaker-compatible' },
 
-  // Memory - use fast model for learning extraction (cost-effective)
-  memoryExtractionModel: { model: 'claude-haiku' },
+  // Memory - use automaker-compatible
+  memoryExtractionModel: { model: defaultCompatibleModel, providerId: 'automaker-compatible' },
 
-  // Commit messages - use fast model for speed
-  commitMessageModel: { model: 'claude-haiku' },
-  // PR descriptions - use balanced model for better quality descriptions
-  prDescriptionModel: { model: 'claude-sonnet' },
+  // Commit messages & PR descriptions - use automaker-compatible
+  commitMessageModel: { model: defaultCompatibleModel, providerId: 'automaker-compatible' },
+  prDescriptionModel: { model: defaultCompatibleModel, providerId: 'automaker-compatible' },
 };
 
 /** Current version of the global settings schema */

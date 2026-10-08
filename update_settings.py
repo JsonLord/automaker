@@ -19,38 +19,55 @@ def main():
         except Exception as e:
             print(f"Error reading settings: {e}")
 
-    # Format canonical OpenCode model string for automaker-compatible provider
+    # Format canonical model string for automaker-compatible provider
     if "/" not in model and not model.startswith("automaker-compatible/"):
         canonical_model = f"automaker-compatible/{model}"
     else:
         canonical_model = model
 
+    model_entry = {"model": canonical_model, "providerId": "automaker-compatible"}
+
     # Set enhancement model
     settings["enhancementModel"] = canonical_model
     # Set default feature model
-    settings["defaultFeatureModel"] = {"model": canonical_model, "provider": "opencode"}
-    
-    # Set phase models
+    settings["defaultFeatureModel"] = model_entry
+
+    # Set phase models for all application tasks
     if "phaseModels" not in settings:
         settings["phaseModels"] = {}
 
-    settings["phaseModels"]["specGenerationModel"] = canonical_model
-    settings["phaseModels"]["planningModel"] = canonical_model
-    settings["phaseModels"]["implementationModel"] = canonical_model
-    settings["phaseModels"]["reviewModel"] = canonical_model
-    settings["phaseModels"]["ideationModel"] = canonical_model
+    phase_keys = [
+        "enhancementModel",
+        "fileDescriptionModel",
+        "imageDescriptionModel",
+        "validationModel",
+        "specGenerationModel",
+        "featureGenerationModel",
+        "backlogPlanningModel",
+        "projectAnalysisModel",
+        "ideationModel",
+        "memoryExtractionModel",
+        "commitMessageModel",
+        "prDescriptionModel",
+        "planningModel",
+        "implementationModel",
+        "reviewModel",
+    ]
+
+    for key in phase_keys:
+        settings["phaseModels"][key] = model_entry
 
     # Update active model in profiles if they exist
     if "profiles" in settings:
         for profile in settings["profiles"]:
             profile["model"] = canonical_model
-            profile["provider"] = "opencode"
+            profile["providerId"] = "automaker-compatible"
 
     try:
         os.makedirs(data_dir, exist_ok=True)
         with open(settings_file, "w") as f:
             json.dump(settings, f, indent=2)
-        print(f"Updated settings with model {model} and forced all phases/profiles to use it via OpenCode")
+        print(f"Updated settings with model {canonical_model} across all phase models and profiles")
     except Exception as e:
         print(f"Error writing settings: {e}")
 

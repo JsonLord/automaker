@@ -22,9 +22,9 @@ elif [ -n "$AUTOMAKER_API_KEY" ]; then
     export AUTOMAKER_DISABLE_AUTH=false
     echo "Automaker API authentication configured from AUTOMAKER_API_KEY."
 else
-    export AUTOMAKER_DISABLE_AUTH=true
-    export AUTOMAKER_AUTO_LOGIN=true
-    echo "No AUTHENTICATION_TOKEN secret provided; auto-login and public mode enabled for HF Space."
+    export AUTOMAKER_DISABLE_AUTH=false
+    export AUTOMAKER_AUTO_LOGIN=false
+    echo "No AUTHENTICATION_TOKEN secret provided; requiring login via key generated in logs."
 fi
 
 # Map HF Space secrets for OpenAI compatible provider if present

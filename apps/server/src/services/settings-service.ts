@@ -239,6 +239,50 @@ export class SettingsService {
       needsSave = true;
     }
 
+    // Ensure automaker-compatible provider is registered when environment variables are present
+    if (process.env.COMPATIBLE_URL || process.env.COMPATIBLE_MODEL) {
+      const compUrl = process.env.COMPATIBLE_URL || process.env.OPENAI_COMPATIBLE_URL || '';
+      const compModel = process.env.COMPATIBLE_MODEL || process.env.OPENAI_COMPATIBLE_MODEL || 'auto';
+      const compApiKey = process.env.COMPATIBLE_API_KEY || process.env.OPENAI_COMPATIBLE_API_KEY || process.env.OPENAI_COMPATIBLE_API || '';
+
+      const providers = result.claudeCompatibleProviders || [];
+      let compProvider = providers.find((p) => p.id === 'automaker-compatible-provider');
+      if (!compProvider) {
+        compProvider = {
+          id: 'automaker-compatible-provider',
+          name: 'Automaker Compatible',
+          providerType: 'custom',
+          apiKeySource: 'inline',
+          baseUrl: compUrl,
+          apiKey: compApiKey,
+          enabled: true,
+          models: [],
+        };
+        providers.push(compProvider);
+        result.claudeCompatibleProviders = providers;
+      }
+
+      compProvider.baseUrl = compUrl || compProvider.baseUrl;
+      compProvider.apiKey = compApiKey || compProvider.apiKey;
+      compProvider.enabled = true;
+      compProvider.models ||= [];
+
+      const modelsToEnsure = [
+        compModel,
+        compModel.startsWith('automaker-compatible/') ? compModel : `automaker-compatible/${compModel}`,
+        'test-blablador',
+        'automaker-compatible/test-blablador',
+        'auto',
+        'automaker-compatible/auto',
+      ];
+
+      for (const mId of modelsToEnsure) {
+        if (!compProvider.models.some((m) => m.id === mId)) {
+          compProvider.models.push({ id: mId, displayName: mId });
+        }
+      }
+    }
+
     // Update version if any migration occurred
     if (needsSave) {
       result.version = SETTINGS_VERSION;

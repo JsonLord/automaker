@@ -27,6 +27,29 @@ def main():
 
     model_entry = {"model": canonical_model, "providerId": "automaker-compatible"}
 
+    comp_url = os.environ.get("COMPATIBLE_URL", os.environ.get("OPENAI_COMPATIBLE_URL", ""))
+    comp_api_key = os.environ.get("COMPATIBLE_API_KEY", os.environ.get("OPENAI_COMPATIBLE_API_KEY", os.environ.get("OPENAI_COMPATIBLE_API", "")))
+
+    comp_provider = {
+        "id": "automaker-compatible-provider",
+        "name": "Automaker Compatible",
+        "providerType": "custom",
+        "apiKeySource": "inline",
+        "baseUrl": comp_url,
+        "apiKey": comp_api_key,
+        "enabled": True,
+        "models": [
+            {"id": canonical_model, "displayName": canonical_model},
+            {"id": model, "displayName": model},
+            {"id": "test-blablador", "displayName": "test-blablador"},
+            {"id": "automaker-compatible/test-blablador", "displayName": "Automaker Compatible test-blablador"},
+            {"id": "auto", "displayName": "auto"},
+            {"id": "automaker-compatible/auto", "displayName": "Automaker Compatible auto"}
+        ]
+    }
+
+    settings["claudeCompatibleProviders"] = [comp_provider]
+
     # Set enhancement model
     settings["enhancementModel"] = canonical_model
     # Set default feature model
@@ -67,7 +90,7 @@ def main():
         os.makedirs(data_dir, exist_ok=True)
         with open(settings_file, "w") as f:
             json.dump(settings, f, indent=2)
-        print(f"Updated settings with model {canonical_model} across all phase models and profiles")
+        print(f"Updated settings with model {canonical_model} across all phase models, profiles, and claudeCompatibleProviders")
     except Exception as e:
         print(f"Error writing settings: {e}")
 

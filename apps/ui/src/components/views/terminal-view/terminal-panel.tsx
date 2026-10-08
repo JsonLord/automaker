@@ -1146,6 +1146,10 @@ export function TerminalPanel({
         const wsToken = await fetchWsToken();
         if (wsToken) {
           url += `&wsToken=${encodeURIComponent(wsToken)}`;
+        } else {
+          logger.debug('No wsToken available for terminal WebSocket connection');
+          setIsConnecting(false);
+          return;
         }
         // Cookies are also sent automatically with same-origin WebSocket
       }

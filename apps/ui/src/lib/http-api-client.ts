@@ -76,16 +76,19 @@ const notifyLoggedOut = (): void => {
  * then notifies the UI to redirect.
  */
 const handleUnauthorized = (): void => {
+  const tokenExists = Boolean(getSessionToken());
   clearSessionToken();
-  // Best-effort cookie clear (avoid throwing)
-  fetch(`${getServerUrl()}/api/auth/logout`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: '{}',
-    cache: NO_STORE_CACHE_MODE,
-  }).catch(() => {});
-  notifyLoggedOut();
+  if (tokenExists) {
+    // Only call logout endpoint if we held an active session token
+    fetch(`${getServerUrl()}/api/auth/logout`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: '{}',
+      cache: NO_STORE_CACHE_MODE,
+    }).catch(() => {});
+    notifyLoggedOut();
+  }
 };
 
 /**
@@ -886,19 +889,18 @@ export class HttpApiClient implements ElectronAPI {
     }
 
     // In web mode, fetch a short-lived wsToken first
-    this.fetchWsToken(options)
+    this.fetchWsToken({ silent: true, ...options })
       .then((wsToken) => {
         const wsUrl = this.serverUrl.replace(/^http/, 'ws') + '/api/events';
         if (wsToken) {
           this.establishWebSocket(`${wsUrl}?wsToken=${encodeURIComponent(wsToken)}`);
         } else {
-          // Fallback: try connecting without token (will fail if not authenticated)
-          logger.warn('No wsToken available, attempting connection anyway');
-          this.establishWebSocket(wsUrl);
+          logger.debug('No wsToken available (unauthenticated), skipping WebSocket connection');
+          this.isConnecting = false;
         }
       })
       .catch((error) => {
-        logger.error('Failed to prepare WebSocket connection:', error);
+        logger.debug('Failed to prepare WebSocket connection:', error);
         this.isConnecting = false;
       });
   }

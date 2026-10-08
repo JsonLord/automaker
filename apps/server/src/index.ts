@@ -696,7 +696,7 @@ server.on('upgrade', (request, socket, head) => {
 
   // Authenticate all WebSocket connections
   if (!authenticateWebSocket(request)) {
-    logger.info('Authentication failed, rejecting connection');
+    logger.debug('Authentication failed, rejecting connection');
     socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
     socket.destroy();
     return;

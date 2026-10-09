@@ -18,6 +18,10 @@ export interface SubprocessOptions {
    * Avoids shell interpretation issues when passing data as CLI arguments.
    */
   stdinData?: string;
+  /** Optional sanitization of diagnostics before they reach logs or consumers. */
+  sanitizeOutput?: (text: string) => string;
+  /** Bound collected output for non-streaming probes and role calls. */
+  maxOutputBytes?: number;
 }
 
 export interface SubprocessResult {
@@ -47,7 +51,8 @@ export async function* spawnJSONLProcess(options: SubprocessOptions): AsyncGener
   };
 
   // Log command without stdin data (which may be large/sensitive)
-  console.log(`[SubprocessManager] Spawning: ${command} ${args.join(' ')}`);
+  const sanitize = options.sanitizeOutput || ((text: string) => text);
+  console.log(sanitize(`[SubprocessManager] Spawning: ${command} ${args.join(' ')}`));
   console.log(`[SubprocessManager] Working directory: ${cwd}`);
   if (stdinData) {
     console.log(`[SubprocessManager] Passing ${stdinData.length} bytes via stdin`);
@@ -73,6 +78,7 @@ export async function* spawnJSONLProcess(options: SubprocessOptions): AsyncGener
   }
 
   let stderrOutput = '';
+  let stderrOverflow = false;
   let lastOutputTime = Date.now();
   let timeoutHandle: NodeJS.Timeout | null = null;
   let processExited = false;
@@ -93,8 +99,15 @@ export async function* spawnJSONLProcess(options: SubprocessOptions): AsyncGener
   if (childProcess.stderr) {
     childProcess.stderr.on('data', (data: Buffer) => {
       const text = data.toString();
-      stderrOutput += text;
-      console.warn(`[SubprocessManager] stderr: ${text}`);
+      // Delay logging when sanitizing: secrets may span separate data chunks.
+      if (!stderrOverflow) {
+        stderrOutput += text;
+        if (options.sanitizeOutput && stderrOutput.length > 65536) {
+          stderrOutput = 'OpenCode stderr exceeded the diagnostic limit';
+          stderrOverflow = true;
+        }
+      }
+      if (!options.sanitizeOutput) console.warn(`[SubprocessManager] stderr: ${text}`);
     });
   }
 
@@ -194,10 +207,10 @@ export async function* spawnJSONLProcess(options: SubprocessOptions): AsyncGener
         try {
           eventQueue.push(JSON.parse(trimmed));
         } catch (parseError) {
-          console.error(`[SubprocessManager] Failed to parse JSONL line: ${trimmed}`, parseError);
+          console.error(`[SubprocessManager] Failed to parse JSONL line: ${sanitize(trimmed)}`);
           eventQueue.push({
             type: 'error',
-            error: `Failed to parse output: ${trimmed}`,
+            error: `Failed to parse output: ${sanitize(trimmed)}`,
           });
         }
       }
@@ -219,12 +232,11 @@ export async function* spawnJSONLProcess(options: SubprocessOptions): AsyncGener
           eventQueue.push(JSON.parse(lineBuffer.trim()));
         } catch (parseError) {
           console.error(
-            `[SubprocessManager] Failed to parse final JSONL line: ${lineBuffer}`,
-            parseError
+            `[SubprocessManager] Failed to parse final JSONL line: ${sanitize(lineBuffer)}`
           );
           eventQueue.push({
             type: 'error',
-            error: `Failed to parse output: ${lineBuffer}`,
+            error: `Failed to parse output: ${sanitize(lineBuffer)}`,
           });
         }
         lineBuffer = '';
@@ -292,11 +304,12 @@ export async function* spawnJSONLProcess(options: SubprocessOptions): AsyncGener
 
   // Handle non-zero exit codes
   if (exitCode !== 0 && exitCode !== null) {
-    const errorMessage = stderrOutput || `Process exited with code ${exitCode}`;
+    const errorMessage = sanitize(stderrOutput) || `Process exited with code ${exitCode}`;
     console.error(`[SubprocessManager] Process failed: ${errorMessage}`);
     yield {
       type: 'error',
       error: errorMessage,
+      exitCode,
     };
   }
 
@@ -337,16 +350,30 @@ export async function spawnProcess(options: SubprocessOptions): Promise<Subproce
 
     let stdout = '';
     let stderr = '';
+    let stdoutOverflow = false;
+    let stderrOverflow = false;
 
     if (childProcess.stdout) {
       childProcess.stdout.on('data', (data: Buffer) => {
-        stdout += data.toString();
+        if (!stdoutOverflow) {
+          stdout += data.toString();
+          if (options.maxOutputBytes && Buffer.byteLength(stdout) > options.maxOutputBytes) {
+            stdout = 'OpenCode stdout exceeded the diagnostic limit';
+            stdoutOverflow = true;
+          }
+        }
       });
     }
 
     if (childProcess.stderr) {
       childProcess.stderr.on('data', (data: Buffer) => {
-        stderr += data.toString();
+        if (!stderrOverflow) {
+          stderr += data.toString();
+          if (options.maxOutputBytes && Buffer.byteLength(stderr) > options.maxOutputBytes) {
+            stderr = 'OpenCode stderr exceeded the diagnostic limit';
+            stderrOverflow = true;
+          }
+        }
       });
     }
 

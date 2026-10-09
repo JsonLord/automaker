@@ -1791,34 +1791,27 @@ export interface ProjectSettings {
  * Uses canonical prefixed model IDs for consistent routing.
  */
 const defaultCompatibleModel =
-  typeof process !== 'undefined' && process.env?.COMPATIBLE_MODEL
-    ? (process.env.COMPATIBLE_MODEL.startsWith('automaker-compatible/')
-        ? process.env.COMPATIBLE_MODEL
-        : `automaker-compatible/${process.env.COMPATIBLE_MODEL}`)
-    : 'automaker-compatible/auto';
+  typeof process !== 'undefined' && process.env?.COMPATIBLE_URL && process.env.COMPATIBLE_MODEL
+    ? `automaker-compatible/${process.env.COMPATIBLE_MODEL.replace(/^automaker-compatible\//, '')}`
+    : undefined;
+const phaseDefault = (model: string, thinkingLevel?: ThinkingLevel): PhaseModelEntry =>
+  defaultCompatibleModel
+    ? { model: defaultCompatibleModel, providerId: 'automaker-compatible' }
+    : { model, ...(thinkingLevel ? { thinkingLevel } : {}) };
 
 export const DEFAULT_PHASE_MODELS: PhaseModelConfig = {
-  // Quick tasks - use automaker-compatible
-  enhancementModel: { model: defaultCompatibleModel, providerId: 'automaker-compatible' },
-  fileDescriptionModel: { model: defaultCompatibleModel, providerId: 'automaker-compatible' },
-  imageDescriptionModel: { model: defaultCompatibleModel, providerId: 'automaker-compatible' },
-
-  // Validation - use automaker-compatible
-  validationModel: { model: defaultCompatibleModel, providerId: 'automaker-compatible' },
-
-  // Generation - use automaker-compatible
-  specGenerationModel: { model: defaultCompatibleModel, providerId: 'automaker-compatible' },
-  featureGenerationModel: { model: defaultCompatibleModel, providerId: 'automaker-compatible' },
-  backlogPlanningModel: { model: defaultCompatibleModel, providerId: 'automaker-compatible' },
-  projectAnalysisModel: { model: defaultCompatibleModel, providerId: 'automaker-compatible' },
-  ideationModel: { model: defaultCompatibleModel, providerId: 'automaker-compatible' },
-
-  // Memory - use automaker-compatible
-  memoryExtractionModel: { model: defaultCompatibleModel, providerId: 'automaker-compatible' },
-
-  // Commit messages & PR descriptions - use automaker-compatible
-  commitMessageModel: { model: defaultCompatibleModel, providerId: 'automaker-compatible' },
-  prDescriptionModel: { model: defaultCompatibleModel, providerId: 'automaker-compatible' },
+  enhancementModel: phaseDefault('claude-sonnet'),
+  fileDescriptionModel: phaseDefault('claude-haiku'),
+  imageDescriptionModel: phaseDefault('claude-haiku'),
+  validationModel: phaseDefault('claude-sonnet'),
+  specGenerationModel: phaseDefault('claude-opus', 'adaptive'),
+  featureGenerationModel: phaseDefault('claude-sonnet'),
+  backlogPlanningModel: phaseDefault('claude-sonnet'),
+  projectAnalysisModel: phaseDefault('claude-sonnet'),
+  ideationModel: phaseDefault('claude-sonnet'),
+  memoryExtractionModel: phaseDefault('claude-haiku'),
+  commitMessageModel: phaseDefault('claude-haiku'),
+  prDescriptionModel: phaseDefault('claude-sonnet'),
 };
 
 /** Current version of the global settings schema */

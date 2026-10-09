@@ -21,7 +21,7 @@ import {
   stripProviderPrefix,
   isPipelineStatus,
 } from '@automaker/types';
-import { resolveModelString } from '@automaker/model-resolver';
+import { resolveModelString, resolveOpenCodeModel } from '@automaker/model-resolver';
 import { createLogger, loadContextFiles, classifyError } from '@automaker/utils';
 import { getFeatureDir } from '@automaker/platform';
 import * as secureFs from '../../lib/secure-fs.js';
@@ -265,7 +265,10 @@ export class AutoModeServiceFacade {
           [key: string]: unknown;
         }
       ): Promise<void> => {
-        const resolvedModel = resolveModelString(model, DEFAULT_MODELS.claude);
+        const resolvedModel =
+          opts?.providerId === 'opencode'
+            ? resolveOpenCodeModel(model || 'opencode/big-pickle', 'opencode').id
+            : resolveModelString(model, DEFAULT_MODELS.claude);
         const provider = ProviderFactory.getProviderForModel(resolvedModel);
         const effectiveBareModel = stripProviderPrefix(resolvedModel);
 

@@ -13,6 +13,7 @@ export {
 } from '@automaker/types';
 
 // Export resolver functions
+export * from './opencode.js';
 export {
   resolveModelString,
   getEffectiveModel,

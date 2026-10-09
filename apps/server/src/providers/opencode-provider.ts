@@ -1,3 +1,9 @@
+import {
+  openCodeFailure,
+  sanitizeOpenCodeOutput,
+  redactOpenCodeEvent,
+} from '../lib/opencode-errors.js';
+import { resolveOpenCodeModel } from '@automaker/model-resolver';
 /**
  * OpenCode Provider - Executes queries using opencode CLI
  *
@@ -112,6 +118,7 @@ interface OpenCodePart {
  * Format: {"type":"event_type","timestamp":...,"sessionID":"...","part":{...}}
  */
 interface OpenCodeBaseEvent {
+  exitCode?: number | null;
   /** Event type identifier (step_start, text, step_finish, tool_call, etc.) */
   type: string;
   /** Unix timestamp */
@@ -361,21 +368,7 @@ export class OpencodeProvider extends CliProvider {
     // Convert canonical prefix format (opencode-xxx) to CLI slash format (opencode/xxx)
     // OpenCode CLI expects provider/model format (e.g., 'opencode/big-model')
     if (options.model) {
-      // Strip opencode- prefix if present, then ensure slash format
-      const model = options.model.startsWith('opencode-')
-        ? options.model.slice('opencode-'.length)
-        : options.model;
-
-      let cliModel = model;
-
-      if (!model.includes('/')) {
-        const compModel = process.env.COMPATIBLE_MODEL;
-        if (compModel && (model === compModel || model === `automaker-compatible/${compModel}`)) {
-          cliModel = `automaker-compatible/${compModel}`;
-        } else {
-          cliModel = `opencode/${model}`;
-        }
-      }
+      const cliModel = resolveOpenCodeModel(options.model, options.claudeCompatibleProvider?.id).id;
 
       args.push('--model', cliModel);
     }
@@ -432,7 +425,10 @@ export class OpencodeProvider extends CliProvider {
 
     // Pass prompt via stdin to avoid shell interpretation of special characters
     // like $(), backticks, quotes, etc. that may appear in prompts or file content
+    subprocessOptions.env = { ...subprocessOptions.env, ...this.config.env };
     subprocessOptions.stdinData = this.extractPromptText(options);
+    subprocessOptions.sanitizeOutput = (text) =>
+      sanitizeOpenCodeOutput(text, { ...process.env, ...this.config.env });
 
     return subprocessOptions;
   }
@@ -454,7 +450,10 @@ export class OpencodeProvider extends CliProvider {
    * @returns true if the error indicates the session was not found
    */
   private static isSessionNotFoundError(errorText: string): boolean {
-    const cleaned = OpencodeProvider.stripAnsiCodes(errorText).toLowerCase();
+    const cleaned = OpencodeProvider.stripAnsiCodes(errorText)
+      .replace(/\s+\[provider=.*$/, '')
+      .toLowerCase();
+    if (/provider(?:model)?notfounderror/.test(cleaned)) return false;
 
     // Explicit session-related phrases — high confidence
     if (
@@ -506,20 +505,35 @@ export class OpencodeProvider extends CliProvider {
     // Remove leading "Error: " prefix (case-insensitive) if present.
     cleaned = cleaned.replace(/^Error:\s*/i, '').trim();
 
-    // Scrub secret API keys if present in error message
-    const secrets = [
-      process.env.COMPATIBLE_API_KEY,
-      process.env.OPENAI_COMPATIBLE_API_KEY,
-      process.env.openai_compatible_api_key,
-      process.env.ANTHROPIC_API_KEY,
-      process.env.OPENAI_API_KEY,
-    ].filter((s): s is string => !!s && s.length > 3);
+    return sanitizeOpenCodeOutput(cleaned) || 'Unknown OpenCode error';
+  }
 
-    for (const secret of secrets) {
-      cleaned = cleaned.replaceAll(secret, '[REDACTED_API_KEY]');
+  private async *executeCliQuery(options: ExecuteOptions): AsyncGenerator<ProviderMessage> {
+    try {
+      yield* super.executeQuery(options);
+    } catch (error) {
+      throw new Error(
+        this.describeFailure(error instanceof Error ? error.message : String(error), options)
+      );
     }
+  }
 
-    return cleaned || text;
+  private describeFailure(
+    text: string,
+    options: ExecuteOptions,
+    exitCode?: number | null,
+    sessionId?: string
+  ): string {
+    return openCodeFailure(
+      text,
+      resolveOpenCodeModel(
+        options.model || 'opencode/big-pickle',
+        options.claudeCompatibleProvider?.id
+      ),
+      exitCode,
+      sessionId || options.sdkSessionId,
+      { ...process.env, ...this.config.env }
+    );
   }
 
   /**
@@ -557,10 +571,10 @@ export class OpencodeProvider extends CliProvider {
     // When no sdkSessionId is set, there is nothing to "retry without" — just
     // stream normally and clean error messages as they pass through.
     if (!options.sdkSessionId) {
-      for await (const msg of super.executeQuery(options)) {
+      for await (const msg of this.executeCliQuery(options)) {
         // Clean error messages so consumers don't get ANSI or double "Error:" prefix
         if (msg.type === 'error' && msg.error && typeof msg.error === 'string') {
-          msg.error = OpencodeProvider.cleanErrorMessage(msg.error);
+          msg.error = this.describeFailure(msg.error, options, msg.exit_code, msg.session_id);
         }
         yield msg;
       }
@@ -580,7 +594,7 @@ export class OpencodeProvider extends CliProvider {
     let seenHealthyMessage = false;
 
     try {
-      for await (const msg of super.executeQuery(options)) {
+      for await (const msg of this.executeCliQuery(options)) {
         if (msg.type === 'error') {
           const errorText = msg.error || '';
           if (OpencodeProvider.isSessionNotFoundError(errorText)) {
@@ -594,7 +608,7 @@ export class OpencodeProvider extends CliProvider {
 
           // Non-session error — clean it
           if (msg.error && typeof msg.error === 'string') {
-            msg.error = OpencodeProvider.cleanErrorMessage(msg.error);
+            msg.error = this.describeFailure(msg.error, options, msg.exit_code, msg.session_id);
           }
         } else {
           // A non-error message is a healthy signal — stop buffering after this
@@ -627,7 +641,7 @@ export class OpencodeProvider extends CliProvider {
             `— retrying without --session to start fresh`
         );
       } else {
-        throw error;
+        throw error; // executeCliQuery already sanitized and added invocation context
       }
     }
 
@@ -640,9 +654,14 @@ export class OpencodeProvider extends CliProvider {
       // If the retry also fails, it's a genuine error (not session-related)
       // and should be surfaced as-is rather than masked with a misleading
       // "session could not be created" message.
-      for await (const retryMsg of super.executeQuery(retryOptions)) {
+      for await (const retryMsg of this.executeCliQuery(retryOptions)) {
         if (retryMsg.type === 'error' && retryMsg.error && typeof retryMsg.error === 'string') {
-          retryMsg.error = OpencodeProvider.cleanErrorMessage(retryMsg.error);
+          retryMsg.error = this.describeFailure(
+            retryMsg.error,
+            retryOptions,
+            retryMsg.exit_code,
+            retryMsg.session_id
+          );
         }
         yield retryMsg;
       }
@@ -675,6 +694,7 @@ export class OpencodeProvider extends CliProvider {
    * @returns Normalized ProviderMessage or null to skip the event
    */
   normalizeEvent(event: unknown): ProviderMessage | null {
+    event = redactOpenCodeEvent(event, { ...process.env, ...this.config.env });
     if (!event || typeof event !== 'object') {
       return null;
     }
@@ -779,6 +799,7 @@ export class OpencodeProvider extends CliProvider {
           type: 'error',
           session_id: toolErrorEvent.sessionID,
           error: errorMessage,
+          ...(openCodeEvent.exitCode != null ? { exit_code: openCodeEvent.exitCode } : {}),
         };
       }
 
@@ -892,12 +913,19 @@ export class OpencodeProvider extends CliProvider {
         //   \x1b[91m\x1b[1mError: \x1b[0mSession not found
         // Without cleaning, consumers that wrap in their own "Error: " prefix
         // produce "Error: Error: Session not found".
+        if (
+          typeof errorEvent.error === 'object' &&
+          /Provider(?:Model)?NotFoundError/.test(errorEvent.error?.name || '')
+        ) {
+          errorMessage = `${errorEvent.error?.name}: ${errorMessage}`;
+        }
         errorMessage = OpencodeProvider.cleanErrorMessage(errorMessage);
 
         return {
           type: 'error',
           session_id: errorEvent.sessionID,
           error: errorMessage,
+          ...(openCodeEvent.exitCode != null ? { exit_code: openCodeEvent.exitCode } : {}),
         };
       }
 
@@ -1557,7 +1585,8 @@ export class OpencodeProvider extends CliProvider {
     const hasCompApiKey = !!compApiKey;
 
     const isCompatibleComplete = hasCompUrl && hasCompModel && hasCompApiKey;
-    const isCompatiblePartial = (hasCompUrl || hasCompModel || hasCompApiKey) && !isCompatibleComplete;
+    const isCompatiblePartial =
+      (hasCompUrl || hasCompModel || hasCompApiKey) && !isCompatibleComplete;
 
     if (isCompatibleComplete) {
       return {

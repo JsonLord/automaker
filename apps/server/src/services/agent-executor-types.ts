@@ -34,6 +34,7 @@ export interface AgentExecutionOptions {
   mcpServers?: Record<string, unknown>;
   sdkSessionId?: string;
   sdkOptions?: {
+    model?: string;
     maxTurns?: number;
     allowedTools?: string[];
     systemPrompt?: string | { type: 'preset'; preset: 'claude_code'; append?: string };

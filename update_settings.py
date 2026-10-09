@@ -1,6 +1,26 @@
 import os
 import json
 import sys
+import tempfile
+
+def remove_managed_profiles(settings):
+    settings["claudeCompatibleProviders"] = [
+        provider for provider in settings.get("claudeCompatibleProviders", [])
+        if provider.get("id") not in ("automaker-compatible", "automaker-compatible-provider")
+    ]
+
+
+def write_atomic(filename, settings):
+    directory = os.path.dirname(filename)
+    fd, temp_path = tempfile.mkstemp(prefix="settings.json.tmp.", dir=directory)
+    try:
+        with os.fdopen(fd, "w") as f:
+            json.dump(settings, f, indent=2)
+        os.replace(temp_path, filename)
+    finally:
+        if os.path.exists(temp_path):
+            os.unlink(temp_path)
+
 
 def main():
     if len(sys.argv) < 3:
@@ -17,38 +37,13 @@ def main():
             with open(settings_file, "r") as f:
                 settings = json.load(f)
         except Exception as e:
-            print(f"Error reading settings: {e}")
+            raise RuntimeError("Cannot read settings; refusing to overwrite them") from e
 
-    # Format canonical model string for automaker-compatible provider
-    if "/" not in model and not model.startswith("automaker-compatible/"):
-        canonical_model = f"automaker-compatible/{model}"
-    else:
-        canonical_model = model
-
+    # OpenCode provider/model identity; credentials remain exclusively in env.
+    bare_model = model.removeprefix("automaker-compatible/")
+    canonical_model = f"automaker-compatible/{bare_model}"
     model_entry = {"model": canonical_model, "providerId": "automaker-compatible"}
-
-    comp_url = os.environ.get("COMPATIBLE_URL", os.environ.get("OPENAI_COMPATIBLE_URL", ""))
-    comp_api_key = os.environ.get("COMPATIBLE_API_KEY", os.environ.get("OPENAI_COMPATIBLE_API_KEY", os.environ.get("OPENAI_COMPATIBLE_API", "")))
-
-    comp_provider = {
-        "id": "automaker-compatible-provider",
-        "name": "Automaker Compatible",
-        "providerType": "custom",
-        "apiKeySource": "inline",
-        "baseUrl": comp_url,
-        "apiKey": comp_api_key,
-        "enabled": True,
-        "models": [
-            {"id": canonical_model, "displayName": canonical_model},
-            {"id": model, "displayName": model},
-            {"id": "test-blablador", "displayName": "test-blablador"},
-            {"id": "automaker-compatible/test-blablador", "displayName": "Automaker Compatible test-blablador"},
-            {"id": "auto", "displayName": "auto"},
-            {"id": "automaker-compatible/auto", "displayName": "Automaker Compatible auto"}
-        ]
-    }
-
-    settings["claudeCompatibleProviders"] = [comp_provider]
+    remove_managed_profiles(settings)
 
     # Set enhancement model
     settings["enhancementModel"] = canonical_model
@@ -88,11 +83,19 @@ def main():
 
     try:
         os.makedirs(data_dir, exist_ok=True)
-        with open(settings_file, "w") as f:
-            json.dump(settings, f, indent=2)
-        print(f"Updated settings with model {canonical_model} across all phase models, profiles, and claudeCompatibleProviders")
+        # Sanitize existing generated-profile backups without copying the old
+        # inline key into a new backup during this migration.
+        for index in range(1, 4):
+            backup_file = f"{settings_file}.bak{index}"
+            if os.path.exists(backup_file):
+                with open(backup_file) as f:
+                    backup = json.load(f)
+                remove_managed_profiles(backup)
+                write_atomic(backup_file, backup)
+        write_atomic(settings_file, settings)
+        print(f"Updated settings with model {canonical_model} across all phase models and profiles (OpenCode credentials stay in environment)")
     except Exception as e:
-        print(f"Error writing settings: {e}")
+        raise RuntimeError("Cannot write OpenCode settings") from e
 
 if __name__ == "__main__":
     main()

@@ -128,7 +128,11 @@ export function getAllCodexModelIds(): CodexModelId[] {
  */
 export const DEFAULT_MODELS = {
   get claude(): string {
-    if (typeof process !== 'undefined' && process.env?.COMPATIBLE_MODEL) {
+    if (
+      typeof process !== 'undefined' &&
+      process.env?.COMPATIBLE_URL &&
+      process.env.COMPATIBLE_MODEL
+    ) {
       const m = process.env.COMPATIBLE_MODEL;
       return m.startsWith('automaker-compatible/') ? m : `automaker-compatible/${m}`;
     }

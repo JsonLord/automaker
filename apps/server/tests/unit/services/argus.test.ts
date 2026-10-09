@@ -23,6 +23,7 @@ afterEach(async () => {
   delete process.env.ARGUS_BRIDGE_FAKE;
   delete process.env.DATA_DIR;
   delete process.env.COMPATIBLE_MODEL;
+  delete process.env.COMPATIBLE_URL;
   await Promise.all(dirs.splice(0).map((dir) => fs.rm(dir, { recursive: true, force: true })));
 });
 
@@ -106,6 +107,7 @@ describe('Argus Milestones A/B', () => {
     const data = await temp();
     process.env.DATA_DIR = data;
     process.env.COMPATIBLE_MODEL = 'brain';
+    process.env.COMPATIBLE_URL = 'https://models.test/v1';
     await ensureArgusControlFiles(dir, '# spec', '# objective');
     const service = new SupervisedArgusService(
       path.resolve(process.cwd(), 'scripts/argus_runtime_bridge.py')

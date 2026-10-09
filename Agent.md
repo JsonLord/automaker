@@ -1,6 +1,6 @@
-# Deployment Guidelines for Automaker to Hugging Face Spaces
+# Deployment Manager Agent.md
 
-This repository contains an `Automaker` instance designed to be deployed directly to Hugging Face Spaces using the Docker SDK.
+This file serves as a guide for further agents regarding deployment best practices and tips for Automaker on Hugging Face Spaces.
 
 ## 1. Deployment Configuration
 
@@ -11,12 +11,12 @@ This repository contains an `Automaker` instance designed to be deployed directl
 - **Frontend Port:** `7860` (mandatory for all Hugging Face Spaces)
 
 ### Deployment Method
-We use the **Docker SDK** for flexibility, as Automaker is a custom Node.js application.
+- **Docker SDK**
 
 ### HF Token
-- The environment variable **`HF_TOKEN` will always be provided at execution time**.
+- The HF token environment variable will always be provided at execution time.
 - Never hardcode the token. Always read it from the environment.
-- All monitoring and log-streaming commands rely on `HF_TOKEN`.
+- All monitoring and log‑streaming commands rely on the HF token.
 
 ### Required Files
 - `Dockerfile`
@@ -29,73 +29,153 @@ We use the **Docker SDK** for flexibility, as Automaker is a custom Node.js appl
   ---
   ```
 - `.hfignore` to exclude unnecessary files
-- `Agent.md` (this file)
+- `Agent.md`
+
+---
 
 ## 2. API Exposure and Documentation
 
 ### Mandatory Endpoints
-The backend exposes the following unauthenticated endpoints required by Hugging Face at the top of the middleware stack:
-
-- **`/health`**
-  - Returns HTTP 200 `{"status": "ok"}` when the app is ready.
-  - Required for Hugging Face to transition the Space from *starting* -> *running*.
-
-- **`/api-docs`**
-  - Documents available API endpoints.
-  - Reachable at: `https://Leon4gr45-automaker.hf.space/api-docs`
+- **`/health`**: Returns HTTP 200 when ready. Required for Hugging Face to transition the Space from starting to running.
+- **`/api-docs`**: Documents all available API endpoints. Reachable at: `https://Leon4gr45-automaker.hf.space/api-docs`
 
 ### Functional Endpoints
 
-#### /health
+### /health
 - **Method:** GET
-- **Purpose:** Check server health and readiness. Required for HF space status.
-- **Request:** (none)
-- **Response:** `{"status": "ok"}`
+- **Path:** `/health`
+- **Purpose:** Check server health and readiness
+- **Request Example:**
+  ```json
+  {}
+  ```
+- **Response Example:**
+  ```json
+  {
+    "status": "ok"
+  }
+  ```
 
-#### /api-docs
+### /api-docs
 - **Method:** GET
-- **Purpose:** Document all available API endpoints.
-- **Request:** (none)
-- **Response:** JSON with API metadata and endpoints list.
+- **Path:** `/api-docs`
+- **Purpose:** Document all available API endpoints
+- **Request Example:**
+  ```json
+  {}
+  ```
+- **Response Example:**
+  ```json
+  {
+    "message": "Automaker API Documentation",
+    "endpoints": [
+      {
+        "method": "GET",
+        "path": "/health",
+        "purpose": "Check server health and readiness"
+      }
+    ]
+  }
+  ```
 
-#### /api/projects
+### /api/projects
 - **Method:** GET
-- **Purpose:** List all configured projects.
-- **Request:** (none)
-- **Response:** JSON containing projects array.
+- **Path:** `/api/projects`
+- **Purpose:** List all configured projects
+- **Request Example:**
+  ```json
+  {}
+  ```
+- **Response Example:**
+  ```json
+  {
+    "projects": [
+      {
+        "id": "project-1",
+        "name": "My Project",
+        "path": "/app/data/projects/my-project"
+      }
+    ]
+  }
+  ```
 
-#### /api/agent/chat
+### /api/agent/chat
 - **Method:** POST
-- **Purpose:** Send a message to the AI agent.
-- **Request:** `{"message": "Hello", "projectPath": "/app/data/projects/my-project"}`
-- **Response:** `{"sessionId": "session-123", "status": "started"}`
+- **Path:** `/api/agent/chat`
+- **Purpose:** Send a message to the AI agent
+- **Request Example:**
+  ```json
+  {
+    "message": "Hello agent",
+    "projectPath": "/app/data/projects/my-project"
+  }
+  ```
+- **Response Example:**
+  ```json
+  {
+    "sessionId": "session-123",
+    "status": "started"
+  }
+  ```
 
-#### /api/features
+### /api/features
 - **Method:** POST
-- **Purpose:** Create a new feature card on the Kanban board.
-- **Request:** `{"title": "New Feature", "description": "Details...", "projectPath": "..."}`
-- **Response:** `{"id": "feat-123", "title": "New Feature", "status": "backlog"}`
+- **Path:** `/api/features`
+- **Purpose:** Create a new feature card on the Kanban board
+- **Request Example:**
+  ```json
+  {
+    "title": "New Feature",
+    "description": "Implement feature details",
+    "projectPath": "/app/data/projects/my-project"
+  }
+  ```
+- **Response Example:**
+  ```json
+  {
+    "id": "feat-123",
+    "title": "New Feature",
+    "status": "backlog"
+  }
+  ```
 
-#### /api/settings
+### /api/settings
 - **Method:** GET
-- **Purpose:** Get global application settings.
-- **Request:** (none)
-- **Response:** JSON with current settings configuration.
+- **Path:** `/api/settings`
+- **Purpose:** Get global application settings
+- **Request Example:**
+  ```json
+  {}
+  ```
+- **Response Example:**
+  ```json
+  {
+    "theme": "dark",
+    "concurrentAgents": 3
+  }
+  ```
+
+---
 
 ## 3. Deployment Workflow
 
-Standard Hugging Face Hub CLI deployment command:
+Precondition: Use the huggingface hub cli `hf` to check that the space is empty of files and delete any which are still in there and not belonging to the project to be uploaded.
 
+### Standard Deployment Command
+After any code change, run:
 ```bash
-hf upload Leon4gr45/automaker --repo-type=space
+hf upload Leon4gr45/automaker . --repo-type=space --token <HF_TOKEN>
 ```
 
-Monitor via Hugging Face SSE endpoints:
-
+### Monitoring Logs
+Scan build and run logs:
+- Get build logs (SSE):
 ```bash
-# Build logs
-curl -N -H "Authorization: Bearer <TOKEN>" "https://huggingface.co/api/spaces/Leon4gr45/automaker/logs/build"
-
-# Run logs
-curl -N -H "Authorization: Bearer <TOKEN>" "https://huggingface.co/api/spaces/Leon4gr45/automaker/logs/run"
+curl -N -H "Authorization: Bearer <HF_TOKEN>" "https://huggingface.co/api/spaces/Leon4gr45/automaker/logs/build"
 ```
+- Get run logs (SSE) once the build logs succeed:
+```bash
+curl -N -H "Authorization: Bearer <HF_TOKEN>" "https://huggingface.co/api/spaces/Leon4gr45/automaker/logs/run"
+```
+
+Monitor for 300 seconds to see if the deployment has been successful. If any logs indicate failure, fix these issues in the codebase via code modifications, redeploy, and monitor again until the space is running and reacts to API endpoints.

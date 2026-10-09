@@ -5,7 +5,11 @@
 import path from 'path';
 import type { Feature } from '@automaker/types';
 import { createLogger, classifyError, loadContextFiles, recordMemoryUsage } from '@automaker/utils';
-import { resolveModelString, DEFAULT_MODELS } from '@automaker/model-resolver';
+import {
+  resolveModelString,
+  resolveOpenCodeModel,
+  DEFAULT_MODELS,
+} from '@automaker/model-resolver';
 import { getFeatureDir } from '@automaker/platform';
 import { ProviderFactory } from '../providers/provider-factory.js';
 import * as secureFs from '../lib/secure-fs.js';
@@ -305,7 +309,10 @@ ${feature.spec}
       const imagePaths = feature.imagePaths?.map((img) =>
         typeof img === 'string' ? img : img.path
       );
-      const model = resolveModelString(feature.model, DEFAULT_MODELS.claude);
+      const model =
+        feature.providerId === 'opencode' && feature.model
+          ? resolveOpenCodeModel(feature.model, 'opencode').id
+          : resolveModelString(feature.model, DEFAULT_MODELS.claude);
       tempRunningFeature.model = model;
       tempRunningFeature.provider = ProviderFactory.getProviderNameForModel(model);
 

@@ -1,3 +1,4 @@
+import { resolveOpenCodeModel, isManagedOpenCodeProvider } from '@automaker/model-resolver';
 /**
  * Settings Service - Handles reading/writing settings to JSON files
  *
@@ -239,6 +240,41 @@ export class SettingsService {
       needsSave = true;
     }
 
+    // Older startup code registered the OpenCode endpoint as a Claude SDK
+    // profile and copied its environment credential into settings.json. Remove
+    // only that generated profile; preserve user-created providers.
+    const hadManagedProfile = (result.claudeCompatibleProviders || []).some((provider) =>
+      isManagedOpenCodeProvider(provider.id)
+    );
+    const beforeManagedMigration = JSON.stringify(result);
+    result.claudeCompatibleProviders = (result.claudeCompatibleProviders || []).filter(
+      (provider) => !isManagedOpenCodeProvider(provider.id)
+    );
+    const migrateEntry = (entry: import('@automaker/types').PhaseModelEntry) => {
+      if (
+        isManagedOpenCodeProvider(entry.providerId) ||
+        entry.model?.startsWith('automaker-compatible/') ||
+        (process.env.COMPATIBLE_URL &&
+          entry.model === process.env.COMPATIBLE_MODEL?.replace(/^automaker-compatible\//, ''))
+      ) {
+        return {
+          ...entry,
+          model: resolveOpenCodeModel(entry.model, entry.providerId).id,
+          providerId: 'automaker-compatible',
+        };
+      }
+      return entry;
+    };
+    for (const key of Object.keys(result.phaseModels) as Array<keyof typeof result.phaseModels>) {
+      result.phaseModels[key] = migrateEntry(result.phaseModels[key]);
+    }
+    result.defaultFeatureModel = migrateEntry(result.defaultFeatureModel);
+    const legacy = result as GlobalSettings & {
+      profiles?: import('@automaker/types').PhaseModelEntry[];
+    };
+    if (legacy.profiles) legacy.profiles = legacy.profiles.map(migrateEntry);
+    if (JSON.stringify(result) !== beforeManagedMigration) needsSave = true;
+
     // Update version if any migration occurred
     if (needsSave) {
       result.version = SETTINGS_VERSION;
@@ -248,7 +284,26 @@ export class SettingsService {
     if (needsSave) {
       try {
         await ensureDataDir(this.dataDir);
-        await writeSettingsJson(settingsPath, result);
+        // Do not create a new backup containing the legacy environment key.
+        await atomicWriteJson(settingsPath, result, {
+          backupCount: hadManagedProfile ? 0 : DEFAULT_BACKUP_COUNT,
+        });
+        if (hadManagedProfile) {
+          for (let index = 1; index <= DEFAULT_BACKUP_COUNT; index++) {
+            const backupPath = `${settingsPath}.bak${index}`;
+            try {
+              const backup = JSON.parse((await secureFs.readFile(backupPath, 'utf8')) as string);
+              if (Array.isArray(backup.claudeCompatibleProviders)) {
+                backup.claudeCompatibleProviders = backup.claudeCompatibleProviders.filter(
+                  (provider: { id?: string }) => !isManagedOpenCodeProvider(provider.id)
+                );
+                await atomicWriteJson(backupPath, backup);
+              }
+            } catch (error) {
+              if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+            }
+          }
+        }
         logger.info('Settings migration complete');
       } catch (error) {
         logger.error('Failed to save migrated settings:', error);

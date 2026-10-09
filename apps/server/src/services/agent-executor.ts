@@ -1,3 +1,4 @@
+import { resolveOpenCodeModel } from '@automaker/model-resolver';
 /**
  * AgentExecutor - Core agent execution engine with streaming support
  */
@@ -118,7 +119,13 @@ export class AgentExecutor {
 
     const executeOptions: ExecuteOptions = {
       prompt: promptContent,
-      model: effectiveBareModel,
+      model:
+        provider.getName() === 'opencode'
+          ? resolveOpenCodeModel(
+              (sdkOptions?.model as string | undefined) || options.model || effectiveBareModel,
+              claudeCompatibleProvider?.id
+            ).id
+          : effectiveBareModel,
       maxTurns: resolvedMaxTurns,
       cwd: workDir,
       allowedTools: sdkOptions?.allowedTools as string[] | undefined,
@@ -809,7 +816,13 @@ export class AgentExecutor {
   private buildExecOpts(o: AgentExecutionOptions, prompt: string, maxTurns: number) {
     return {
       prompt,
-      model: o.effectiveBareModel,
+      model:
+        o.provider.getName() === 'opencode'
+          ? resolveOpenCodeModel(
+              (o.sdkOptions?.model as string | undefined) || o.model || o.effectiveBareModel,
+              o.claudeCompatibleProvider?.id
+            ).id
+          : o.effectiveBareModel,
       maxTurns,
       cwd: o.workDir,
       allowedTools: o.sdkOptions?.allowedTools as string[] | undefined,

@@ -1,3 +1,4 @@
+import { resolveOpenCodeModel } from '@automaker/model-resolver';
 import { spawn, type ChildProcessWithoutNullStreams } from 'child_process';
 import fs from 'fs/promises';
 import path from 'path';
@@ -60,11 +61,32 @@ export class SupervisedArgusService implements ArgusService {
     const allowed = [
       'PATH',
       'HOME',
+      'XDG_CONFIG_HOME',
+      'XDG_DATA_HOME',
+      'XDG_CACHE_HOME',
+      'XDG_STATE_HOME',
+      'OPENCODE_CONFIG',
+      'HTTPS_PROXY',
+      'HTTP_PROXY',
+      'ALL_PROXY',
+      'NO_PROXY',
+      'https_proxy',
+      'http_proxy',
+      'all_proxy',
+      'no_proxy',
+      'NODE_EXTRA_CA_CERTS',
+      'SSL_CERT_FILE',
       'ARGUS_BIN',
       'ARGUS_BRIDGE_FAKE',
       'ARGUS_WEB_PORT',
       'ARGUS_SKILL_HOME',
       'COMPATIBLE_API_KEY',
+      'ARGUS_SKILL_OPENCODE_PROVIDER',
+      'ARGUS_SKILL_MODEL',
+      'ARGUS_SKILL_MANAGER_MODEL',
+      'ARGUS_SKILL_PLAN_MODEL',
+      'ARGUS_SKILL_ENGINEER_MODEL',
+      'ARGUS_SKILL_REVIEWER_MODEL',
     ];
     const env = Object.fromEntries(
       allowed.flatMap((key) => (process.env[key] ? [[key, process.env[key]!]] : []))
@@ -75,13 +97,13 @@ export class SupervisedArgusService implements ArgusService {
     env.ARGUS_SKILL_PLANNER_BACKEND = 'opencode';
     env.ARGUS_SKILL_ENGINEER_BACKEND = 'opencode';
     env.ARGUS_SKILL_REVIEWER_BACKEND = 'opencode';
-    env.ARGUS_SKILL_OPENCODE_PROVIDER = 'automaker-compatible';
-    if (process.env.COMPATIBLE_MODEL) {
-      env.ARGUS_SKILL_MODEL = process.env.COMPATIBLE_MODEL;
-      env.ARGUS_SKILL_MANAGER_MODEL = process.env.COMPATIBLE_MODEL;
-      env.ARGUS_SKILL_PLAN_MODEL = process.env.COMPATIBLE_MODEL;
-      env.ARGUS_SKILL_ENGINEER_MODEL = process.env.COMPATIBLE_MODEL;
-      env.ARGUS_SKILL_REVIEWER_MODEL = process.env.COMPATIBLE_MODEL;
+    if (process.env.COMPATIBLE_URL && process.env.COMPATIBLE_MODEL) {
+      const identity = resolveOpenCodeModel(process.env.COMPATIBLE_MODEL, 'automaker-compatible');
+      env.ARGUS_SKILL_OPENCODE_PROVIDER = identity.provider;
+      for (const role of ['', 'MANAGER_', 'PLAN_', 'ENGINEER_', 'REVIEWER_']) {
+        // The upstream bridge has separate provider and model fields.
+        env[`ARGUS_SKILL_${role}MODEL`] = identity.model;
+      }
     }
     this.child = spawn(process.env.ARGUS_PYTHON || 'python3', ['-u', this.bridgePath], {
       stdio: ['pipe', 'pipe', 'pipe'],
@@ -139,7 +161,11 @@ export class SupervisedArgusService implements ArgusService {
       : { running: false, upstreamInstalled: false, error: 'bridge not started' };
   }
   async createOrResolveProject(input: { projectId: string; projectPath: string; model: string }) {
-    const state = await resolveState(input.projectId, input.projectPath, input.model);
+    const state = await resolveState(
+      input.projectId,
+      input.projectPath,
+      resolveOpenCodeModel(input.model).id
+    );
     this.projects.set(input.projectPath, state);
     const native = await this.call<{ projectId: string; correlationId: string }>('ensure_project', {
       projectId: state.argusCorrelationId,

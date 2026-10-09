@@ -40,17 +40,32 @@ export function createDetailsHandler() {
       }
 
       try {
-        // Get current branch
-        const { stdout: branchRaw } = await execAsync('git rev-parse --abbrev-ref HEAD', {
-          cwd: projectPath,
-        });
-        const branch = branchRaw.trim();
+        let branch = 'main';
+        let hasHead = false;
+
+        try {
+          const { stdout: branchRaw } = await execAsync('git symbolic-ref --short HEAD', {
+            cwd: projectPath,
+          }).catch(async () => {
+            return await execAsync('git rev-parse --abbrev-ref HEAD', { cwd: projectPath });
+          });
+          branch = branchRaw.trim();
+        } catch {
+          branch = 'main';
+        }
+
+        try {
+          await execAsync('git rev-parse --verify HEAD', { cwd: projectPath });
+          hasHead = true;
+        } catch {
+          hasHead = false;
+        }
 
         if (!filePath) {
-          // Project-level details - just return branch info
+          // Project-level details - return branch and head status
           res.json({
             success: true,
-            details: { branch },
+            details: { branch, hasHead, initialized: true },
           });
           return;
         }
@@ -61,22 +76,24 @@ export function createDetailsHandler() {
         let lastCommitAuthor = '';
         let lastCommitTimestamp = '';
 
-        try {
-          const { stdout: logOutput } = await execFileAsync(
-            'git',
-            ['log', '-1', '--format=%H|%s|%an|%aI', '--', filePath],
-            { cwd: projectPath }
-          );
+        if (hasHead) {
+          try {
+            const { stdout: logOutput } = await execFileAsync(
+              'git',
+              ['log', '-1', '--format=%H|%s|%an|%aI', '--', filePath],
+              { cwd: projectPath }
+            );
 
-          if (logOutput.trim()) {
-            const parts = logOutput.trim().split('|');
-            lastCommitHash = parts[0] || '';
-            lastCommitMessage = parts[1] || '';
-            lastCommitAuthor = parts[2] || '';
-            lastCommitTimestamp = parts[3] || '';
+            if (logOutput.trim()) {
+              const parts = logOutput.trim().split('|');
+              lastCommitHash = parts[0] || '';
+              lastCommitMessage = parts[1] || '';
+              lastCommitAuthor = parts[2] || '';
+              lastCommitTimestamp = parts[3] || '';
+            }
+          } catch {
+            // File may not have any commits yet
           }
-        } catch {
-          // File may not have any commits yet
         }
 
         // Get diff stats (lines added/removed)

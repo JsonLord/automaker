@@ -20,9 +20,17 @@ export async function captureGitDispatchContext(
   projectPath: string,
   explicitBaseBranch?: string
 ): Promise<GitDispatchContext> {
-  const remoteUrl = (await execGitCommand(['remote', 'get-url', 'origin'], projectPath)).trim();
+  let remoteUrl = '';
+  try {
+    remoteUrl = (await execGitCommand(['remote', 'get-url', 'origin'], projectPath)).trim();
+  } catch {
+    throw new Error('GITHUB_REMOTE_REQUIRED_FOR_JULES: Jules autonomous execution requires a canonical GitHub repository remote origin.');
+  }
+
   const repository = normalizeGitHubRepository(remoteUrl);
-  if (!repository) throw new Error('JULES_SOURCE_NOT_FOUND: origin is not a GitHub repository');
+  if (!repository) {
+    throw new Error('GITHUB_REMOTE_REQUIRED_FOR_JULES: origin is not a canonical GitHub repository URL.');
+  }
   await execGitCommand(['fetch', '--prune', 'origin'], projectPath);
   let baseBranch = explicitBaseBranch || '';
   if (!baseBranch)

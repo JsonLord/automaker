@@ -272,8 +272,10 @@ const app = express();
 
 // Move health checks to the top but DON'T intercept the root '/' which serves the UI
 app.get('/health', (_req, res) => res.status(200).json({ status: 'ok' }));
-app.get('/api-docs', (_req, res) => {
-  const publicUrl = process.env.AUTOMAKER_PUBLIC_URL || 'https://leon4gr45-twenty.hf.space';
+app.get('/api-docs', (req, res) => {
+  const host = req.get('host');
+  const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+  const publicUrl = process.env.AUTOMAKER_PUBLIC_URL || (host ? `${protocol}://${host}` : 'https://Leon4gr45-automaker.hf.space');
   res.status(200).json({
     message: 'Automaker API Documentation',
     baseUrl: publicUrl,
@@ -604,7 +606,7 @@ app.use('/api/models', createModelsRoutes());
 app.use('/api/spec-regeneration', createSpecRegenerationRoutes(events, settingsService));
 app.use('/api/running-agents', createRunningAgentsRoutes(autoModeService));
 app.use('/api/workspace', createWorkspaceRoutes());
-app.use('/api/templates', createTemplatesRoutes());
+app.use('/api/templates', createTemplatesRoutes(settingsService));
 app.use('/api/terminal', createTerminalRoutes());
 app.use('/api/settings', createSettingsRoutes(settingsService));
 app.use('/api/claude', createClaudeRoutes(claudeUsageService));
@@ -694,7 +696,7 @@ server.on('upgrade', (request, socket, head) => {
 
   // Authenticate all WebSocket connections
   if (!authenticateWebSocket(request)) {
-    logger.info('Authentication failed, rejecting connection');
+    logger.debug('Authentication failed, rejecting connection');
     socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
     socket.destroy();
     return;

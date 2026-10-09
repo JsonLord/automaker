@@ -1,3 +1,5 @@
+import { openCodeFailure, redactOpenCodeOutput } from '../../lib/opencode-errors.js';
+import { resolveOpenCodeModel } from '@automaker/model-resolver';
 import crypto from 'crypto';
 import fs from 'fs/promises';
 import os from 'os';
@@ -23,25 +25,87 @@ export const READ_ONLY_ENFORCEMENT =
 
 export class OpenCodeRoleRunner {
   constructor(
-    private readonly model = `automaker-compatible/${process.env.COMPATIBLE_MODEL || ''}`,
+    private readonly model = process.env.COMPATIBLE_URL && process.env.COMPATIBLE_MODEL
+      ? resolveOpenCodeModel(process.env.COMPATIBLE_MODEL, 'automaker-compatible').id
+      : 'opencode/big-pickle',
     private readonly invoke: RoleInvoker = OpenCodeRoleRunner.invokeCli
   ) {}
 
   static async invokeCli(input: RoleInvocation) {
-    const result = await spawnProcess({
-      command: 'opencode',
-      args: ['run', '--model', input.model, '--format', 'json', input.prompt],
-      cwd: input.cwd,
-      env: Object.fromEntries(
-        [
-          ['PATH', process.env.PATH],
-          ['HOME', process.env.HOME],
-          ['COMPATIBLE_API_KEY', process.env.COMPATIBLE_API_KEY],
-        ].filter((entry): entry is [string, string] => Boolean(entry[1]))
-      ),
-    });
-    if (result.exitCode !== 0) throw new Error('OPENCODE_ROLE_FAILED');
-    return result.stdout;
+    const abortController = new AbortController();
+    const timer = setTimeout(() => abortController.abort(), 180000);
+    let result;
+    try {
+      result = await spawnProcess({
+        command: 'opencode',
+        args: ['run', '--model', input.model, '--format', 'json'],
+        stdinData: input.prompt,
+        maxOutputBytes: 65536,
+        abortController,
+        cwd: input.cwd,
+        env: Object.fromEntries(
+          [
+            ['PATH', process.env.PATH],
+            ['HOME', process.env.HOME],
+            ['COMPATIBLE_API_KEY', process.env.COMPATIBLE_API_KEY],
+          ].filter((entry): entry is [string, string] => Boolean(entry[1]))
+        ),
+      });
+    } catch {
+      throw new Error(
+        openCodeFailure(
+          'OpenCode role subprocess failed or timed out',
+          resolveOpenCodeModel(input.model)
+        )
+      );
+    } finally {
+      clearTimeout(timer);
+    }
+    if (result.exitCode !== 0)
+      throw new Error(
+        openCodeFailure(
+          result.stderr || result.stdout,
+          resolveOpenCodeModel(input.model),
+          result.exitCode
+        )
+      );
+    const text: string[] = [];
+    let sessionId: string | undefined;
+    for (const line of result.stdout.split(/\r?\n/).filter(Boolean)) {
+      let event: any;
+      try {
+        event = JSON.parse(line);
+      } catch {
+        continue;
+      }
+      sessionId = event.sessionID || sessionId;
+      if (event.type === 'error') {
+        throw new Error(
+          openCodeFailure(
+            typeof event.error === 'string'
+              ? event.error
+              : event.error?.data?.message ||
+                  event.error?.message ||
+                  event.error?.name ||
+                  'Unknown error',
+            resolveOpenCodeModel(input.model),
+            result.exitCode,
+            sessionId
+          )
+        );
+      }
+      if (event.type === 'text' && typeof event.part?.text === 'string') text.push(event.part.text);
+    }
+    if (!text.length)
+      throw new Error(
+        openCodeFailure(
+          result.stderr || 'OpenCode returned no text content',
+          resolveOpenCodeModel(input.model),
+          result.exitCode,
+          sessionId
+        )
+      );
+    return redactOpenCodeOutput(text.join(''));
   }
 
   async diagnose(payload: unknown): Promise<{ contextId: string; result: SeniorDiagnosis }> {
@@ -57,7 +121,7 @@ export class OpenCodeRoleRunner {
     const output = await this.invoke({
       role: 'engineer',
       contextId,
-      model: this.model,
+      model: resolveOpenCodeModel(this.model).id,
       prompt,
       cwd: worktreePath,
       readOnly: false,
@@ -77,7 +141,7 @@ export class OpenCodeRoleRunner {
       const output = await this.invoke({
         role,
         contextId,
-        model: this.model,
+        model: resolveOpenCodeModel(this.model).id,
         prompt: `${JSON.stringify(payload)}\nReturn only the required JSON object.`,
         cwd: sandbox,
         readOnly: true,

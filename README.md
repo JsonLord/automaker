@@ -8,7 +8,7 @@ app_port: 7860
 pinned: false
 ---
 
-<!-- Hugging Face Space Deployment for Leon4gr45/twenty -->
+<!-- Hugging Face Space Deployment for Leon4gr45/automaker -->
 
 <p align="center">
   <img src="apps/ui/public/readme_logo.svg" alt="Automaker Logo" height="80" />

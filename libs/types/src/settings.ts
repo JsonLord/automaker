@@ -1790,29 +1790,28 @@ export interface ProjectSettings {
 /** Default phase model configuration - sensible defaults for each task type
  * Uses canonical prefixed model IDs for consistent routing.
  */
+const defaultCompatibleModel =
+  typeof process !== 'undefined' && process.env?.COMPATIBLE_URL && process.env.COMPATIBLE_MODEL
+    ? `automaker-compatible/${process.env.COMPATIBLE_MODEL.replace(/^automaker-compatible\//, '')}`
+    : undefined;
+const phaseDefault = (model: string, thinkingLevel?: ThinkingLevel): PhaseModelEntry =>
+  defaultCompatibleModel
+    ? { model: defaultCompatibleModel, providerId: 'automaker-compatible' }
+    : { model, ...(thinkingLevel ? { thinkingLevel } : {}) };
+
 export const DEFAULT_PHASE_MODELS: PhaseModelConfig = {
-  // Quick tasks - use fast models for speed and cost
-  enhancementModel: { model: 'claude-sonnet' },
-  fileDescriptionModel: { model: 'claude-haiku' },
-  imageDescriptionModel: { model: 'claude-haiku' },
-
-  // Validation - use smart models for accuracy
-  validationModel: { model: 'claude-sonnet' },
-
-  // Generation - use powerful models for quality
-  specGenerationModel: { model: 'claude-opus', thinkingLevel: 'adaptive' },
-  featureGenerationModel: { model: 'claude-sonnet' },
-  backlogPlanningModel: { model: 'claude-sonnet' },
-  projectAnalysisModel: { model: 'claude-sonnet' },
-  ideationModel: { model: 'claude-sonnet' },
-
-  // Memory - use fast model for learning extraction (cost-effective)
-  memoryExtractionModel: { model: 'claude-haiku' },
-
-  // Commit messages - use fast model for speed
-  commitMessageModel: { model: 'claude-haiku' },
-  // PR descriptions - use balanced model for better quality descriptions
-  prDescriptionModel: { model: 'claude-sonnet' },
+  enhancementModel: phaseDefault('claude-sonnet'),
+  fileDescriptionModel: phaseDefault('claude-haiku'),
+  imageDescriptionModel: phaseDefault('claude-haiku'),
+  validationModel: phaseDefault('claude-sonnet'),
+  specGenerationModel: phaseDefault('claude-opus', 'adaptive'),
+  featureGenerationModel: phaseDefault('claude-sonnet'),
+  backlogPlanningModel: phaseDefault('claude-sonnet'),
+  projectAnalysisModel: phaseDefault('claude-sonnet'),
+  ideationModel: phaseDefault('claude-sonnet'),
+  memoryExtractionModel: phaseDefault('claude-haiku'),
+  commitMessageModel: phaseDefault('claude-haiku'),
+  prDescriptionModel: phaseDefault('claude-sonnet'),
 };
 
 /** Current version of the global settings schema */

@@ -114,6 +114,8 @@ export class ArgusOrchestrator {
       id: task.featureId,
       title: task.title,
       category: 'Argus',
+      orchestrator: 'argus',
+      executionOwner: 'argus-autonomy',
       description: task.description,
       status: task.phase === 'blocked' ? 'failed' : 'backlog',
       dependencies: task.dependencies,

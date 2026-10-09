@@ -38,6 +38,26 @@ describe('opencode-provider.ts', () => {
   // Basic Provider Tests
   // ==========================================================================
 
+  it('does not retry a thrown model-not-found error merely because diagnostics include a session ID', async () => {
+    (provider as unknown as { cliPath: string }).cliPath = '/usr/bin/opencode';
+    vi.mocked(spawnJSONLProcess).mockReturnValue(
+      (async function* () {
+        throw new Error('ProviderModelNotFoundError');
+      })()
+    );
+    await expect(
+      collectAsyncGenerator(
+        provider.executeQuery({
+          prompt: 'Hello',
+          model: 'opencode/missing',
+          sdkSessionId: 'existing-session',
+          cwd: '/tmp',
+        })
+      )
+    ).rejects.toThrow('OPENCODE_MODEL_NOT_CONFIGURED');
+    expect(spawnJSONLProcess).toHaveBeenCalledTimes(1);
+  });
+
   describe('getName', () => {
     it("should return 'opencode' as provider name", () => {
       expect(provider.getName()).toBe('opencode');
@@ -225,6 +245,8 @@ describe('opencode-provider.ts', () => {
 
     it('should format model as automaker-compatible/<model> when COMPATIBLE_MODEL is configured', () => {
       const original = process.env.COMPATIBLE_MODEL;
+      const originalUrl = process.env.COMPATIBLE_URL;
+      process.env.COMPATIBLE_URL = 'https://example.test/v1';
       process.env.COMPATIBLE_MODEL = 'MiniMax-M2.7';
 
       try {
@@ -238,7 +260,10 @@ describe('opencode-provider.ts', () => {
         expect(modelIndex).toBeGreaterThan(-1);
         expect(args[modelIndex + 1]).toBe('automaker-compatible/MiniMax-M2.7');
       } finally {
-        process.env.COMPATIBLE_MODEL = original;
+        if (original === undefined) delete process.env.COMPATIBLE_MODEL;
+        else process.env.COMPATIBLE_MODEL = original;
+        if (originalUrl === undefined) delete process.env.COMPATIBLE_URL;
+        else process.env.COMPATIBLE_URL = originalUrl;
       }
     });
   });

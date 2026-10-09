@@ -1,3 +1,4 @@
+import { resolveOpenCodeModel } from '@automaker/model-resolver';
 import crypto from 'crypto';
 import fs from 'fs/promises';
 import path from 'path';
@@ -149,6 +150,9 @@ export async function resolveState(
       existing.autonomy = 'enabled';
       existing.latestStatus = 'External objective change requires Manager reconciliation.';
     }
+    for (const role of Object.values(existing.roles)) {
+      role.model = resolveOpenCodeModel(role.model).id;
+    }
     existing.updatedAt = new Date().toISOString();
     await saveArgusState(projectPath, existing);
     return existing;
@@ -159,7 +163,7 @@ export async function resolveState(
   const roles = Object.fromEntries(
     (['manager', 'planner', 'reviewer', 'senior-engineer'] as ArgusRole[]).map((role) => [
       role,
-      roleContext(id, role, model),
+      roleContext(id, role, resolveOpenCodeModel(model).id),
     ])
   ) as ArgusProjectState['roles'];
   const state: ArgusProjectState = {

@@ -1,3 +1,4 @@
+import { resolveOpenCodeModel, isManagedOpenCodeProvider } from '@automaker/model-resolver';
 /**
  * Helper utilities for loading settings and context file handling across different parts of the server
  */
@@ -742,6 +743,23 @@ export async function resolveProviderContext(
   providerId?: string,
   logPrefix = '[SettingsHelper]'
 ): Promise<ProviderContextResult> {
+  // This is an OpenCode provider, not a Claude-compatible SDK profile. Its key
+  // is supplied to the CLI through the environment, never through stored settings.
+  if (
+    isManagedOpenCodeProvider(providerId) ||
+    providerId === 'opencode' ||
+    modelId.startsWith('automaker-compatible/') ||
+    (!providerId &&
+      process.env.COMPATIBLE_URL &&
+      modelId === process.env.COMPATIBLE_MODEL?.replace(/^automaker-compatible\//, ''))
+  ) {
+    return {
+      provider: undefined,
+      credentials: undefined,
+      resolvedModel: resolveOpenCodeModel(modelId, providerId).id,
+      modelConfig: undefined,
+    };
+  }
   try {
     const globalSettings = await settingsService.getGlobalSettings();
     const credentials = await settingsService.getCredentials();

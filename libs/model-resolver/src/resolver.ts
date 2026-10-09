@@ -35,6 +35,8 @@ import {
   type ReasoningEffort,
 } from '@automaker/types';
 
+import { resolveOpenCodeModel, isManagedOpenCodeProvider } from './opencode.js';
+
 // Pattern definitions for Codex/OpenAI models
 const CODEX_MODEL_PREFIXES = ['codex-', 'gpt-'];
 const OPENAI_O_SERIES_PATTERN = /^o\d/;
@@ -59,6 +61,16 @@ export function resolveModelString(
     `[ModelResolver] resolveModelString called with modelKey: "${modelKey}", defaultModel: "${defaultModel}"`
   );
 
+  if (
+    modelKey &&
+    typeof process !== 'undefined' &&
+    process.env?.COMPATIBLE_URL &&
+    process.env.COMPATIBLE_MODEL &&
+    modelKey === process.env.COMPATIBLE_MODEL.replace(/^automaker-compatible\//, '')
+  ) {
+    return resolveOpenCodeModel(modelKey).id;
+  }
+
   // No model specified - use default
   if (!modelKey) {
     console.log(`[ModelResolver] No model specified, using default: ${defaultModel}`);
@@ -74,7 +86,7 @@ export function resolveModelString(
   // Automaker Compatible model (e.g., "automaker-compatible/MiniMax-M2.7")
   if (canonicalKey.startsWith('automaker-compatible/')) {
     console.log(`[ModelResolver] Using Automaker Compatible model: ${canonicalKey}`);
-    return canonicalKey;
+    return resolveOpenCodeModel(canonicalKey).id;
   }
 
   // Cursor model with explicit prefix (e.g., "cursor-auto", "cursor-composer-1")
@@ -240,7 +252,10 @@ export function resolvePhaseModel(
       `[ModelResolver] Using provider model: providerId="${phaseModel.providerId}", model="${phaseModel.model}"`
     );
     return {
-      model: phaseModel.model, // Pass through unchanged
+      model:
+        isManagedOpenCodeProvider(phaseModel.providerId) || phaseModel.providerId === 'opencode'
+          ? resolveOpenCodeModel(phaseModel.model, phaseModel.providerId).id
+          : phaseModel.model,
       thinkingLevel: phaseModel.thinkingLevel,
       reasoningEffort: phaseModel.reasoningEffort,
       providerId: phaseModel.providerId,

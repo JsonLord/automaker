@@ -273,6 +273,8 @@ export interface ProviderMessage {
     content: ContentBlock[];
   };
   result?: string;
+  /** CLI process exit code when available. */
+  exit_code?: number | null;
   error?: string;
   parent_tool_use_id?: string | null;
   /** Structured output from SDK when using outputFormat */

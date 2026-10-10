@@ -41,6 +41,9 @@ describe('Argus Control Endpoints', () => {
   it('resume - should resume runner, update state and register/wake', async () => {
     mockService.getStatus.mockResolvedValue({ autonomy: 'paused', reconciliation: {} });
 
+    // We expect wake to be awaited
+    mockRunner.wake.mockResolvedValue(undefined);
+
     const res = await request(app).post('/api/argus/resume').send({ projectPath: '/test/path' });
 
     expect(res.status).toBe(200);
@@ -49,12 +52,30 @@ describe('Argus Control Endpoints', () => {
     expect(mockRunner.wake).toHaveBeenCalledWith('/test/path', 'api-resume');
   });
 
+  it('resume - should generate parseable ISO date string', async () => {
+    mockService.getStatus.mockResolvedValue({ autonomy: 'paused', reconciliation: {} });
+    mockRunner.wake.mockResolvedValue(undefined);
+
+    // Provide a mocked implementation for project lifecycle saveState since we're using dynamic import in the handler
+    vi.mock('../../src/services/argus/project-lifecycle.js', () => ({
+      saveArgusState: vi.fn((path, state) => {
+        // Assert the nextAt inside the mock to catch the state updates
+        expect(Number.isNaN(Date.parse(state.reconciliation.nextAt))).toBe(false);
+      }),
+    }));
+
+    const res = await request(app).post('/api/argus/resume').send({ projectPath: '/test/path' });
+
+    expect(res.status).toBe(200);
+  });
+
   it('wake - should wake runner with reason', async () => {
     mockService.getStatus.mockResolvedValue({
       phase: 'test',
       latestStatus: 'test',
       reconciliation: {},
     });
+    mockRunner.wake.mockResolvedValue(undefined);
 
     const res = await request(app)
       .post('/api/argus/wake')
@@ -63,6 +84,31 @@ describe('Argus Control Endpoints', () => {
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
     expect(mockRunner.wake).toHaveBeenCalledWith('/test/path', 'manual wake');
+  });
+
+  it('wake - should handle wake failure deterministically', async () => {
+    mockService.getStatus.mockResolvedValue({
+      phase: 'test',
+      latestStatus: 'test',
+      reconciliation: {},
+    });
+
+    // Reject the wake call
+    mockRunner.wake.mockRejectedValue(new Error('Wake failed inside runner'));
+
+    const res = await request(app).post('/api/argus/wake').send({ projectPath: '/test/path' });
+
+    // It should surface as a 500 error handled by express, without crashing node with an UnhandledPromiseRejection
+    expect(res.status).toBe(500);
+  });
+
+  it('wake - should check if project is missing and return 404 before trying to wake runner', async () => {
+    mockService.getStatus.mockResolvedValue(null);
+
+    const res = await request(app).post('/api/argus/wake').send({ projectPath: '/unknown/path' });
+
+    expect(res.status).toBe(404);
+    expect(mockRunner.wake).not.toHaveBeenCalled();
   });
 
   it('reconcile - should run reconcile', async () => {

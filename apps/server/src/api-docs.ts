@@ -51,7 +51,7 @@ export function handleApiDocs(req: Request, res: Response) {
         path: '/api/auth/token',
         purpose: 'Get short-lived websocket token (Authenticated endpoint)',
         request: {},
-        response: { token: 'wsToken...', expiresAt: 123456789 },
+        response: { success: true, token: 'wsToken...', expiresIn: 300 },
       },
       {
         method: 'POST',
@@ -86,12 +86,7 @@ export function handleApiDocs(req: Request, res: Response) {
           success: true,
           projectId: '...',
           projectPath: '...',
-          bootstrap: {
-            controlFiles: true,
-            baselineHead: '...',
-            argusRegistered: true,
-            argusWoken: true,
-          },
+          projectName: '...',
         },
       },
       {

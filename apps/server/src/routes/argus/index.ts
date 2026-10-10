@@ -44,14 +44,14 @@ export function createArgusRoutes(
     if (!runner) return res.status(503).json({ error: 'ARGUS_RUNNER_UNAVAILABLE' });
 
     status.autonomy = 'enabled';
-    status.reconciliation.nextAt = Date.now().toString();
+    status.reconciliation.nextAt = new Date().toISOString();
     status.reconciliation.reason = 'api-resume';
 
     const { saveArgusState } = await import('../../services/argus/project-lifecycle.js');
     await saveArgusState(projectPath, status);
 
     runner.register(projectPath);
-    runner.wake(projectPath, 'api-resume');
+    await runner.wake(projectPath, 'api-resume');
 
     return res.json({ success: true, status: 'enabled' });
   });
@@ -61,6 +61,9 @@ export function createArgusRoutes(
     if (!projectPath || typeof projectPath !== 'string')
       return res.status(400).json({ error: 'projectPath is required' });
 
+    const status = await service.getStatus(projectPath);
+    if (!status) return res.status(404).json({ error: 'Argus project not found' });
+
     const runner = getArgusAutonomyRunner();
     if (!runner) return res.status(503).json({ error: 'ARGUS_RUNNER_UNAVAILABLE' });
 
@@ -68,16 +71,16 @@ export function createArgusRoutes(
       typeof reason === 'string' && reason.trim().length > 0
         ? reason.trim().substring(0, 100)
         : 'api-wake';
-    runner.wake(projectPath, wakeReason);
+    await runner.wake(projectPath, wakeReason);
 
-    const status = await service.getStatus(projectPath);
-    if (!status) return res.status(404).json({ error: 'Argus project not found' });
+    const refreshedStatus = await service.getStatus(projectPath);
+    if (!refreshedStatus) return res.status(404).json({ error: 'Argus project not found' });
 
     return res.json({
       success: true,
-      phase: status.phase,
-      latestStatus: status.latestStatus,
-      reconciliation: status.reconciliation,
+      phase: refreshedStatus.phase,
+      latestStatus: refreshedStatus.latestStatus,
+      reconciliation: refreshedStatus.reconciliation,
     });
   });
 

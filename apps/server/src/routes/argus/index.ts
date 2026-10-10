@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import type { ArgusService } from '../../services/argus/types.js';
 import type { AutonomyRunnerHealth } from '../../services/argus/autonomy-runner.js';
+import { getArgusAutonomyRunner } from '../../services/argus/autonomy-runtime.js';
 
 export function createArgusRoutes(
   service: ArgusService,
@@ -10,6 +11,95 @@ export function createArgusRoutes(
   router.get('/health', async (_req, res) =>
     res.json({ ...(await service.health()), autonomy: await autonomyHealth?.() })
   );
+
+  router.post('/pause', async (req, res) => {
+    const { projectPath } = req.body;
+    if (!projectPath || typeof projectPath !== 'string')
+      return res.status(400).json({ error: 'projectPath is required' });
+    const status = await service.getStatus(projectPath);
+    if (!status) return res.status(404).json({ error: 'Argus project not found' });
+
+    const runner = getArgusAutonomyRunner();
+    if (!runner) return res.status(503).json({ error: 'ARGUS_RUNNER_UNAVAILABLE' });
+
+    status.autonomy = 'paused';
+    status.reconciliation.nextAt = null;
+    status.reconciliation.reason = 'api-pause';
+    status.latestStatus = 'ARGUS_PAUSED_BY_API';
+
+    const { saveArgusState } = await import('../../services/argus/project-lifecycle.js');
+    await saveArgusState(projectPath, status);
+
+    return res.json({ success: true, status: 'paused', latestStatus: status.latestStatus });
+  });
+
+  router.post('/resume', async (req, res) => {
+    const { projectPath } = req.body;
+    if (!projectPath || typeof projectPath !== 'string')
+      return res.status(400).json({ error: 'projectPath is required' });
+    const status = await service.getStatus(projectPath);
+    if (!status) return res.status(404).json({ error: 'Argus project not found' });
+
+    const runner = getArgusAutonomyRunner();
+    if (!runner) return res.status(503).json({ error: 'ARGUS_RUNNER_UNAVAILABLE' });
+
+    status.autonomy = 'enabled';
+    status.reconciliation.nextAt = new Date().toISOString();
+    status.reconciliation.reason = 'api-resume';
+
+    const { saveArgusState } = await import('../../services/argus/project-lifecycle.js');
+    await saveArgusState(projectPath, status);
+
+    runner.register(projectPath);
+    await runner.wake(projectPath, 'api-resume');
+
+    return res.json({ success: true, status: 'enabled' });
+  });
+
+  router.post('/wake', async (req, res) => {
+    const { projectPath, reason } = req.body;
+    if (!projectPath || typeof projectPath !== 'string')
+      return res.status(400).json({ error: 'projectPath is required' });
+
+    const status = await service.getStatus(projectPath);
+    if (!status) return res.status(404).json({ error: 'Argus project not found' });
+
+    const runner = getArgusAutonomyRunner();
+    if (!runner) return res.status(503).json({ error: 'ARGUS_RUNNER_UNAVAILABLE' });
+
+    const wakeReason =
+      typeof reason === 'string' && reason.trim().length > 0
+        ? reason.trim().substring(0, 100)
+        : 'api-wake';
+    await runner.wake(projectPath, wakeReason);
+
+    const refreshedStatus = await service.getStatus(projectPath);
+    if (!refreshedStatus) return res.status(404).json({ error: 'Argus project not found' });
+
+    return res.json({
+      success: true,
+      phase: refreshedStatus.phase,
+      latestStatus: refreshedStatus.latestStatus,
+      reconciliation: refreshedStatus.reconciliation,
+    });
+  });
+
+  router.post('/reconcile', async (req, res) => {
+    const { projectPath } = req.body;
+    if (!projectPath || typeof projectPath !== 'string')
+      return res.status(400).json({ error: 'projectPath is required' });
+    const status = await service.getStatus(projectPath);
+    if (!status) return res.status(404).json({ error: 'Argus project not found' });
+
+    if (status.autonomy === 'paused') return res.status(409).json({ error: 'ARGUS_PAUSED' });
+
+    const runner = getArgusAutonomyRunner();
+    if (!runner) return res.status(503).json({ error: 'ARGUS_RUNNER_UNAVAILABLE' });
+
+    await runner.reconcile(projectPath);
+    return res.json({ success: true });
+  });
+
   router.get('/status', async (req, res) => {
     const projectPath = typeof req.query.projectPath === 'string' ? req.query.projectPath : '';
     if (!projectPath) return res.status(400).json({ error: 'projectPath is required' });

@@ -142,6 +142,7 @@ export function createAuthRoutes(): Router {
       success: true,
       authenticated,
       required: true,
+      keySource: process.env.AUTOMAKER_API_KEY ? 'environment' : 'generated',
     });
   });
 

@@ -1710,6 +1710,12 @@ interface SetupAPI {
     success: boolean;
     status?: string;
     installed?: boolean;
+    ready?: boolean;
+    authMode?: string;
+    provider?: string | null;
+    model?: string | null;
+    reason?: string | null;
+    loginCommand?: string;
     method?: string;
     version?: string;
     path?: string;

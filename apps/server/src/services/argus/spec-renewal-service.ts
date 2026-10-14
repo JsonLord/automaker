@@ -1,3 +1,4 @@
+import { writeAtomicFile } from './durable-store.js';
 import crypto from 'crypto';
 import fs from 'fs/promises';
 import path from 'path';
@@ -45,13 +46,12 @@ export class SpecRenewalService {
       evidence: evaluation.evidence,
       createdAt: new Date().toISOString(),
     };
-    await fs.writeFile(
+    await writeAtomicFile(
       path.join(
         history,
         `${String(oldRevision + 1).padStart(4, '0')}-${newHash.slice(0, 12)}.json`
       ),
-      `${JSON.stringify(metadata, null, 2)}\n`,
-      { mode: 0o600 }
+      `${JSON.stringify(metadata, null, 2)}\n`
     );
     state.previousSpecHashes = [...(state.previousSpecHashes || []), previousHash];
     state.specRevision = oldRevision + 1;

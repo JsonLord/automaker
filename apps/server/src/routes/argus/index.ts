@@ -1,3 +1,5 @@
+import { ArgusProjectAccess, ArgusAccessError } from '../../services/argus/project-access.js';
+import type { SettingsService } from '../../services/settings-service.js';
 import { Router } from 'express';
 import type { ArgusService } from '../../services/argus/types.js';
 import type { AutonomyRunnerHealth } from '../../services/argus/autonomy-runner.js';
@@ -5,108 +7,66 @@ import { getArgusAutonomyRunner } from '../../services/argus/autonomy-runtime.js
 
 export function createArgusRoutes(
   service: ArgusService,
-  autonomyHealth?: () => Promise<AutonomyRunnerHealth | undefined>
+  autonomyHealth?: () => Promise<AutonomyRunnerHealth | undefined>,
+  settingsService?: SettingsService
 ): Router {
   const router = Router();
   router.get('/health', async (_req, res) =>
     res.json({ ...(await service.health()), autonomy: await autonomyHealth?.() })
   );
 
-  router.post('/pause', async (req, res) => {
-    const { projectPath } = req.body;
-    if (!projectPath || typeof projectPath !== 'string')
-      return res.status(400).json({ error: 'projectPath is required' });
-    const status = await service.getStatus(projectPath);
-    if (!status) return res.status(404).json({ error: 'Argus project not found' });
-
-    const runner = getArgusAutonomyRunner();
-    if (!runner) return res.status(503).json({ error: 'ARGUS_RUNNER_UNAVAILABLE' });
-
-    status.autonomy = 'paused';
-    status.reconciliation.nextAt = null;
-    status.reconciliation.reason = 'api-pause';
-    status.latestStatus = 'ARGUS_PAUSED_BY_API';
-
-    const { saveArgusState } = await import('../../services/argus/project-lifecycle.js');
-    await saveArgusState(projectPath, status);
-
-    return res.json({ success: true, status: 'paused', latestStatus: status.latestStatus });
+  const access = settingsService ? new ArgusProjectAccess(settingsService) : undefined;
+  router.use(async (req, res, next) => {
+    try {
+      if (!access) return res.status(503).json({ error: 'ARGUS_PROJECT_ACCESS_UNAVAILABLE' });
+      const projectPath = await access.resolve(req.method === 'GET' ? req.query : req.body);
+      res.locals.projectPath = projectPath;
+      next();
+    } catch (error) {
+      if (error instanceof ArgusAccessError)
+        return res.status(error.status).json({ error: error.message });
+      return res.status(503).json({ error: 'ARGUS_PROJECT_ACCESS_UNAVAILABLE' });
+    }
   });
 
-  router.post('/resume', async (req, res) => {
-    const { projectPath } = req.body;
-    if (!projectPath || typeof projectPath !== 'string')
-      return res.status(400).json({ error: 'projectPath is required' });
-    const status = await service.getStatus(projectPath);
-    if (!status) return res.status(404).json({ error: 'Argus project not found' });
-
-    const runner = getArgusAutonomyRunner();
-    if (!runner) return res.status(503).json({ error: 'ARGUS_RUNNER_UNAVAILABLE' });
-
-    status.autonomy = 'enabled';
-    status.reconciliation.nextAt = new Date().toISOString();
-    status.reconciliation.reason = 'api-resume';
-
-    const { saveArgusState } = await import('../../services/argus/project-lifecycle.js');
-    await saveArgusState(projectPath, status);
-
-    runner.register(projectPath);
-    await runner.wake(projectPath, 'api-resume');
-
-    return res.json({ success: true, status: 'enabled' });
-  });
-
-  router.post('/wake', async (req, res) => {
-    const { projectPath, reason } = req.body;
-    if (!projectPath || typeof projectPath !== 'string')
-      return res.status(400).json({ error: 'projectPath is required' });
-
-    const status = await service.getStatus(projectPath);
-    if (!status) return res.status(404).json({ error: 'Argus project not found' });
-
-    const runner = getArgusAutonomyRunner();
-    if (!runner) return res.status(503).json({ error: 'ARGUS_RUNNER_UNAVAILABLE' });
-
-    const wakeReason =
-      typeof reason === 'string' && reason.trim().length > 0
-        ? reason.trim().substring(0, 100)
-        : 'api-wake';
-    await runner.wake(projectPath, wakeReason);
-
-    const refreshedStatus = await service.getStatus(projectPath);
-    if (!refreshedStatus) return res.status(404).json({ error: 'Argus project not found' });
-
-    return res.json({
-      success: true,
-      phase: refreshedStatus.phase,
-      latestStatus: refreshedStatus.latestStatus,
-      reconciliation: refreshedStatus.reconciliation,
+  for (const action of ['pause', 'resume', 'wake', 'reconcile'] as const) {
+    router.post(`/${action}`, async (req, res) => {
+      const projectPath = res.locals.projectPath as string;
+      const state = await service.getStatus(projectPath);
+      if (!state) return res.status(404).json({ error: 'Argus project not found' });
+      const runner = getArgusAutonomyRunner();
+      if (!runner) return res.status(503).json({ error: 'ARGUS_RUNNER_UNAVAILABLE' });
+      const control = await runner.control(projectPath);
+      if (
+        (action === 'wake' || action === 'reconcile') &&
+        (control?.desiredAutonomy === 'paused' || state.autonomy === 'paused')
+      )
+        return res.status(409).json({ error: 'ARGUS_PAUSED' });
+      const queued = await runner.requestReconcile(
+        projectPath,
+        `api-${action}`,
+        action === 'pause' || action === 'resume' ? action : undefined
+      );
+      return res
+        .status(202)
+        .json({
+          success: true,
+          status: 'queued',
+          requestRevision: queued.revision,
+          desiredAutonomy: queued.desiredAutonomy,
+        });
     });
-  });
-
-  router.post('/reconcile', async (req, res) => {
-    const { projectPath } = req.body;
-    if (!projectPath || typeof projectPath !== 'string')
-      return res.status(400).json({ error: 'projectPath is required' });
-    const status = await service.getStatus(projectPath);
-    if (!status) return res.status(404).json({ error: 'Argus project not found' });
-
-    if (status.autonomy === 'paused') return res.status(409).json({ error: 'ARGUS_PAUSED' });
-
-    const runner = getArgusAutonomyRunner();
-    if (!runner) return res.status(503).json({ error: 'ARGUS_RUNNER_UNAVAILABLE' });
-
-    await runner.reconcile(projectPath);
-    return res.json({ success: true });
-  });
+  }
 
   router.get('/status', async (req, res) => {
-    const projectPath = typeof req.query.projectPath === 'string' ? req.query.projectPath : '';
+    const projectPath = res.locals.projectPath as string;
     if (!projectPath) return res.status(400).json({ error: 'projectPath is required' });
     const status = await service.getStatus(projectPath);
     if (!status) return res.status(404).json({ error: 'Argus project not found' });
     return res.json({
-      enabled: status.autonomy === 'enabled',
+      enabled:
+        ((await getArgusAutonomyRunner()?.control(projectPath))?.desiredAutonomy ||
+          status.autonomy) === 'enabled',
       running: status.phase !== 'error',
       argusProjectId: status.argusProjectId,
       specRevision: status.specRevision,

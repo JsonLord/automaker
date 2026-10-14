@@ -1,3 +1,4 @@
+import { withDurableLock, writeAtomicFile } from './argus/durable-store.js';
 /**
  * Starter Project Bootstrap Service
  * Owns the post-clone lifecycle for Automaker starter kit projects.
@@ -29,6 +30,7 @@ export interface BootstrapStarterProjectOptions {
 export interface BootstrapState {
   completedPhases: string[];
   bootstrappedAt: string;
+  lastError?: string;
 }
 
 async function readOptionalFile(filePath: string): Promise<string | null> {
@@ -43,8 +45,10 @@ async function readOptionalFile(filePath: string): Promise<string | null> {
  * Inspects project files read-only to produce evidence-based summary context for initial spec.
  */
 async function inspectProjectContext(projectPath: string): Promise<string> {
-  const readme = (await readOptionalFile(path.join(projectPath, 'README.md'))) ||
-                 (await readOptionalFile(path.join(projectPath, 'README'))) || '';
+  const readme =
+    (await readOptionalFile(path.join(projectPath, 'README.md'))) ||
+    (await readOptionalFile(path.join(projectPath, 'README'))) ||
+    '';
   const pkgJsonStr = await readOptionalFile(path.join(projectPath, 'package.json'));
 
   let pkgDetails = '';
@@ -58,7 +62,10 @@ async function inspectProjectContext(projectPath: string): Promise<string> {
   }
 
   const entries = await fs.readdir(projectPath).catch(() => []);
-  const topLevel = entries.filter((e) => !e.startsWith('.')).slice(0, 30).join(', ');
+  const topLevel = entries
+    .filter((e) => !e.startsWith('.'))
+    .slice(0, 30)
+    .join(', ');
 
   return `
 Template README Snippet:
@@ -75,7 +82,11 @@ ${topLevel}
 /**
  * Generate initial spec content for Campaign 1.
  */
-function generateInitialSpec(projectName: string, overview: string, contextSummary: string): string {
+function generateInitialSpec(
+  projectName: string,
+  overview: string,
+  contextSummary: string
+): string {
   return `# Campaign 1
 
 ## Current baseline
@@ -127,7 +138,18 @@ async function ensureLocalGitIdentity(projectPath: string): Promise<void> {
   }
 }
 
-export async function bootstrapStarterProject(options: BootstrapStarterProjectOptions): Promise<void> {
+export async function bootstrapStarterProject(
+  options: BootstrapStarterProjectOptions
+): Promise<void> {
+  return withDurableLock(
+    path.join(options.projectPath, '.automaker', 'bootstrap-transaction'),
+    () => bootstrapStarterProjectLocked(options)
+  );
+}
+
+async function bootstrapStarterProjectLocked(
+  options: BootstrapStarterProjectOptions
+): Promise<void> {
   const {
     projectPath,
     projectId,
@@ -140,7 +162,9 @@ export async function bootstrapStarterProject(options: BootstrapStarterProjectOp
     settingsService,
   } = options;
 
-  logger.info(`[StarterBootstrap] Starting bootstrap for project ${projectName} (${projectId}) at ${projectPath}`);
+  logger.info(
+    `[StarterBootstrap] Starting bootstrap for project ${projectName} (${projectId}) at ${projectPath}`
+  );
 
   const automakerDir = path.join(projectPath, '.automaker');
   await fs.mkdir(automakerDir, { recursive: true });
@@ -150,14 +174,14 @@ export async function bootstrapStarterProject(options: BootstrapStarterProjectOp
   try {
     const raw = await fs.readFile(statePath, 'utf8');
     state = JSON.parse(raw);
-  } catch {
-    // New bootstrap
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
   }
 
   const markPhase = async (phase: string) => {
     if (!state.completedPhases.includes(phase)) {
       state.completedPhases.push(phase);
-      await fs.writeFile(statePath, JSON.stringify(state, null, 2));
+      await writeAtomicFile(statePath, JSON.stringify(state, null, 2));
     }
   };
 
@@ -170,7 +194,10 @@ export async function bootstrapStarterProject(options: BootstrapStarterProjectOp
         bootstrappedAt: new Date().toISOString(),
       },
     };
-    await fs.writeFile(path.join(automakerDir, 'template.json'), JSON.stringify(provenance, null, 2));
+    await writeAtomicFile(
+      path.join(automakerDir, 'template.json'),
+      JSON.stringify(provenance, null, 2)
+    );
     await markPhase('provenance');
     logger.info('[StarterBootstrap] Saved template provenance');
   }
@@ -180,27 +207,40 @@ export async function bootstrapStarterProject(options: BootstrapStarterProjectOp
     const contextSummary = await inspectProjectContext(projectPath);
     const specContent = generateInitialSpec(projectName, projectOverview || '', contextSummary);
     const defaultObjective = `Develop ${projectName} from the selected starter architecture while preserving a working, testable baseline and implementing the explicitly defined project requirements.`;
-    const objective = projectOverview ? `${projectOverview}\n\n${defaultObjective}` : defaultObjective;
+    const objective = projectOverview
+      ? `${projectOverview}\n\n${defaultObjective}`
+      : defaultObjective;
 
     await ensureArgusControlFiles(projectPath, specContent, objective);
     await markPhase('control-files');
     logger.info('[StarterBootstrap] Created ARGUS.md, spec.md, and argus.yaml');
   }
 
-  // Phase 3: Initial Baseline Commit
-  if (!state.completedPhases.includes('baseline-commit')) {
+  // A recorded phase is not evidence that Git still has a valid baseline.
+  const validHead = async () =>
+    (await execGitCommand(['rev-parse', '--verify', 'HEAD'], projectPath).catch(() => '')).trim();
+  let head = await validHead();
+  if (!head) {
+    state.completedPhases = state.completedPhases.filter((phase) => phase !== 'baseline-commit');
     await ensureLocalGitIdentity(projectPath);
     try {
       await execGitCommand(['add', '-A'], projectPath);
-      await execGitCommand(['commit', '-m', 'chore: initialize project from starter kit'], projectPath);
-      const headSha = (await execGitCommand(['rev-parse', '--verify', 'HEAD'], projectPath)).trim();
-      logger.info(`[StarterBootstrap] Created initial baseline commit HEAD: ${headSha}`);
-      await markPhase('baseline-commit');
-    } catch (error) {
-      logger.warn('[StarterBootstrap] Baseline commit warning (might already have HEAD):', error);
-      await markPhase('baseline-commit');
+      await execGitCommand(
+        ['commit', '-m', 'chore: initialize project from starter kit'],
+        projectPath
+      );
+    } catch {
+      /* Verify HEAD independently; a failing hook is not a completed phase. */
     }
+    head = await validHead();
   }
+  if (!head) {
+    state.lastError = 'BOOTSTRAP_BASELINE_HEAD_MISSING';
+    await writeAtomicFile(statePath, JSON.stringify(state, null, 2));
+    return; // No downstream autonomous execution against an unborn repository.
+  }
+  delete state.lastError;
+  await markPhase('baseline-commit');
 
   // Phase 4: Register with Automaker Settings
   if (!state.completedPhases.includes('register-project') && settingsService) {
@@ -237,7 +277,7 @@ export async function bootstrapStarterProject(options: BootstrapStarterProjectOp
 
       if (autonomyRunner) {
         autonomyRunner.register(projectPath);
-        await autonomyRunner.wake(projectPath, 'starter-bootstrap');
+        await autonomyRunner.requestReconcile(projectPath, 'starter-bootstrap');
         logger.info('[StarterBootstrap] Registered and woken Argus autonomy runner');
       }
       await markPhase('wake-argus');

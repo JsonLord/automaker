@@ -200,6 +200,7 @@ export interface ObjectiveEvaluation {
   remainingGaps: ObjectiveGap[];
 }
 export interface ArgusProjectState {
+  stateRevision?: number;
   version: 2;
   automakerProjectId: string;
   argusProjectId: string;

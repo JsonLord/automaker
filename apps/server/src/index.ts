@@ -560,7 +560,7 @@ app.use(
 );
 app.use(
   '/api/argus',
-  createArgusRoutes(argusService, async () => argusAutonomyRunner?.health())
+  createArgusRoutes(argusService, async () => argusAutonomyRunner?.health(), settingsService)
 );
 
 // SPA Routing: Serve index.html for all non-API routes
@@ -1011,9 +1011,10 @@ async function startAutomaker() {
     };
     const julesExecutor = julesClient
       ? new JulesDeveloperAdapter(julesClient, argusService, featureLoader, {
-          onPullRequest: (projectPath) =>
-            argusAutonomyRunner?.wake(projectPath, 'pull-request-created') ||
-            postPrReconcile.reconcile(projectPath),
+          autoMonitor: false,
+          onPullRequest: async (projectPath) => {
+            await argusAutonomyRunner?.requestReconcile(projectPath, 'pull-request-created');
+          },
         })
       : undefined;
     await discoverAndResumeArgusProjects(

@@ -1,3 +1,5 @@
+import { redactOpenCodeEvent } from '../../lib/opencode-errors.js';
+import { withDurableLock, readDurableJson, writeAtomicFile } from './durable-store.js';
 import { resolveOpenCodeModel } from '@automaker/model-resolver';
 import crypto from 'crypto';
 import fs from 'fs/promises';
@@ -44,9 +46,22 @@ async function readOptional(file: string): Promise<string> {
 }
 
 export async function saveArgusState(projectPath: string, state: ArgusProjectState): Promise<void> {
-  state.updatedAt = new Date().toISOString();
   const statePath = path.join(projectPath, '.automaker', 'argus-state.json');
-  await fs.writeFile(statePath, `${JSON.stringify(state, null, 2)}\n`, { mode: 0o600 });
+  await withDurableLock(statePath, async () => {
+    const disk = await readDurableJson<ArgusProjectState>(statePath);
+    if (disk && (disk.stateRevision || 0) !== (state.stateRevision || 0)) {
+      throw new Error('ARGUS_STATE_REVISION_CONFLICT');
+    }
+    const revision = (disk?.stateRevision || 0) + 1;
+    const snapshot = redactOpenCodeEvent({
+      ...state,
+      stateRevision: revision,
+      updatedAt: new Date().toISOString(),
+    }) as ArgusProjectState;
+    await writeAtomicFile(statePath, `${JSON.stringify(snapshot, null, 2)}\n`);
+    state.stateRevision = revision;
+    state.updatedAt = snapshot.updatedAt;
+  });
 }
 
 export async function ensureArgusControlFiles(
@@ -57,13 +72,13 @@ export async function ensureArgusControlFiles(
   const charterPath = path.join(projectPath, 'ARGUS.md');
   if (!(await readOptional(charterPath))) {
     const charter = `# Project Objective\n\n## North-star objective\n${objective || spec.slice(0, 500)}\n\n## Success conditions\n- The current specification is implemented and verified.\n\n## Architecture constraints\n- Preserve the existing architecture unless the specification requires change.\n\n## Non-goals\n- Deployment and publishing are excluded.\n\n## Quality and test expectations\n- Relevant tests, type checking, and builds must pass.\n\n## Definition of done\n- The objective is satisfied with reviewable evidence.\n`;
-    await fs.writeFile(charterPath, charter);
+    await writeAtomicFile(charterPath, charter);
   }
-  await fs.writeFile(path.join(projectPath, 'spec.md'), spec);
+  await writeAtomicFile(path.join(projectPath, 'spec.md'), spec);
   const automakerDir = path.join(projectPath, '.automaker');
   await fs.mkdir(automakerDir, { recursive: true });
   const policyPath = path.join(automakerDir, 'argus.yaml');
-  if (!(await readOptional(policyPath))) await fs.writeFile(policyPath, YAML.stringify(POLICY));
+  if (!(await readOptional(policyPath))) await writeAtomicFile(policyPath, YAML.stringify(POLICY));
 }
 
 export async function migrateArgusControlFiles(projectPath: string): Promise<boolean> {

@@ -104,9 +104,10 @@ loadSessions();
  */
 function ensureApiKey(): string {
   // First check environment variable (Electron passes it this way)
-  if (process.env.AUTOMAKER_API_KEY) {
+  const configured = process.env.AUTOMAKER_API_KEY || process.env.AUTHENTICATION_TOKEN;
+  if (configured) {
     logger.info('Using API key from environment variable');
-    return process.env.AUTOMAKER_API_KEY;
+    return configured;
   }
 
   // Try to read from file
@@ -150,7 +151,9 @@ if (!isEnvTrue(process.env.AUTOMAKER_HIDE_API_KEY)) {
   const line1 = "When accessing via browser, you'll be prompted to enter this key:".padEnd(
     BOX_CONTENT_WIDTH
   );
-  const line2 = API_KEY.padEnd(BOX_CONTENT_WIDTH);
+  const line2 = '[redacted; retrieve the key through secure operator access]'.padEnd(
+    BOX_CONTENT_WIDTH
+  );
   const line3 = 'In Electron mode, authentication is handled automatically.'.padEnd(
     BOX_CONTENT_WIDTH
   );
@@ -397,7 +400,7 @@ function checkAuthentication(
  */
 export function authMiddleware(req: Request, res: Response, next: NextFunction): void {
   // Allow disabling auth for local/trusted networks
-  if (isEnvTrue(process.env.AUTOMAKER_DISABLE_AUTH)) {
+  if (process.env.NODE_ENV !== 'production' && isEnvTrue(process.env.AUTOMAKER_DISABLE_AUTH)) {
     next();
     return;
   }
@@ -447,7 +450,8 @@ export function isAuthEnabled(): boolean {
  * Get authentication status for health endpoint
  */
 export function getAuthStatus(): { enabled: boolean; method: string } {
-  const disabled = isEnvTrue(process.env.AUTOMAKER_DISABLE_AUTH);
+  const disabled =
+    process.env.NODE_ENV !== 'production' && isEnvTrue(process.env.AUTOMAKER_DISABLE_AUTH);
   return {
     enabled: !disabled,
     method: disabled ? 'disabled' : 'api_key_or_session',
@@ -458,7 +462,8 @@ export function getAuthStatus(): { enabled: boolean; method: string } {
  * Check if a request is authenticated (for status endpoint)
  */
 export function isRequestAuthenticated(req: Request): boolean {
-  if (isEnvTrue(process.env.AUTOMAKER_DISABLE_AUTH)) return true;
+  if (process.env.NODE_ENV !== 'production' && isEnvTrue(process.env.AUTOMAKER_DISABLE_AUTH))
+    return true;
   const result = checkAuthentication(
     req.headers as Record<string, string | string[] | undefined>,
     req.query as Record<string, string | undefined>,
@@ -476,6 +481,7 @@ export function checkRawAuthentication(
   query: Record<string, string | undefined>,
   cookies: Record<string, string | undefined>
 ): boolean {
-  if (isEnvTrue(process.env.AUTOMAKER_DISABLE_AUTH)) return true;
+  if (process.env.NODE_ENV !== 'production' && isEnvTrue(process.env.AUTOMAKER_DISABLE_AUTH))
+    return true;
   return checkAuthentication(headers, query, cookies).authenticated;
 }

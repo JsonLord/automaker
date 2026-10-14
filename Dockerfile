@@ -5,6 +5,9 @@
 # BUILD STAGE
 # =============================================================================
 FROM node:22-slim AS builder
+ARG BUILD_GIT_SHA
+ARG BUILD_TIMESTAMP
+ENV BUILD_GIT_SHA=${BUILD_GIT_SHA} BUILD_TIMESTAMP=${BUILD_TIMESTAMP}
 
 # Install build dependencies for native modules (node-pty)
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -35,6 +38,9 @@ RUN npm run build --workspace=apps/server && \
 # FINAL PRODUCTION STAGE
 # =============================================================================
 FROM node:22-slim
+ARG BUILD_GIT_SHA
+ARG BUILD_TIMESTAMP
+ENV BUILD_GIT_SHA=${BUILD_GIT_SHA} BUILD_TIMESTAMP=${BUILD_TIMESTAMP}
 
 WORKDIR /app
 
@@ -64,7 +70,12 @@ ENV HOME=/home/node
 ENV PATH="/opt/argus/bin:/home/node/.local/bin:/home/node/.opencode/bin:${PATH}"
 
 # Install OpenCode CLI
-RUN curl -fsSL https://opencode.ai/install | bash
+ARG OPENCODE_VERSION=1.18.35
+ENV OPENCODE_VERSION=${OPENCODE_VERSION}
+RUN npm install --prefix /home/node/.local/opencode --ignore-scripts --no-audit --no-fund \
+      "opencode-linux-$(node -p process.arch)@${OPENCODE_VERSION}" && \
+    ln -s "/home/node/.local/opencode/node_modules/opencode-linux-$(node -p process.arch)/bin/opencode" /home/node/.local/bin/opencode && \
+    opencode --version | grep -Fx "${OPENCODE_VERSION}"
 
 # Microsoft ArgusAgent 0.1.1 source. Upgrade only by changing both documented pins.
 ARG ARGUS_SOURCE_REVISION=746f76b7a74a1217507c9ee348eecd3b782f7c92
@@ -112,6 +123,9 @@ ENV DATA_DIR=/app/data
 ENV ARGUS_SKILL_HOME=/app/data/argus
 ENV NODE_ENV=production
 ENV AUTOMAKER_AUTO_LOGIN=false
+ENV AUTOMAKER_DISABLE_AUTH=false
+ENV AUTOMAKER_HIDE_API_KEY=true
+ENV ALLOWED_ROOT_DIRECTORY=/app/data/projects
 
 # Copy scripts
 COPY --chown=node:node entrypoint.sh ./entrypoint.sh

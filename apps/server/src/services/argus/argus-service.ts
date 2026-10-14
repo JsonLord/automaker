@@ -1,3 +1,5 @@
+import { sanitizeOpenCodeOutput } from '../../lib/opencode-errors.js';
+import { realpathSync } from 'fs';
 import { resolveOpenCodeModel } from '@automaker/model-resolver';
 import { spawn, type ChildProcessWithoutNullStreams } from 'child_process';
 import fs from 'fs/promises';
@@ -132,7 +134,7 @@ export class SupervisedArgusService implements ArgusService {
         );
     });
     this.child.stderr.on('data', (chunk) =>
-      logger.warn(`Argus bridge: ${String(chunk).trim().slice(0, 500)}`)
+      logger.warn(`Argus bridge: ${sanitizeOpenCodeOutput(String(chunk)).trim().slice(0, 500)}`)
     );
     this.child.on('exit', (code) => {
       this.child = undefined;
@@ -161,6 +163,7 @@ export class SupervisedArgusService implements ArgusService {
       : { running: false, upstreamInstalled: false, error: 'bridge not started' };
   }
   async createOrResolveProject(input: { projectId: string; projectPath: string; model: string }) {
+    input = { ...input, projectPath: await fs.realpath(input.projectPath) };
     const state = await resolveState(
       input.projectId,
       input.projectPath,
@@ -277,10 +280,10 @@ export class SupervisedArgusService implements ArgusService {
     return result.spec;
   }
   async getStatus(projectPath: string) {
-    return this.projects.get(projectPath);
+    return this.projects.get(await fs.realpath(projectPath));
   }
   private requireProject(projectPath: string) {
-    const state = this.projects.get(projectPath);
+    const state = this.projects.get(realpathSync(projectPath));
     if (!state) throw new Error(`Argus project is not registered: ${projectPath}`);
     return state;
   }

@@ -35,7 +35,11 @@ export default defineConfig({
         statements: 60,
       },
     },
-    include: ['apps/server/tests/**/*.test.ts', 'apps/server/tests/**/*.spec.ts'],
+    include: [
+      'apps/server/tests/**/*.test.ts',
+      'apps/server/tests/**/*.spec.ts',
+      'apps/server/src/tests/**/*.test.ts',
+    ],
     exclude: ['**/node_modules/**', '**/dist/**'],
     mockReset: true,
     restoreMocks: true,

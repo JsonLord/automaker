@@ -53,6 +53,11 @@ export interface CodexCliStatus {
 // OpenCode CLI Status
 export interface OpencodeCliStatus {
   installed: boolean;
+  ready?: boolean;
+  authMode?: string;
+  provider?: string;
+  model?: string;
+  reason?: string;
   version?: string | null;
   path?: string | null;
   auth?: {

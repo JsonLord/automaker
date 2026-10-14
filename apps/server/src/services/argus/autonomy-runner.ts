@@ -18,6 +18,7 @@ const EXECUTOR_PHASES = new Set([
   'senior-guided-repair',
 ]);
 const MILESTONE_D_PHASES = new Set([
+  'loki-gate',
   'pr-open',
   'ci-check',
   'ci-failed',

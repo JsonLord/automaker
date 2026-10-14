@@ -45,7 +45,20 @@ async function readOptional(file: string): Promise<string> {
   }
 }
 
+export async function ensureArgusMetadataDirectory(projectPath: string) {
+  const directory = path.join(projectPath, '.automaker');
+  try {
+    if ((await fs.lstat(directory)).isSymbolicLink())
+      throw new Error('ARGUS_METADATA_SYMLINK_REFUSED');
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+  }
+  await fs.mkdir(directory, { recursive: true, mode: 0o700 });
+  return directory;
+}
+
 export async function saveArgusState(projectPath: string, state: ArgusProjectState): Promise<void> {
+  await ensureArgusMetadataDirectory(projectPath);
   const statePath = path.join(projectPath, '.automaker', 'argus-state.json');
   await withDurableLock(statePath, async () => {
     const disk = await readDurableJson<ArgusProjectState>(statePath);
@@ -75,8 +88,7 @@ export async function ensureArgusControlFiles(
     await writeAtomicFile(charterPath, charter);
   }
   await writeAtomicFile(path.join(projectPath, 'spec.md'), spec);
-  const automakerDir = path.join(projectPath, '.automaker');
-  await fs.mkdir(automakerDir, { recursive: true });
+  const automakerDir = await ensureArgusMetadataDirectory(projectPath);
   const policyPath = path.join(automakerDir, 'argus.yaml');
   if (!(await readOptional(policyPath))) await writeAtomicFile(policyPath, YAML.stringify(POLICY));
 }
@@ -94,6 +106,7 @@ export async function resolveState(
   projectPath: string,
   model: string
 ): Promise<ArgusProjectState> {
+  await ensureArgusMetadataDirectory(projectPath);
   const statePath = path.join(projectPath, '.automaker', 'argus-state.json');
   const objective = await readOptional(path.join(projectPath, 'ARGUS.md'));
   const spec = await readOptional(path.join(projectPath, 'spec.md'));

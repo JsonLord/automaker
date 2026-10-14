@@ -48,6 +48,12 @@ export class ArgusProjectAccess {
       const root = await fs.realpath(process.env.ALLOWED_ROOT_DIRECTORY);
       if (!within(root, actual)) throw new ArgusAccessError(403, 'PROJECT_OUTSIDE_ALLOWED_ROOT');
     }
+    try {
+      if ((await fs.lstat(path.join(actual, '.automaker'))).isSymbolicLink())
+        throw new ArgusAccessError(403, 'ARGUS_METADATA_SYMLINK_REFUSED');
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    }
     return actual;
   }
 }

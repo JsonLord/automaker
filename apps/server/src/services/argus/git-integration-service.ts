@@ -1,3 +1,4 @@
+import { GitHubMergeCoordinator, type MergeCoordinator } from './merge-coordinator.js';
 import crypto from 'crypto';
 import { execGitCommand } from '@automaker/git-utils';
 import type { ArgusTaskState, RecoverySnapshot } from './types.js';
@@ -62,7 +63,14 @@ export class CommandLocalGitAdapter implements LocalGitAdapter {
     const remoteHead = (
       await execGitCommand(['rev-parse', `origin/${baseBranch}`], projectPath)
     ).trim();
-    const dirty = Boolean((await execGitCommand(['status', '--porcelain'], projectPath)).trim());
+    const dirty = Boolean(
+      (
+        await execGitCommand(
+          ['status', '--porcelain', '--', '.', ':(top,exclude).automaker'],
+          projectPath
+        )
+      ).trim()
+    );
     const localAhead = !(await isAncestor(projectPath, localHead, remoteHead));
     const remoteContainsMerge = mergeSha
       ? await isAncestor(projectPath, mergeSha, remoteHead)
@@ -71,6 +79,8 @@ export class CommandLocalGitAdapter implements LocalGitAdapter {
   }
 
   async synchronize(projectPath: string, baseBranch: string, mergeSha: string, taskId: string) {
+    if ((await execGitCommand(['ls-files', '--', '.automaker'], projectPath)).trim())
+      throw new Error('ARGUS_STATE_TRACKED_IN_GIT');
     await execGitCommand(['fetch', '--prune', 'origin'], projectPath);
     let state = await this.inspect(projectPath, baseBranch, mergeSha);
     if (!state.remoteContainsMerge) throw new Error('REMOTE_MERGE_NOT_FOUND');
@@ -82,7 +92,10 @@ export class CommandLocalGitAdapter implements LocalGitAdapter {
     const stamp = recoveryCreatedAt.replace(/[-:.TZ]/g, '').slice(0, 14);
     if (state.dirty) {
       const label = `automaker-recovery/${stamp}/${taskId}`;
-      await execGitCommand(['stash', 'push', '-u', '-m', label], projectPath);
+      await execGitCommand(
+        ['stash', 'push', '-u', '-m', label, '--', '.', ':(top,exclude).automaker'],
+        projectPath
+      );
       const stashSha = (await execGitCommand(['rev-parse', 'stash@{0}'], projectPath)).trim();
       const ref = `refs/automaker/recovery/${stamp}-dirty-${stashSha.slice(0, 8)}`;
       await execGitCommand(['update-ref', ref, stashSha], projectPath);
@@ -145,7 +158,8 @@ async function isAncestor(projectPath: string, ancestor: string, descendant: str
 export class GitIntegrationService {
   constructor(
     private github: GitHubCiObserver,
-    private local: LocalGitAdapter = new CommandLocalGitAdapter()
+    private local: LocalGitAdapter = new CommandLocalGitAdapter(),
+    readonly coordinator: MergeCoordinator = new GitHubMergeCoordinator(github)
   ) {}
   refreshPullRequest(repository: string, number: number) {
     return this.github.getPullRequest(repository, number);

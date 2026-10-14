@@ -34,6 +34,7 @@ describe('bootstrap baseline invariant', () => {
   it('commits an initial baseline and repeated calls do not duplicate work', async () => {
     await git();
     await bootstrapStarterProject(options());
+    expect((await execGitCommand(['ls-files', '--', '.automaker'], dir)).trim()).toBe('');
     const first = await head();
     expect((await state()).completedPhases).toContain('baseline-commit');
     await bootstrapStarterProject(options());

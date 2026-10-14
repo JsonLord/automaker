@@ -8,7 +8,10 @@ import fs from 'fs/promises';
 import path from 'path';
 import { execGitCommand } from '@automaker/git-utils';
 import { createLogger } from '@automaker/utils';
-import { ensureArgusControlFiles } from './argus/project-lifecycle.js';
+import {
+  ensureArgusControlFiles,
+  ensureArgusMetadataDirectory,
+} from './argus/project-lifecycle.js';
 import type { ArgusService } from './argus/types.js';
 import type { ArgusAutonomyRunner } from './argus/autonomy-runner.js';
 import type { SettingsService } from './settings-service.js';
@@ -166,8 +169,7 @@ async function bootstrapStarterProjectLocked(
     `[StarterBootstrap] Starting bootstrap for project ${projectName} (${projectId}) at ${projectPath}`
   );
 
-  const automakerDir = path.join(projectPath, '.automaker');
-  await fs.mkdir(automakerDir, { recursive: true });
+  const automakerDir = await ensureArgusMetadataDirectory(projectPath);
 
   const statePath = path.join(automakerDir, 'bootstrap-state.json');
   let state: BootstrapState = { completedPhases: [], bootstrappedAt: new Date().toISOString() };
@@ -224,7 +226,7 @@ async function bootstrapStarterProjectLocked(
     state.completedPhases = state.completedPhases.filter((phase) => phase !== 'baseline-commit');
     await ensureLocalGitIdentity(projectPath);
     try {
-      await execGitCommand(['add', '-A'], projectPath);
+      await execGitCommand(['add', '-A', '--', '.', ':(top,exclude).automaker'], projectPath);
       await execGitCommand(
         ['commit', '-m', 'chore: initialize project from starter kit'],
         projectPath

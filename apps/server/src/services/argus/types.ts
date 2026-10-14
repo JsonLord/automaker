@@ -1,9 +1,12 @@
+import type { RepositoryMergeLease } from './merge-coordinator.js';
+import type { VerificationEvidence } from './verification.js';
 export type ArgusRole = 'manager' | 'planner' | 'reviewer' | 'senior-engineer';
 export type ArgusPhase =
   | 'idle'
   | 'planning'
   | 'awaiting-executor'
   | 'jules-running'
+  | 'loki-gate'
   | 'pr-open'
   | 'ci-check'
   | 'ci-failed'
@@ -133,6 +136,24 @@ export interface SeniorReview {
   evidence: string[];
 }
 export interface ArgusTaskState extends ArgusPlannedTask {
+  mergeLease?: RepositoryMergeLease | null;
+  integrationEvidence?: {
+    headSha: string;
+    baseSha: string;
+    mergeSha: string;
+    verdict: 'VERIFIED';
+    observedAt: string;
+  } | null;
+  lokiEvidence?: VerificationEvidence | null;
+  lokiRepairAttempts?: number;
+  lokiRepairIntent?: {
+    headSha: string;
+    sessionId: string;
+    attempt: number;
+    marker: string;
+    outcome: 'unknown' | 'sent';
+    requestedAt: string;
+  } | null;
   featureId: string;
   phase: ArgusPhase;
   executor: 'jules' | 'senior' | null;

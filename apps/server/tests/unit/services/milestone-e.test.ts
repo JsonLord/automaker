@@ -104,7 +104,19 @@ function adapters(pr = pull()) {
   return {
     github,
     local,
-    git: new GitIntegrationService(github as any, local as any),
+    git: new GitIntegrationService(github as any, local as any, {
+      prepare: (task: any) => ({
+        owner: 'test-owner',
+        reference: 'tags/test',
+        tagSha: 't'.repeat(40),
+        expiresAt: new Date(Date.now() + 600000).toISOString(),
+        repository: task.repository,
+        baseBranch: task.baseBranch,
+      }),
+      acquire: async () => {},
+      assertCurrentBase: async () => {},
+      release: async () => {},
+    }),
     getPr: () => current,
   };
 }

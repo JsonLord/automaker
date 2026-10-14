@@ -29,7 +29,26 @@ export class MilestoneEOrchestrator {
     locks.set(projectPath, queued);
     await previous;
     try {
-      await this.reconcileLocked(projectPath);
+      const state = await this.argus.getStatus(projectPath),
+        task = state?.activeTask;
+      if (task && (task.phase === 'merge-ready' || task.mergeIntent?.mergeOutcome === 'unknown')) {
+        task.mergeLease ||= this.git.coordinator.prepare(task);
+        await saveArgusState(projectPath, state!); // intent survives a crash while acquiring ownership
+        try {
+          const authoritative = await this.git.refreshPullRequest(task.repository!, task.prNumber!);
+          if (!authoritative.merged) await this.git.coordinator.acquire(task.mergeLease);
+          await saveArgusState(projectPath, state!);
+          await this.reconcileLocked(projectPath);
+        } catch (error) {
+          await this.block(projectPath, task, (error as Error).message);
+        } finally {
+          if (task.mergeLease?.tagSha && task.mergeIntent?.mergeOutcome !== 'unknown') {
+            await this.git.coordinator.release(task.mergeLease);
+            task.mergeLease = null;
+            await saveArgusState(projectPath, state!);
+          }
+        }
+      } else await this.reconcileLocked(projectPath);
     } finally {
       release();
       if (locks.get(projectPath) === queued) locks.delete(projectPath);
@@ -56,6 +75,7 @@ export class MilestoneEOrchestrator {
         );
         try {
           this.git.assertMergeGate(task, pr, /deployment:\s*disabled/.test(policy));
+          await this.git.coordinator.assertCurrentBase(task, pr, task.mergeLease!);
         } catch (error) {
           return this.block(projectPath, task, (error as Error).message);
         }
@@ -66,6 +86,7 @@ export class MilestoneEOrchestrator {
       const policy = await fs.readFile(path.join(projectPath, '.automaker', 'argus.yaml'), 'utf8');
       try {
         this.git.assertMergeGate(task, pr, /deployment:\s*disabled/.test(policy));
+        await this.git.coordinator.assertCurrentBase(task, pr, task.mergeLease!);
       } catch (error) {
         this.event(task, 'MERGE_GATE_REJECTED');
         if ((error as Error).message === 'MERGE_GATE_STALE_HEAD')
@@ -160,6 +181,8 @@ export class MilestoneEOrchestrator {
     await this.persist(projectPath, task);
   }
   private async stale(projectPath: string, task: ArgusTaskState, head: string) {
+    task.lokiEvidence = null;
+    task.integrationEvidence = null;
     task.prHeadSha = head;
     task.ciHeadSha = null;
     task.ciState = 'pending';

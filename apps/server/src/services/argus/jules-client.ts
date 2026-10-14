@@ -60,7 +60,8 @@ export class JulesClient {
       throw new JulesError('JULES_AUTH_FAILED', 'JULES_API_KEY is not configured', false, true);
     const sleep =
       this.options.sleep || ((ms: number) => new Promise((resolve) => setTimeout(resolve, ms)));
-    const max = this.options.maxRetries ?? 3;
+    const max =
+      init.method && !['GET', 'HEAD'].includes(init.method) ? 0 : (this.options.maxRetries ?? 3);
     for (let attempt = 0; ; attempt++) {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), this.options.timeoutMs ?? 15_000);

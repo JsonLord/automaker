@@ -1,3 +1,4 @@
+import { sanitizeOpenCodeOutput } from '../../lib/opencode-errors.js';
 import { spawnProcess } from '@automaker/platform';
 import type { CiFailureSummary, CiState } from './types.js';
 
@@ -48,9 +49,14 @@ export class GitHubCiObserver {
     const result = await spawnProcess({ command: 'gh', args, env, cwd: process.cwd() });
     if (result.exitCode !== 0)
       throw new Error(
-        `GITHUB_OBSERVATION_FAILED: ${result.stderr || `gh exited ${result.exitCode}`}`
+        `GITHUB_OBSERVATION_FAILED: ${sanitizeOpenCodeOutput(result.stderr || `gh exited ${result.exitCode}`)}`
       );
     return result.stdout;
+  }
+
+  async api(args: string[]): Promise<Record<string, any>> {
+    const text = await this.runner(args);
+    return text.trim() ? JSON.parse(text) : {};
   }
 
   async getPullRequest(repository: string, number: number): Promise<GitHubPullRequest> {

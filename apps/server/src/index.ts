@@ -1,3 +1,4 @@
+import { LokiVerifier, RemoteLokiExecutor } from './services/argus/verification.js';
 /**
  * Automaker Backend Server
  *
@@ -986,6 +987,14 @@ async function startAutomaker() {
     const julesClient = process.env.JULES_API_KEY
       ? new JulesClient(process.env.JULES_API_KEY)
       : undefined;
+    const loki = new LokiVerifier(
+      process.env.ARGUS_LOKI_WORKER_URL && process.env.ARGUS_LOKI_WORKER_TOKEN
+        ? new RemoteLokiExecutor(
+            process.env.ARGUS_LOKI_WORKER_URL,
+            process.env.ARGUS_LOKI_WORKER_TOKEN
+          )
+        : undefined
+    );
     const milestoneD = julesClient
       ? new MilestoneDOrchestrator(
           argusService,
@@ -993,7 +1002,8 @@ async function startAutomaker() {
           new GitHubCiObserver(),
           julesClient,
           new OpenCodeRoleRunner(),
-          new GitSeniorWorktreeAdapter()
+          new GitSeniorWorktreeAdapter(),
+          loki
         )
       : undefined;
     const milestoneE = new MilestoneEOrchestrator(

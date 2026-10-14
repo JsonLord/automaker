@@ -47,14 +47,12 @@ export function createArgusRoutes(
         `api-${action}`,
         action === 'pause' || action === 'resume' ? action : undefined
       );
-      return res
-        .status(202)
-        .json({
-          success: true,
-          status: 'queued',
-          requestRevision: queued.revision,
-          desiredAutonomy: queued.desiredAutonomy,
-        });
+      return res.status(202).json({
+        success: true,
+        status: 'queued',
+        requestRevision: queued.revision,
+        desiredAutonomy: queued.desiredAutonomy,
+      });
     });
   }
 
@@ -85,6 +83,20 @@ export function createArgusRoutes(
             prNumber: status.activeTask.prNumber,
             prUrl: status.activeTask.prUrl,
             prHeadSha: status.activeTask.prHeadSha,
+            loki: status.activeTask.lokiEvidence
+              ? {
+                  verdict: status.activeTask.lokiEvidence.verdict,
+                  headSha: status.activeTask.lokiEvidence.headSha,
+                  baseSha: status.activeTask.lokiEvidence.baseSha,
+                  findings: status.activeTask.lokiEvidence.findings,
+                  proven: status.activeTask.lokiEvidence.proven,
+                  notProven: status.activeTask.lokiEvidence.notProven,
+                  attempts: status.activeTask.lokiEvidence.attempts,
+                  finishedAt: status.activeTask.lokiEvidence.finishedAt,
+                }
+              : null,
+            lokiRepairAttempts: status.activeTask.lokiRepairAttempts || 0,
+            integrationEvidence: status.activeTask.integrationEvidence || null,
             ciState: status.activeTask.ciState,
             ciHeadSha: status.activeTask.ciHeadSha,
             reviewVerdict: status.activeTask.reviewVerdict,

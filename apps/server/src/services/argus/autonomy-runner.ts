@@ -79,6 +79,7 @@ export class ArgusAutonomyRunner {
     private readonly milestoneE: { reconcile(path: string): Promise<void> },
     private readonly options: {
       campaigns?: ArgusCampaignManager;
+      discovery?: { discover(path: string): Promise<boolean> };
       now?: () => number;
       jitter?: () => number;
       setTimer?: typeof setTimeout;
@@ -195,6 +196,8 @@ export class ArgusAutonomyRunner {
   decision(state: ArgusProjectState): ReconcileDecision {
     if (state.autonomy !== 'enabled' || QUIET_PHASES.has(state.phase))
       return { needsReconcile: false, nextReconcileAt: null, reason: state.phase };
+    if (state.phase === 'idle' && !state.activeTask)
+      return { needsReconcile: false, nextReconcileAt: null, reason: 'NO_ACTION' };
     const delay = this.delayFor(state);
     return {
       needsReconcile: true,
@@ -226,6 +229,10 @@ export class ArgusAutonomyRunner {
     if (!before) return;
     await this.applyControl(projectPath, before);
     const campaign = await this.options.campaigns?.beforeCycle(projectPath, before);
+    if ((!campaign || campaign.allowNewTasks) && before.autonomy === 'satisfied') {
+      await this.options.discovery?.discover(projectPath);
+      before = (await this.argus.getStatus(projectPath))!;
+    }
     if (
       campaign?.allowReconcile === false ||
       before.autonomy !== 'enabled' ||
@@ -253,14 +260,14 @@ export class ArgusAutonomyRunner {
         const task = state.activeTask;
         if (!task || state.phase === 'planning' || state.phase === 'idle') {
           if (budget?.allowNewTasks === false) break;
-          await this.planner.reconcileProject(projectPath);
+          const planned = await this.planner.reconcileProject(projectPath);
+          if (!planned) break;
           continue;
         }
         if (task.phase === 'awaiting-executor') {
           if (
-            budget?.allowNewTasks === false ||
-            (this.options.campaigns &&
-              !(await this.options.campaigns.reserveTask(projectPath, task)))
+            this.options.campaigns &&
+            !(await this.options.campaigns.reserveTask(projectPath, task))
           )
             break;
           if (task.executor === 'jules' && this.executor)
@@ -322,8 +329,13 @@ export class ArgusAutonomyRunner {
         }
         break;
       }
-      const state = await this.argus.getStatus(projectPath);
+      let state = await this.argus.getStatus(projectPath);
       if (!state) return;
+      const remaining = await this.options.campaigns?.beforeCycle(projectPath, state);
+      if ((!remaining || remaining.allowNewTasks) && state.autonomy === 'satisfied') {
+        await this.options.discovery?.discover(projectPath);
+        state = (await this.argus.getStatus(projectPath))!;
+      }
       const progressed = marker !== this.marker(state);
       state.reconciliation.attempt = progressed ? 0 : state.reconciliation.attempt;
       state.reconciliation.lastFinishedAt = new Date(this.now()).toISOString();

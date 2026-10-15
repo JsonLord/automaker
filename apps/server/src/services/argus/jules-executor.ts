@@ -1,3 +1,4 @@
+import { ArgusBoardProjector } from './board-projector.js';
 import type { FeatureLoader } from '../feature-loader.js';
 import { saveArgusState } from './project-lifecycle.js';
 import {
@@ -201,10 +202,7 @@ export class JulesDeveloperAdapter implements DeveloperExecutor {
     state.phase = task.phase;
     state.latestStatus = task.lastArgusEvent;
     await saveArgusState(projectPath, state);
-    await this.features.update(projectPath, task.featureId, {
-      status: task.phase === 'blocked' ? 'failed' : task.phase === 'pr-open' ? 'review' : 'running',
-      argus: { ...task },
-    });
+    await new ArgusBoardProjector(this.features).project(projectPath, task);
   }
   private prompt(task: ArgusTaskState, git: GitDispatchContext) {
     return [

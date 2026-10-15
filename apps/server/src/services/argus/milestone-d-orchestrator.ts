@@ -1,3 +1,4 @@
+import { ArgusBoardProjector } from './board-projector.js';
 import crypto from 'crypto';
 import { VerificationEvidenceStore, type ArgusExternalVerifier } from './verification.js';
 import type { FeatureLoader } from '../feature-loader.js';
@@ -288,6 +289,8 @@ export class MilestoneDOrchestrator {
   }
 
   private async takeOver(projectPath: string, task: ArgusTaskState) {
+    if (this.senior.canExecuteIsolated === false)
+      return this.block(projectPath, task, 'SENIOR_ISOLATED_EXECUTOR_UNAVAILABLE');
     task.lease = null;
     const now = new Date().toISOString();
     task.lease = { taskId: task.taskId, executor: 'senior', acquiredAt: now, heartbeatAt: now };
@@ -369,9 +372,6 @@ export class MilestoneDOrchestrator {
     state.phase = task.phase;
     state.latestStatus = task.lastArgusEvent;
     await saveArgusState(projectPath, state);
-    await this.features.update(projectPath, task.featureId, {
-      status: task.phase === 'blocked' ? 'failed' : 'review',
-      argus: { ...task },
-    });
+    await new ArgusBoardProjector(this.features).project(projectPath, task);
   }
 }

@@ -1,3 +1,4 @@
+import { EngineeringScout } from './services/argus/engineering-scout.js';
 import { LokiVerifier, RemoteLokiExecutor } from './services/argus/verification.js';
 /**
  * Automaker Backend Server
@@ -1034,7 +1035,14 @@ async function startAutomaker() {
       julesExecutor,
       milestoneD,
       milestoneE,
-      { campaigns: argusCampaigns }
+      {
+        campaigns: argusCampaigns,
+        discovery: new EngineeringScout(
+          argusService,
+          new ArgusOrchestrator(argusService, featureLoader),
+          ideationService
+        ),
+      }
     );
     setArgusAutonomyRunner(argusAutonomyRunner);
     for (const project of settings.projects || []) argusAutonomyRunner.register(project.path);

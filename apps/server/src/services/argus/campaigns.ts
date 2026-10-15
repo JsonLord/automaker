@@ -292,6 +292,18 @@ export class ArgusCampaignManager {
       return campaign;
     });
   }
+  private async experimentSummaries(root: string) {
+    const ids =
+      (await readDurableJson<string[]>(
+        path.join(root, '.automaker', 'experiments', 'index.json')
+      )) || [];
+    return Promise.all(
+      ids
+        .filter((id) => /^[a-f0-9-]{36}$/.test(id))
+        .slice(0, 3)
+        .map((id) => readDurableJson(path.join(root, '.automaker', 'experiments', `${id}.json`)))
+    );
+  }
   async report(projectPath: string, campaign?: ArgusCampaign, state?: ArgusProjectState) {
     campaign ||= await this.current(projectPath);
     if (!campaign) throw new Error('CAMPAIGN_NOT_FOUND');
@@ -326,7 +338,22 @@ export class ArgusCampaignManager {
       objectiveProgress: state
         ? { phase: state.phase, autonomy: state.autonomy, specRevision: state.specRevision }
         : null,
-      experiments: [],
+      experiments: await this.experimentSummaries(projectPath),
+      taskRecords: campaign.taskRecords,
+      activeTaskEvidence: state?.activeTask
+        ? {
+            taskId: state.activeTask.taskId,
+            headSha: state.activeTask.prHeadSha,
+            prNumber: state.activeTask.prNumber,
+            loki: state.activeTask.lokiEvidence || null,
+            ciState: state.activeTask.ciState,
+            seniorVerdict: state.activeTask.reviewVerdict,
+            repairs:
+              (state.activeTask.lokiRepairAttempts || 0) +
+              state.activeTask.julesRepairAttempt +
+              state.activeTask.seniorGuidedRepairAttempt,
+          }
+        : null,
       notProven: ['Provider token/API cost accounting is unavailable unless supplied by a worker'],
       recommendedNextActions: campaign.taskRecords.some((t) => t.blocked)
         ? ['Inspect blocked task evidence before resuming']

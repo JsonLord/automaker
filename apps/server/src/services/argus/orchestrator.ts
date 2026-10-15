@@ -1,3 +1,6 @@
+import { EngineeringExperiments } from './engineering-experiments.js';
+import { ArgusBoardProjector } from './board-projector.js';
+import { TaskHistoryStore } from './task-history.js';
 import type { FeatureLoader } from '../feature-loader.js';
 import { saveArgusState } from './project-lifecycle.js';
 import type {
@@ -98,9 +101,39 @@ export class ArgusOrchestrator {
       await saveArgusState(projectPath, state);
       return null;
     }
-    if (/\b(deploy|publish|release)\b/i.test(`${planned.objective} ${planned.description}`))
+    return this.admitPlannedTask(projectPath, planned);
+  }
+  async admitPlannedTask(
+    projectPath: string,
+    planned: ArgusPlannedTask,
+    resumeSatisfied = false
+  ): Promise<ArgusTaskState | null> {
+    const state = await this.argus.getStatus(projectPath);
+    if (
+      !state ||
+      (state.autonomy !== 'enabled' && !(resumeSatisfied && state.autonomy === 'satisfied')) ||
+      state.activeTask
+    )
+      return state?.activeTask || null;
+    if ((await new TaskHistoryStore().list(projectPath)).some((t) => t.taskId === planned.taskId)) {
+      state.phase = 'idle';
+      state.latestStatus = 'NO_ACTION: task already archived';
+      await saveArgusState(projectPath, state);
+      return null;
+    }
+    if (
+      /\b(deploy|publish|release|authentication|authorization|billing|secrets|destructive migration|permission escalation)\b/i.test(
+        `${planned.objective} ${planned.description}`
+      )
+    )
       planned.recommendedExecutor = 'blocked';
+    if (planned.experimentId) {
+      const winner = await new EngineeringExperiments().selected(projectPath, planned.experimentId);
+      if (!winner || winner.headSha !== planned.selectedVariantSha)
+        throw new Error('EXPERIMENT_WINNER_REQUIRED');
+    }
     const featureId = `argus-${planned.taskId.replace(/[^a-zA-Z0-9_-]/g, '-').slice(0, 80)}`;
+    state.autonomy = 'enabled';
     state.activeTask = taskState(planned, featureId);
     state.phase = state.activeTask.phase;
     state.latestStatus = `Planner created ${planned.taskId}`;
@@ -109,22 +142,7 @@ export class ArgusOrchestrator {
     return state.activeTask;
   }
   async projectCard(projectPath: string, task: ArgusTaskState): Promise<void> {
-    const existing = await this.features.get(projectPath, task.featureId);
-    const data = {
-      id: task.featureId,
-      title: task.title,
-      category: 'Argus',
-      orchestrator: 'argus',
-      executionOwner: 'argus-autonomy',
-      description: task.description,
-      status: task.phase === 'blocked' ? 'failed' : 'backlog',
-      dependencies: task.dependencies,
-      planningMode: 'skip' as const,
-      requirePlanApproval: false,
-      argus: { ...task },
-    };
-    if (existing) await this.features.update(projectPath, task.featureId, data);
-    else await this.features.create(projectPath, data);
+    await new ArgusBoardProjector(this.features).project(projectPath, task);
   }
   private validateDecision(decision: ArgusManagerDecision) {
     if (!decision || typeof decision.admitted !== 'boolean' || !decision.reason)

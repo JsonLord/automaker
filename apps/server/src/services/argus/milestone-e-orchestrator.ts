@@ -1,3 +1,4 @@
+import { ArgusBoardProjector } from './board-projector.js';
 import { TaskHistoryStore } from './task-history.js';
 import fs from 'fs/promises';
 import path from 'path';
@@ -233,10 +234,7 @@ export class MilestoneEOrchestrator {
       await this.specs.renew(projectPath, state, nextSpec, evaluation);
       this.event(task, 'SPEC_RENEWED');
       this.event(task, 'NEXT_CAMPAIGN_STARTED');
-      await this.features.update(projectPath, task.featureId, {
-        status: 'verified',
-        argus: { ...task },
-      });
+      await new ArgusBoardProjector(this.features).project(projectPath, task);
       // The authoritative runner admits the next task after checking campaign budgets.
     } catch (error) {
       await this.block(
@@ -268,6 +266,6 @@ export class MilestoneEOrchestrator {
     state.phase = task.phase;
     state.latestStatus = task.lastArgusEvent;
     await saveArgusState(projectPath, state);
-    await this.features.update(projectPath, task.featureId, { status, argus: { ...task } });
+    await new ArgusBoardProjector(this.features).project(projectPath, task);
   }
 }

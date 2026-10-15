@@ -53,7 +53,7 @@ export class TaskHistoryStore {
     await updateDurableJson<TaskOutcome[]>(this.index(projectPath), (records) =>
       [...(records || []).filter((r) => r.taskId !== task.taskId), record].slice(-1000)
     );
-    return record;
+    return redactOpenCodeEvent(record) as TaskOutcome;
   }
   async list(projectPath: string) {
     return (await readDurableJson<TaskOutcome[]>(this.index(projectPath))) || [];

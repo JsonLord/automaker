@@ -1,3 +1,4 @@
+import { TaskHistoryStore } from './task-history.js';
 import { sanitizeOpenCodeOutput } from '../../lib/opencode-errors.js';
 import { realpathSync } from 'fs';
 import { resolveOpenCodeModel } from '@automaker/model-resolver';
@@ -190,7 +191,10 @@ export class SupervisedArgusService implements ArgusService {
     await saveArgusState(projectPath, state);
     return state;
   }
-  async managerHandoff(projectPath: string): Promise<ArgusManagerDecision> {
+  async managerHandoff(
+    projectPath: string,
+    context?: Record<string, unknown>
+  ): Promise<ArgusManagerDecision> {
     const state = this.requireProject(projectPath);
     state.managerStatus = 'running';
     await saveArgusState(projectPath, state);
@@ -209,6 +213,11 @@ export class SupervisedArgusService implements ArgusService {
         specRevision: state.specRevision,
         phase: state.phase,
         activeTask: state.activeTask,
+        archivedTasks: (await new TaskHistoryStore().list(projectPath)).map((t) => ({
+          id: t.taskId,
+          outcome: t.outcome,
+        })),
+        ...context,
       },
     });
     state.managerStatus = result.reason;
@@ -216,7 +225,11 @@ export class SupervisedArgusService implements ArgusService {
     await saveArgusState(projectPath, state);
     return result;
   }
-  async plannerNextTask(projectPath: string, decision: ArgusManagerDecision) {
+  async plannerNextTask(
+    projectPath: string,
+    decision: ArgusManagerDecision,
+    context?: Record<string, unknown>
+  ) {
     const state = this.requireProject(projectPath);
     state.plannerStatus = 'running';
     await saveArgusState(projectPath, state);
@@ -228,6 +241,7 @@ export class SupervisedArgusService implements ArgusService {
       projectId: state.argusCorrelationId,
       projectPath,
       managerDecision: decision,
+      context,
       sourceSpecRevision: state.specRevision,
       objective,
       spec,

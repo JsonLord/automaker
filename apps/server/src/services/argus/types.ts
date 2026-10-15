@@ -53,6 +53,8 @@ export interface ArgusManagerDecision {
   needsNextSpec: boolean;
 }
 export interface ArgusPlannedTask {
+  experimentId?: string;
+  selectedVariantSha?: string;
   taskId: string;
   title: string;
   objective: string;
@@ -273,10 +275,14 @@ export interface ArgusService {
   health(): Promise<ArgusRuntimeHealth>;
   createOrResolveProject(input: ArgusProjectInput): Promise<ArgusProjectState>;
   resumeProject(projectPath: string): Promise<ArgusProjectState>;
-  managerHandoff(projectPath: string): Promise<ArgusManagerDecision>;
+  managerHandoff(
+    projectPath: string,
+    context?: Record<string, unknown>
+  ): Promise<ArgusManagerDecision>;
   plannerNextTask(
     projectPath: string,
-    decision: ArgusManagerDecision
+    decision: ArgusManagerDecision,
+    context?: Record<string, unknown>
   ): Promise<ArgusPlannedTask | null>;
   getPendingWork(projectPath: string): Promise<ArgusPlannedTask[]>;
   getRecentEvents(projectPath: string): Promise<Array<Record<string, unknown>>>;

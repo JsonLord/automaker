@@ -46,7 +46,10 @@ export function createOpencodeStatusHandler() {
           authenticated: status.authenticated || false,
           method: authMethod,
           hasApiKey: status.hasApiKey || false,
-          hasEnvApiKey: status.authMode === 'compatible-provider' || !!process.env.ANTHROPIC_API_KEY || !!process.env.OPENAI_API_KEY,
+          hasEnvApiKey:
+            status.authMode === 'compatible-provider' ||
+            !!process.env.ANTHROPIC_API_KEY ||
+            !!process.env.OPENAI_API_KEY,
           hasOAuthToken: status.hasOAuthToken || false,
         },
         recommendation: !status.installed

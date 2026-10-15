@@ -24,12 +24,16 @@ export async function captureGitDispatchContext(
   try {
     remoteUrl = (await execGitCommand(['remote', 'get-url', 'origin'], projectPath)).trim();
   } catch {
-    throw new Error('GITHUB_REMOTE_REQUIRED_FOR_JULES: Jules autonomous execution requires a canonical GitHub repository remote origin.');
+    throw new Error(
+      'GITHUB_REMOTE_REQUIRED_FOR_JULES: Jules autonomous execution requires a canonical GitHub repository remote origin.'
+    );
   }
 
   const repository = normalizeGitHubRepository(remoteUrl);
   if (!repository) {
-    throw new Error('GITHUB_REMOTE_REQUIRED_FOR_JULES: origin is not a canonical GitHub repository URL.');
+    throw new Error(
+      'GITHUB_REMOTE_REQUIRED_FOR_JULES: origin is not a canonical GitHub repository URL.'
+    );
   }
   await execGitCommand(['fetch', '--prune', 'origin'], projectPath);
   let baseBranch = explicitBaseBranch || '';

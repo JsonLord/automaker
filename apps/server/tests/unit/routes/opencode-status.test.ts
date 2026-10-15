@@ -2,7 +2,11 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import fs from 'fs/promises';
 import path from 'path';
 import os from 'os';
-import { configureOpenCode, upsertCompatibleProvider, AUTOMAKER_PROVIDER_ID } from '../../../src/services/argus/opencode-config.js';
+import {
+  configureOpenCode,
+  upsertCompatibleProvider,
+  AUTOMAKER_PROVIDER_ID,
+} from '../../../src/services/argus/opencode-config.js';
 import { createOpencodeStatusHandler } from '../../../src/routes/setup/routes/opencode-status.js';
 import type { Request, Response } from 'express';
 

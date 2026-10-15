@@ -21,7 +21,11 @@ describe('Starter Project Bootstrap Lifecycle', () => {
   it('successfully bootstraps a fresh starter project with control files, provenance, and baseline commit', async () => {
     // 1. Setup mock template files
     const readmeContent = '# My Starter Template\n\nWelcome to agentic jumpstart.';
-    const pkgJsonContent = JSON.stringify({ name: 'my-starter', version: '1.0.0', scripts: { dev: 'vite' } });
+    const pkgJsonContent = JSON.stringify({
+      name: 'my-starter',
+      version: '1.0.0',
+      scripts: { dev: 'vite' },
+    });
 
     await fs.writeFile(path.join(tempDir, 'README.md'), readmeContent);
     await fs.writeFile(path.join(tempDir, 'package.json'), pkgJsonContent);
@@ -43,14 +47,19 @@ describe('Starter Project Bootstrap Lifecycle', () => {
     const specMd = await fs.readFile(path.join(tempDir, 'spec.md'), 'utf8');
     const argusMd = await fs.readFile(path.join(tempDir, 'ARGUS.md'), 'utf8');
     const argusYaml = await fs.readFile(path.join(tempDir, '.automaker', 'argus.yaml'), 'utf8');
-    const provenanceRaw = await fs.readFile(path.join(tempDir, '.automaker', 'template.json'), 'utf8');
+    const provenanceRaw = await fs.readFile(
+      path.join(tempDir, '.automaker', 'template.json'),
+      'utf8'
+    );
 
     expect(specMd).toContain('# Campaign 1');
     expect(argusMd).toContain('# Project Objective');
     expect(argusYaml).toContain('version: 1');
 
     const provenance = JSON.parse(provenanceRaw);
-    expect(provenance.template.source).toBe('https://github.com/webdevcody/agentic-jumpstart-starter-kit');
+    expect(provenance.template.source).toBe(
+      'https://github.com/webdevcody/agentic-jumpstart-starter-kit'
+    );
 
     // 4. Verify baseline commit exists and git rev-parse HEAD succeeds
     const headSha = (await execGitCommand(['rev-parse', '--verify', 'HEAD'], tempDir)).trim();
@@ -84,8 +93,14 @@ describe('Starter Project Bootstrap Lifecycle', () => {
       status: 'backlog',
     };
 
-    expect(AutoModeServiceFacade.isFeatureEligibleForAutoMode(normalFeature, null, 'main')).toBe(true);
-    expect(AutoModeServiceFacade.isFeatureEligibleForAutoMode(argusCategoryFeature, null, 'main')).toBe(false);
-    expect(AutoModeServiceFacade.isFeatureEligibleForAutoMode(argusOrchestratorFeature, null, 'main')).toBe(false);
+    expect(AutoModeServiceFacade.isFeatureEligibleForAutoMode(normalFeature, null, 'main')).toBe(
+      true
+    );
+    expect(
+      AutoModeServiceFacade.isFeatureEligibleForAutoMode(argusCategoryFeature, null, 'main')
+    ).toBe(false);
+    expect(
+      AutoModeServiceFacade.isFeatureEligibleForAutoMode(argusOrchestratorFeature, null, 'main')
+    ).toBe(false);
   });
 });

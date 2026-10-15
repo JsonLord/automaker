@@ -87,7 +87,13 @@ export function createArgusRoutes(
           action === 'start'
             ? await argusCampaigns.start(projectPath, state.argusProjectId, req.body.options || {})
             : await argusCampaigns.change(projectPath, action);
-        await runner.requestReconcile(projectPath, `campaign-${action}`);
+        await runner.requestReconcile(
+          projectPath,
+          `campaign-${action}`,
+          (action === 'start' || action === 'resume') && state.autonomy === 'paused'
+            ? 'resume'
+            : undefined
+        );
         return res.status(202).json({ status: 'queued', campaign });
       } catch (error) {
         const code = error instanceof Error ? error.message : '';

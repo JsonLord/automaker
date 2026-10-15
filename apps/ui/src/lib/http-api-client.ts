@@ -1001,6 +1001,37 @@ export class HttpApiClient implements ElectronAPI {
     };
   }
 
+  argus = {
+    status: (projectPath: string) =>
+      this.get<{
+        campaign: {
+          id: string;
+          status: string;
+          deadlineAt: string;
+          tasksStarted: number;
+          tasksCompleted: number;
+          tasksBlocked: number;
+          stopReason: string | null;
+        } | null;
+      }>(`/api/argus/status?projectPath=${encodeURIComponent(projectPath)}`),
+    control: (projectPath: string, action: 'start' | 'pause' | 'resume' | 'stop' | 'drain') =>
+      this.post<{
+        campaign: {
+          id: string;
+          status: string;
+          deadlineAt: string;
+          tasksStarted: number;
+          tasksCompleted: number;
+          tasksBlocked: number;
+          stopReason: string | null;
+        };
+      }>(`/api/argus/campaign/${action}`, { projectPath }),
+    report: (projectPath: string) =>
+      this.get<unknown>(
+        `/api/argus/campaign/report?projectPath=${encodeURIComponent(projectPath)}`
+      ),
+  };
+
   private getHeaders(): Record<string, string> {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',

@@ -1,3 +1,4 @@
+import { ArgusCampaignPanel } from './board-view/argus-campaign-panel';
 import { useEffect, useState, useCallback, useMemo, useRef, startTransition } from 'react';
 import { createLogger } from '@automaker/utils/logger';
 import type { PointerEvent as ReactPointerEvent } from 'react';
@@ -1846,6 +1847,7 @@ export function BoardView({ initialFeatureId, initialProjectPath }: BoardViewPro
       className="flex-1 flex flex-col overflow-hidden content-bg relative"
       data-testid="board-view"
     >
+      <ArgusCampaignPanel key={currentProject.path} projectPath={currentProject.path} />
       {/* Header */}
       <BoardHeader
         projectPath={currentProject.path}

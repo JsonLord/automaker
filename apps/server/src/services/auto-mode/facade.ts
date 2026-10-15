@@ -1,3 +1,4 @@
+import { isArgusOwned } from '../argus/board-projector.js';
 /**
  * AutoModeServiceFacade - Clean interface for auto-mode functionality
  *
@@ -650,6 +651,8 @@ export class AutoModeServiceFacade {
     }
   ): Promise<void> {
     try {
+      if (isArgusOwned(await this.featureLoader.get(this.projectPath, featureId)))
+        throw new Error('ARGUS_TASK_REQUIRES_RUNNER');
       return await this.executionService.executeFeature(
         this.projectPath,
         featureId,

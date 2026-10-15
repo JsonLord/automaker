@@ -51,7 +51,10 @@ export class TaskHistoryStore {
       archivedAt: new Date().toISOString(),
     };
     await updateDurableJson<TaskOutcome[]>(this.index(projectPath), (records) =>
-      [...(records || []).filter((r) => r.taskId !== task.taskId), record].slice(-1000)
+      [
+        ...(records || []).filter((r) => r.taskId !== task.taskId),
+        redactOpenCodeEvent(record) as TaskOutcome,
+      ].slice(-1000)
     );
     return redactOpenCodeEvent(record) as TaskOutcome;
   }

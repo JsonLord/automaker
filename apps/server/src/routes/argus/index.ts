@@ -1,3 +1,4 @@
+import { redactOpenCodeEvent } from '../../lib/opencode-errors.js';
 import { ArgusProjectAccess, ArgusAccessError } from '../../services/argus/project-access.js';
 import type { SettingsService } from '../../services/settings-service.js';
 import { Router } from 'express';
@@ -109,57 +110,59 @@ export function createArgusRoutes(
     if (!projectPath) return res.status(400).json({ error: 'projectPath is required' });
     const status = await service.getStatus(projectPath);
     if (!status) return res.status(404).json({ error: 'Argus project not found' });
-    return res.json({
-      enabled: status.autonomy === 'enabled',
-      campaign: (await argusCampaigns.current(projectPath)) || null,
-      running: status.phase !== 'error',
-      argusProjectId: status.argusProjectId,
-      specRevision: status.specRevision,
-      phase: status.phase,
-      managerStatus: status.managerStatus,
-      plannerStatus: status.plannerStatus,
-      objectiveStatus: status.autonomy === 'satisfied' ? 'satisfied' : 'active',
-      activeTask: status.activeTask
-        ? {
-            taskId: status.activeTask.taskId,
-            title: status.activeTask.title,
-            phase: status.activeTask.phase,
-            executor: status.activeTask.executor,
-            julesState: status.activeTask.julesState,
-            julesSessionId: status.activeTask.julesSessionId,
-            prNumber: status.activeTask.prNumber,
-            prUrl: status.activeTask.prUrl,
-            prHeadSha: status.activeTask.prHeadSha,
-            loki: status.activeTask.lokiEvidence
-              ? {
-                  verdict: status.activeTask.lokiEvidence.verdict,
-                  headSha: status.activeTask.lokiEvidence.headSha,
-                  baseSha: status.activeTask.lokiEvidence.baseSha,
-                  findings: status.activeTask.lokiEvidence.findings,
-                  proven: status.activeTask.lokiEvidence.proven,
-                  notProven: status.activeTask.lokiEvidence.notProven,
-                  attempts: status.activeTask.lokiEvidence.attempts,
-                  finishedAt: status.activeTask.lokiEvidence.finishedAt,
-                }
-              : null,
-            lokiRepairAttempts: status.activeTask.lokiRepairAttempts || 0,
-            integrationEvidence: status.activeTask.integrationEvidence || null,
-            ciState: status.activeTask.ciState,
-            ciHeadSha: status.activeTask.ciHeadSha,
-            reviewVerdict: status.activeTask.reviewVerdict,
-            reviewedHeadSha: status.activeTask.reviewedHeadSha,
-            mergeCommitSha: status.activeTask.mergeCommitSha,
-            remoteBaseSha: status.activeTask.remoteBaseSha,
-            localSyncedSha: status.activeTask.localSyncedSha,
-            recoverySnapshots: status.activeTask.recoverySnapshots,
-            nextAction: status.activeTask.nextAction,
-            latestEvent: status.activeTask.lastArgusEvent,
-            blockedReason: status.activeTask.blockedReason,
-          }
-        : null,
-      reconciliation: status.reconciliation,
-      latestStatus: status.latestStatus,
-    });
+    return res.json(
+      redactOpenCodeEvent({
+        enabled: status.autonomy === 'enabled',
+        campaign: (await argusCampaigns.current(projectPath)) || null,
+        running: status.phase !== 'error',
+        argusProjectId: status.argusProjectId,
+        specRevision: status.specRevision,
+        phase: status.phase,
+        managerStatus: status.managerStatus,
+        plannerStatus: status.plannerStatus,
+        objectiveStatus: status.autonomy === 'satisfied' ? 'satisfied' : 'active',
+        activeTask: status.activeTask
+          ? {
+              taskId: status.activeTask.taskId,
+              title: status.activeTask.title,
+              phase: status.activeTask.phase,
+              executor: status.activeTask.executor,
+              julesState: status.activeTask.julesState,
+              julesSessionId: status.activeTask.julesSessionId,
+              prNumber: status.activeTask.prNumber,
+              prUrl: status.activeTask.prUrl,
+              prHeadSha: status.activeTask.prHeadSha,
+              loki: status.activeTask.lokiEvidence
+                ? {
+                    verdict: status.activeTask.lokiEvidence.verdict,
+                    headSha: status.activeTask.lokiEvidence.headSha,
+                    baseSha: status.activeTask.lokiEvidence.baseSha,
+                    findings: status.activeTask.lokiEvidence.findings,
+                    proven: status.activeTask.lokiEvidence.proven,
+                    notProven: status.activeTask.lokiEvidence.notProven,
+                    attempts: status.activeTask.lokiEvidence.attempts,
+                    finishedAt: status.activeTask.lokiEvidence.finishedAt,
+                  }
+                : null,
+              lokiRepairAttempts: status.activeTask.lokiRepairAttempts || 0,
+              integrationEvidence: status.activeTask.integrationEvidence || null,
+              ciState: status.activeTask.ciState,
+              ciHeadSha: status.activeTask.ciHeadSha,
+              reviewVerdict: status.activeTask.reviewVerdict,
+              reviewedHeadSha: status.activeTask.reviewedHeadSha,
+              mergeCommitSha: status.activeTask.mergeCommitSha,
+              remoteBaseSha: status.activeTask.remoteBaseSha,
+              localSyncedSha: status.activeTask.localSyncedSha,
+              recoverySnapshots: status.activeTask.recoverySnapshots,
+              nextAction: status.activeTask.nextAction,
+              latestEvent: status.activeTask.lastArgusEvent,
+              blockedReason: status.activeTask.blockedReason,
+            }
+          : null,
+        reconciliation: status.reconciliation,
+        latestStatus: status.latestStatus,
+      })
+    );
   });
   return router;
 }

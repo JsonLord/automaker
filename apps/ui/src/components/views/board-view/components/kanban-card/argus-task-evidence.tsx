@@ -30,6 +30,7 @@ export function ArgusTaskEvidence({ task }: { task: unknown }) {
       {typeof value.blockedReason === 'string' && (
         <p className="text-destructive">{value.blockedReason}</p>
       )}
+      {typeof value.experimentId === 'string' && <p>Experiment: {value.experimentId}</p>}
       {!!loki?.notProven?.length && (
         <details>
           <summary>Evidence gaps</summary>

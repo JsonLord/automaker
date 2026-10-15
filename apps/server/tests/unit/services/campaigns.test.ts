@@ -231,3 +231,24 @@ it('accelerates a full eight-hour Runner campaign across restart with one dispat
   expect(executor.dispatch).toHaveBeenCalledTimes(3);
   expect(new Set(executor.dispatch.mock.calls.map(([t]) => t.taskId)).size).toBe(3);
 });
+it('redacts archived and reported failures using configured credential values', async () => {
+  const { dir, state } = await fixture();
+  const secret = 'campaign-fixture-private-value';
+  vi.stubEnv('COMPATIBLE_API_KEY', secret);
+  try {
+    const t = task('redaction');
+    t.blockedReason = `failure ${secret}`;
+    const history = new TaskHistoryStore();
+    await history.archive(dir, t, 'blocked');
+    expect(
+      await fs.readFile(path.join(dir, '.automaker', 'task-history.json'), 'utf8')
+    ).not.toContain(secret);
+    const manager = new ArgusCampaignManager(() => 0, history);
+    await manager.start(dir, 'p');
+    await manager.reserveTask(dir, t);
+    state.activeTask = t;
+    expect(JSON.stringify(await manager.report(dir, undefined, state))).not.toContain(secret);
+  } finally {
+    vi.unstubAllEnvs();
+  }
+});

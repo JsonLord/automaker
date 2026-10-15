@@ -1,3 +1,4 @@
+import { redactOpenCodeEvent } from '../../lib/opencode-errors.js';
 import path from 'path';
 import crypto from 'crypto';
 import type { ArgusProjectState, ArgusTaskState } from './types.js';
@@ -361,7 +362,7 @@ export class ArgusCampaignManager {
     };
     return updateDurableJson(
       path.join(projectPath, '.automaker', 'campaigns', 'reports', `${campaign.id}.json`),
-      () => report
+      () => redactOpenCodeEvent(report) as typeof report
     );
   }
 }

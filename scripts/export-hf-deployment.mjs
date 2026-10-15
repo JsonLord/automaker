@@ -4,12 +4,12 @@ import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { writeFileSync, readFileSync } from 'node:fs';
 import path from 'node:path';
+import { assertCleanWorkingTree } from './check-clean-working-tree.mjs';
 const git = (...args) =>
   execFileSync('git', args, { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 }).trim();
 const output = path.resolve(process.argv[2] || '/tmp/automaker-hf.tar');
 const sha = git('rev-parse', 'HEAD');
-if (git('status', '--porcelain', '--untracked-files=no'))
-  throw new Error('Commit tracked changes before exporting deployment source');
+assertCleanWorkingTree('Deployment export');
 const files = git('ls-tree', '-r', '--name-only', 'HEAD').split('\n');
 const forbidden = files.filter(
   (f) =>

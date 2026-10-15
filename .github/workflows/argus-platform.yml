@@ -23,14 +23,36 @@ jobs:
         with:
           node-version: '22'
           cache: npm
-      - run: npm ci --ignore-scripts
-      - run: npm rebuild node-pty
-      - run: npm run build:server
-      - run: npm run build --workspace=apps/ui
-      - run: npm run typecheck
-      - run: npm run lint:server:errors
-      - run: npm run lint:errors
-      - run: npm run test:server
-      - run: npm run test:packages
+      - name: Check checkout is clean
+        run: node scripts/check-clean-working-tree.mjs Checkout
+      - run: |
+          npm ci --ignore-scripts
+          node scripts/check-clean-working-tree.mjs 'Dependency installation'
+      - run: |
+          npm rebuild node-pty
+          node scripts/check-clean-working-tree.mjs 'Native module rebuild'
+      - run: |
+          npm run build:server
+          node scripts/check-clean-working-tree.mjs 'Server build'
+      - run: |
+          npm run build --workspace=apps/ui
+          node scripts/check-clean-working-tree.mjs 'UI build'
+      - run: |
+          npm run typecheck
+          node scripts/check-clean-working-tree.mjs Typecheck
+      - run: |
+          npm run lint:server:errors
+          node scripts/check-clean-working-tree.mjs 'Server lint'
+      - run: |
+          npm run lint:errors
+          node scripts/check-clean-working-tree.mjs 'UI lint'
+      - run: |
+          npm run test:server
+          node scripts/check-clean-working-tree.mjs 'Server tests'
+      - run: |
+          npm run test:packages
+          node scripts/check-clean-working-tree.mjs 'Package tests'
       - name: Validate deployment export
-        run: node scripts/export-hf-deployment.mjs /tmp/automaker-hf.tar
+        run: |
+          node --test scripts/tests/check-clean-working-tree.test.mjs
+          node scripts/export-hf-deployment.mjs /tmp/automaker-hf.tar

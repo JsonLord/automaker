@@ -1,0 +1,36 @@
+name: Argus Platform
+on:
+  pull_request:
+  push:
+    branches: [feat/argus-continuous-engineering]
+permissions:
+  contents: read
+concurrency:
+  group: argus-platform-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  deterministic-validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      NODE_ENV: test
+      ARGUS_LOKI_ENABLED: 'false'
+      ARGUS_CONTINUOUS_ENGINEERING_ENABLED: 'false'
+      AUTOMAKER_HIDE_API_KEY: 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm rebuild node-pty
+      - run: npm run build:server
+      - run: npm run build --workspace=apps/ui
+      - run: npm run typecheck
+      - run: npm run lint:server:errors
+      - run: npm run lint:errors
+      - run: npm run test:server
+      - run: npm run test:packages
+      - name: Validate deployment export
+        run: node scripts/export-hf-deployment.mjs /tmp/automaker-hf.tar

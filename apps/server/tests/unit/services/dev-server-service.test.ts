@@ -182,9 +182,10 @@ describe('dev-server-service.ts', () => {
     it('should detect bun as package manager with bun.lockb', async () => {
       vi.mocked(secureFs.access).mockImplementation(async (p: any) => {
         const pathStr = typeof p === 'string' ? p : '';
+        if (pathStr === testDir) return undefined;
         if (pathStr.includes('bun.lockb')) return undefined;
         if (pathStr.includes('package.json')) return undefined;
-        return undefined;
+        throw Object.assign(new Error('not found'), { code: 'ENOENT' });
       });
 
       const mockProcess = createMockProcess();

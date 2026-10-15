@@ -74,7 +74,13 @@ export class RemoteLokiExecutor implements IsolatedVerifierExecution {
     private transport: typeof fetch = fetch
   ) {
     const target = new URL(url);
-    if (target.protocol !== 'https:' || target.username || target.password)
+    if (
+      target.protocol !== 'https:' ||
+      target.username ||
+      target.password ||
+      target.search ||
+      target.hash
+    )
       throw new Error('LOKI_WORKER_TLS_REQUIRED');
   }
   async execute(
@@ -90,6 +96,7 @@ export class RemoteLokiExecutor implements IsolatedVerifierExecution {
     try {
       const response = await this.transport(this.url, {
         method: 'POST',
+        redirect: 'error',
         headers: { 'content-type': 'application/json', authorization: `Bearer ${this.token}` },
         body: JSON.stringify(input),
         signal: controller.signal,

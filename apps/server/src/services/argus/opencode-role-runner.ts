@@ -21,7 +21,7 @@ export type RoleInvoker = (input: RoleInvocation) => Promise<string>;
 // stable per-run tool-deny flag. Read-only roles therefore receive no repository
 // checkout: only bounded supplied evidence in a chmod-read-only temporary cwd.
 export const READ_ONLY_ENFORCEMENT =
-  'repository-isolation + readonly-temp-cwd + bounded-review-input' as const;
+  'repository-isolation + deny-all-tools + readonly-temp-cwd + bounded-review-input' as const;
 
 export class OpenCodeRoleRunner {
   constructor(
@@ -31,7 +31,12 @@ export class OpenCodeRoleRunner {
     private readonly invoke: RoleInvoker = OpenCodeRoleRunner.invokeCli
   ) {}
 
+  get canExecuteIsolated() {
+    return this.invoke !== OpenCodeRoleRunner.invokeCli;
+  }
+
   static async invokeCli(input: RoleInvocation) {
+    if (!input.readOnly) throw new Error('SENIOR_ISOLATED_EXECUTOR_UNAVAILABLE');
     const abortController = new AbortController();
     const timer = setTimeout(() => abortController.abort(), 180000);
     let result;
@@ -46,6 +51,8 @@ export class OpenCodeRoleRunner {
         env: Object.fromEntries(
           [
             ['PATH', process.env.PATH],
+            ['OPENCODE_PERMISSION', JSON.stringify({ '*': 'deny' })],
+            ['OPENCODE_DISABLE_PROJECT_CONFIG', 'true'],
             ['HOME', process.env.HOME],
             ['COMPATIBLE_API_KEY', process.env.COMPATIBLE_API_KEY],
           ].filter((entry): entry is [string, string] => Boolean(entry[1]))

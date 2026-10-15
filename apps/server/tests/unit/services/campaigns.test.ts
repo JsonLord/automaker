@@ -159,3 +159,75 @@ describe('durable campaign budgets', () => {
     expect(state.autonomy).toBe('satisfied');
   });
 });
+it('rejects nested metadata symlinks before campaign persistence', async () => {
+  const { dir } = await fixture();
+  const outside = await fs.mkdtemp(path.join(os.tmpdir(), 'campaign-outside-'));
+  dirs.push(outside);
+  await fs.symlink(outside, path.join(dir, '.automaker', 'campaigns'));
+  await expect(new ArgusCampaignManager().start(dir, 'p')).rejects.toThrow('SYMLINK_REFUSED');
+  expect(await fs.readdir(outside)).toEqual([]);
+});
+it('accelerates a full eight-hour Runner campaign across restart with one dispatch per task', async () => {
+  const { dir, state } = await fixture();
+  let now = 0;
+  let sequence = 0;
+  const history = new TaskHistoryStore();
+  let campaigns = new ArgusCampaignManager(() => now, history);
+  await campaigns.start(dir, 'p', { maxNewTasks: 3 });
+  state.autonomy = 'enabled';
+  state.phase = 'planning';
+  const planner = {
+    reconcileProject: vi.fn(async () => {
+      state.activeTask = task(`cycle-${++sequence}`);
+      state.phase = 'awaiting-executor';
+      return state.activeTask;
+    }),
+  };
+  const executor = {
+    dispatch: vi.fn(async (t: ArgusTaskState) => {
+      t.julesSessionId = `session-${t.taskId}`;
+      t.phase = 'jules-running';
+      state.phase = t.phase;
+    }),
+    reconcile: vi.fn(async (t: ArgusTaskState) => {
+      t.prNumber = sequence;
+      t.phase = 'merge-ready';
+      state.phase = t.phase;
+    }),
+  };
+  const merge = {
+    reconcile: vi.fn(async () => {
+      const t = state.activeTask!;
+      t.mergeCommitSha = 'a'.repeat(40);
+      t.localSyncedSha = t.mergeCommitSha;
+      await history.archive(dir, t, 'completed');
+      state.activeTask = null;
+      state.phase = 'planning';
+    }),
+  };
+  const service = { getStatus: async () => state } as any;
+  let runner = new ArgusAutonomyRunner(service, planner, executor as any, undefined, merge, {
+    campaigns,
+    now: () => now,
+  });
+  await runner.reconcile(dir);
+  now = 4 * 3600000;
+  campaigns = new ArgusCampaignManager(() => now, history);
+  runner = new ArgusAutonomyRunner(service, planner, executor as any, undefined, merge, {
+    campaigns,
+    now: () => now,
+  });
+  await runner.reconcile(dir);
+  expect(executor.dispatch).toHaveBeenCalledTimes(3);
+  expect(sequence).toBe(3);
+  now = 7.5 * 3600000;
+  await runner.reconcile(dir);
+  expect((await campaigns.current(dir))?.status).toBe('draining');
+  now = 8 * 3600000;
+  await runner.reconcile(dir);
+  const report = await campaigns.report(dir, undefined, state);
+  expect(report.status).toBe('completed');
+  expect(report.tasksCompleted).toBe(3);
+  expect(executor.dispatch).toHaveBeenCalledTimes(3);
+  expect(new Set(executor.dispatch.mock.calls.map(([t]) => t.taskId)).size).toBe(3);
+});

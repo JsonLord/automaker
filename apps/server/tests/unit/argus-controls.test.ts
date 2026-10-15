@@ -22,14 +22,12 @@ beforeEach(async () => {
   vi.stubEnv('ALLOWED_ROOT_DIRECTORY', root);
   service = {
     health: vi.fn().mockResolvedValue({ running: false }),
-    getStatus: vi
-      .fn()
-      .mockResolvedValue({
-        autonomy: 'enabled',
-        phase: 'idle',
-        reconciliation: {},
-        activeTask: null,
-      }),
+    getStatus: vi.fn().mockResolvedValue({
+      autonomy: 'enabled',
+      phase: 'idle',
+      reconciliation: {},
+      activeTask: null,
+    }),
   };
   runner = {
     control: vi.fn().mockResolvedValue(undefined),
@@ -109,7 +107,11 @@ describe('Argus remote controls', () => {
     expect(service.getStatus).not.toHaveBeenCalled();
   });
   it('does not resume a paused project through wake or reconcile', async () => {
-    runner.control.mockResolvedValue({ desiredAutonomy: 'paused' });
+    runner.control.mockResolvedValue({
+      revision: 1,
+      handledRevision: 0,
+      desiredAutonomy: 'paused',
+    });
     expect((await post('wake').send({ projectId: 'p' })).status).toBe(409);
     expect((await post('reconcile').send({ projectId: 'p' })).status).toBe(409);
     expect(runner.requestReconcile).not.toHaveBeenCalled();

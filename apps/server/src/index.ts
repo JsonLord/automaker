@@ -109,7 +109,7 @@ import { MilestoneEOrchestrator } from './services/argus/milestone-e-orchestrato
 import { SpecRenewalService } from './services/argus/spec-renewal-service.js';
 import { ArgusOrchestrator } from './services/argus/orchestrator.js';
 import { ArgusAutonomyRunner } from './services/argus/autonomy-runner.js';
-import { setArgusAutonomyRunner } from './services/argus/autonomy-runtime.js';
+import { argusCampaigns, setArgusAutonomyRunner } from './services/argus/autonomy-runtime.js';
 
 // Load environment variables
 dotenv.config();
@@ -1003,7 +1003,9 @@ async function startAutomaker() {
           julesClient,
           new OpenCodeRoleRunner(),
           new GitSeniorWorktreeAdapter(),
-          loki
+          loki,
+          undefined,
+          (projectPath, task) => argusCampaigns.allowRepair(projectPath, task)
         )
       : undefined;
     const milestoneE = new MilestoneEOrchestrator(
@@ -1013,12 +1015,6 @@ async function startAutomaker() {
       new SpecRenewalService(),
       new ArgusOrchestrator(argusService, featureLoader)
     );
-    const postPrReconcile = {
-      reconcile: async (projectPath: string) => {
-        await milestoneD?.reconcile(projectPath);
-        await milestoneE.reconcile(projectPath);
-      },
-    };
     const julesExecutor = julesClient
       ? new JulesDeveloperAdapter(julesClient, argusService, featureLoader, {
           autoMonitor: false,
@@ -1037,7 +1033,8 @@ async function startAutomaker() {
       new ArgusOrchestrator(argusService, featureLoader),
       julesExecutor,
       milestoneD,
-      milestoneE
+      milestoneE,
+      { campaigns: argusCampaigns }
     );
     setArgusAutonomyRunner(argusAutonomyRunner);
     for (const project of settings.projects || []) argusAutonomyRunner.register(project.path);

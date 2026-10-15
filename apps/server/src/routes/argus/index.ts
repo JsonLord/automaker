@@ -3,7 +3,7 @@ import type { SettingsService } from '../../services/settings-service.js';
 import { Router } from 'express';
 import type { ArgusService } from '../../services/argus/types.js';
 import type { AutonomyRunnerHealth } from '../../services/argus/autonomy-runner.js';
-import { getArgusAutonomyRunner } from '../../services/argus/autonomy-runtime.js';
+import { argusCampaigns, getArgusAutonomyRunner } from '../../services/argus/autonomy-runtime.js';
 
 export function createArgusRoutes(
   service: ArgusService,
@@ -39,7 +39,10 @@ export function createArgusRoutes(
       const control = await runner.control(projectPath);
       if (
         (action === 'wake' || action === 'reconcile') &&
-        (control?.desiredAutonomy === 'paused' || state.autonomy === 'paused')
+        ((control &&
+          control.revision > control.handledRevision &&
+          control.desiredAutonomy === 'paused') ||
+          state.autonomy === 'paused')
       )
         return res.status(409).json({ error: 'ARGUS_PAUSED' });
       const queued = await runner.requestReconcile(
@@ -56,15 +59,53 @@ export function createArgusRoutes(
     });
   }
 
+  router.get(['/campaign', '/campaign/status'], async (_req, res) => {
+    const campaign = await argusCampaigns.current(res.locals.projectPath);
+    return res.json({ campaign: campaign || null });
+  });
+  router.get('/campaign/report', async (_req, res) => {
+    const projectPath = res.locals.projectPath as string;
+    const campaign = await argusCampaigns.current(projectPath);
+    if (!campaign) return res.status(404).json({ error: 'CAMPAIGN_NOT_FOUND' });
+    return res.json(
+      await argusCampaigns.report(
+        projectPath,
+        campaign,
+        (await service.getStatus(projectPath)) || undefined
+      )
+    );
+  });
+  for (const action of ['start', 'pause', 'resume', 'stop', 'drain'] as const) {
+    router.post(`/campaign/${action}`, async (req, res) => {
+      const projectPath = res.locals.projectPath as string;
+      const runner = getArgusAutonomyRunner();
+      if (!runner) return res.status(503).json({ error: 'ARGUS_RUNNER_UNAVAILABLE' });
+      const state = await service.getStatus(projectPath);
+      if (!state) return res.status(404).json({ error: 'Argus project not found' });
+      try {
+        const campaign =
+          action === 'start'
+            ? await argusCampaigns.start(projectPath, state.argusProjectId, req.body.options || {})
+            : await argusCampaigns.change(projectPath, action);
+        await runner.requestReconcile(projectPath, `campaign-${action}`);
+        return res.status(202).json({ status: 'queued', campaign });
+      } catch (error) {
+        const code = error instanceof Error ? error.message : '';
+        return res
+          .status(409)
+          .json({ error: /^CAMPAIGN_[A-Z_]+$/.test(code) ? code : 'CAMPAIGN_CONTROL_FAILED' });
+      }
+    });
+  }
+
   router.get('/status', async (req, res) => {
     const projectPath = res.locals.projectPath as string;
     if (!projectPath) return res.status(400).json({ error: 'projectPath is required' });
     const status = await service.getStatus(projectPath);
     if (!status) return res.status(404).json({ error: 'Argus project not found' });
     return res.json({
-      enabled:
-        ((await getArgusAutonomyRunner()?.control(projectPath))?.desiredAutonomy ||
-          status.autonomy) === 'enabled',
+      enabled: status.autonomy === 'enabled',
+      campaign: (await argusCampaigns.current(projectPath)) || null,
       running: status.phase !== 'error',
       argusProjectId: status.argusProjectId,
       specRevision: status.specRevision,

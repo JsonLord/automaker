@@ -1,3 +1,4 @@
+import { ArgusCampaignManager } from './campaigns.js';
 import { sanitizeOpenCodeOutput } from '../../lib/opencode-errors.js';
 import fs from 'fs';
 import path from 'path';
@@ -77,6 +78,7 @@ export class ArgusAutonomyRunner {
     private readonly milestoneD: { reconcile(path: string): Promise<void> } | undefined,
     private readonly milestoneE: { reconcile(path: string): Promise<void> },
     private readonly options: {
+      campaigns?: ArgusCampaignManager;
       now?: () => number;
       jitter?: () => number;
       setTimer?: typeof setTimeout;
@@ -118,7 +120,9 @@ export class ArgusAutonomyRunner {
             ? 'paused'
             : action === 'resume'
               ? 'enabled'
-              : current?.desiredAutonomy,
+              : current && current.revision > current.handledRevision
+                ? current.desiredAutonomy
+                : undefined,
         reason: reason.slice(0, 100),
         requestedAt: new Date(this.now()).toISOString(),
       })
@@ -138,8 +142,8 @@ export class ArgusAutonomyRunner {
   private async applyControl(projectPath: string, state: ArgusProjectState) {
     const control = await this.control(projectPath);
     if (!control) return;
-    if (control.desiredAutonomy) state.autonomy = control.desiredAutonomy;
     if (control.revision > control.handledRevision) {
+      if (control.desiredAutonomy) state.autonomy = control.desiredAutonomy;
       state.reconciliation.reason = control.reason;
       await saveArgusState(projectPath, state);
       await updateDurableJson<ArgusControlRequest>(this.controlPath(projectPath), (latest) => ({
@@ -221,8 +225,13 @@ export class ArgusAutonomyRunner {
     let before = await this.argus.getStatus(projectPath);
     if (!before) return;
     await this.applyControl(projectPath, before);
-    if (before.autonomy !== 'enabled' || QUIET_PHASES.has(before.phase)) {
-      before.reconciliation.nextAt = null;
+    const campaign = await this.options.campaigns?.beforeCycle(projectPath, before);
+    if (
+      campaign?.allowReconcile === false ||
+      before.autonomy !== 'enabled' ||
+      QUIET_PHASES.has(before.phase)
+    ) {
+      before.reconciliation.nextAt = campaign?.nextCheckAt || null;
       before.reconciliation.reason = before.phase;
       before.reconciliation.lastFinishedAt = new Date(this.now()).toISOString();
       await saveArgusState(projectPath, before);
@@ -239,12 +248,21 @@ export class ArgusAutonomyRunner {
         const state = await this.argus.getStatus(projectPath);
         if (state) await this.applyControl(projectPath, state);
         if (!state || state.autonomy !== 'enabled' || QUIET_PHASES.has(state.phase)) break;
+        const budget = await this.options.campaigns?.beforeCycle(projectPath, state);
+        if (budget?.allowReconcile === false) break;
         const task = state.activeTask;
         if (!task || state.phase === 'planning' || state.phase === 'idle') {
+          if (budget?.allowNewTasks === false) break;
           await this.planner.reconcileProject(projectPath);
           continue;
         }
         if (task.phase === 'awaiting-executor') {
+          if (
+            budget?.allowNewTasks === false ||
+            (this.options.campaigns &&
+              !(await this.options.campaigns.reserveTask(projectPath, task)))
+          )
+            break;
           if (task.executor === 'jules' && this.executor)
             await this.executor.dispatch(task, projectPath);
           else {
@@ -310,8 +328,12 @@ export class ArgusAutonomyRunner {
       state.reconciliation.attempt = progressed ? 0 : state.reconciliation.attempt;
       state.reconciliation.lastFinishedAt = new Date(this.now()).toISOString();
       state.reconciliation.lastError = null;
+      await this.options.campaigns?.observe(projectPath, state);
+      const campaign = await this.options.campaigns?.beforeCycle(projectPath, state);
       const decision = this.decision(state);
-      state.reconciliation.nextAt = decision.nextReconcileAt;
+      state.reconciliation.nextAt = campaign?.exists
+        ? campaign.nextCheckAt
+        : decision.nextReconcileAt;
       state.reconciliation.reason = decision.reason;
       await saveArgusState(projectPath, state);
     } catch (error) {
@@ -339,6 +361,7 @@ export class ArgusAutonomyRunner {
         state.reconciliation.reason = 'transient-retry';
       }
       await saveArgusState(projectPath, state);
+      await this.options.campaigns?.observe(projectPath, state);
     }
   }
 

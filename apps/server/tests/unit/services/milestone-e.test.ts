@@ -152,6 +152,9 @@ describe('Milestone E merge and autonomous campaigns', () => {
     expect(a.github.mergePullRequest).toHaveBeenCalledOnce();
     const afterFirst = (await argus.getStatus(dir))!;
     expect(afterFirst.specRevision).toBe(2);
+    expect(afterFirst.activeTask).toBeNull();
+    // Only the runner's planning stage may admit the next task after budget checks.
+    await planner.reconcileProject(dir);
     expect(afterFirst.activeTask?.taskId).toBe('argus-task-r2');
     expect(await fs.readFile(path.join(dir, 'ARGUS.md'), 'utf8')).toContain('Stable objective');
     expect(

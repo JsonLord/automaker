@@ -33,7 +33,8 @@ export class MilestoneDOrchestrator {
     private senior: OpenCodeRoleRunner,
     private worktrees?: SeniorWorktreeAdapter,
     private verifier?: ArgusExternalVerifier,
-    private evidenceStore = new VerificationEvidenceStore()
+    private evidenceStore = new VerificationEvidenceStore(),
+    private allowRepair: (path: string, task: ArgusTaskState) => Promise<boolean> = async () => true
   ) {}
 
   async reconcile(projectPath: string): Promise<void> {
@@ -149,6 +150,10 @@ export class MilestoneDOrchestrator {
         await this.diagnose(projectPath, task);
         return false;
       }
+      if (!(await this.allowRepair(projectPath, task))) {
+        await this.block(projectPath, task, 'CAMPAIGN_REPAIR_BUDGET_EXHAUSTED');
+        return false;
+      }
       const session = await this.jules.getSession(task.julesSessionId);
       task.julesState = session.state;
       if (!ACTIVE_JULES.has(session.state)) {
@@ -191,6 +196,8 @@ export class MilestoneDOrchestrator {
   }
 
   private async repairOrDiagnose(projectPath: string, task: ArgusTaskState, kind: 'ci' | 'review') {
+    if (!(await this.allowRepair(projectPath, task)))
+      return this.block(projectPath, task, 'CAMPAIGN_REPAIR_BUDGET_EXHAUSTED');
     task.phase = 'ci-failed';
     this.event(task, 'CI_FAILED');
     const active = Boolean(
@@ -216,6 +223,8 @@ export class MilestoneDOrchestrator {
   }
 
   private async diagnose(projectPath: string, task: ArgusTaskState) {
+    if (!(await this.allowRepair(projectPath, task)))
+      return this.block(projectPath, task, 'CAMPAIGN_REPAIR_BUDGET_EXHAUSTED');
     task.phase = 'senior-diagnosis';
     this.event(task, 'SENIOR_DIAGNOSIS_STARTED');
     await this.persist(projectPath, task);

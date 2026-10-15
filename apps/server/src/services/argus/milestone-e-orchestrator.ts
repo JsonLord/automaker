@@ -1,3 +1,4 @@
+import { TaskHistoryStore } from './task-history.js';
 import fs from 'fs/promises';
 import path from 'path';
 import type { FeatureLoader } from '../feature-loader.js';
@@ -216,6 +217,7 @@ export class MilestoneEOrchestrator {
         this.event(task, 'OBJECTIVE_SATISFIED');
         await this.persist(projectPath, task, 'verified');
         state.autonomy = 'satisfied';
+        await new TaskHistoryStore().archive(projectPath, task, 'completed');
         state.activeTask = null;
         state.phase = 'objective-satisfied';
         state.latestStatus = 'OBJECTIVE_SATISFIED';
@@ -227,6 +229,7 @@ export class MilestoneEOrchestrator {
       this.event(task, 'SPEC_RENEWAL_STARTED');
       await this.persist(projectPath, task);
       const nextSpec = await this.argus.renewSpecification(projectPath, evaluation);
+      await new TaskHistoryStore().archive(projectPath, task, 'completed');
       await this.specs.renew(projectPath, state, nextSpec, evaluation);
       this.event(task, 'SPEC_RENEWED');
       this.event(task, 'NEXT_CAMPAIGN_STARTED');
@@ -234,7 +237,7 @@ export class MilestoneEOrchestrator {
         status: 'verified',
         argus: { ...task },
       });
-      await this.nextCampaign?.reconcileProject(projectPath);
+      // The authoritative runner admits the next task after checking campaign budgets.
     } catch (error) {
       await this.block(
         projectPath,

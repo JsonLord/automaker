@@ -1,5 +1,8 @@
 # Cloud implementation results
 
+Historical initial checkpoint. The [PR #11 remediation](PR11-CHECK-REMEDIATION.md)
+and latest hosted checks supersede its test/dependency readiness conclusions.
+
 Starting branch: `jules-14354056622111766374-42608c2c`.
 Verified starting local/remote commit: `bbe8bad2fe29654180335faef26bc78b37c8f7b3`.
 Implementation branch: `feat/argus-continuous-engineering`.

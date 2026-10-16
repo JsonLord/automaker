@@ -85,7 +85,6 @@ export async function getLocalChanges(
   let localChangedFiles: string[] = [];
   if (hasLocalChanges) {
     localChangedFiles = statusOutput
-      .trim()
       .split('\n')
       .filter((line) => line.trim().length > 0)
       .map((line) => {

@@ -13,7 +13,12 @@
 
 import { createLogger } from '@automaker/utils';
 import * as secureFs from '../lib/secure-fs.js';
-import { getEventHistoryIndexPath, getEventPath, ensureEventHistoryDir } from '@automaker/platform';
+import {
+  getEventHistoryIndexPath,
+  getEventPath,
+  ensureEventHistoryDir,
+  validatePath,
+} from '@automaker/platform';
 import type {
   StoredEvent,
   StoredEventIndex,
@@ -23,17 +28,25 @@ import type {
 } from '@automaker/types';
 import { DEFAULT_EVENT_HISTORY_INDEX } from '@automaker/types';
 import { randomUUID } from 'crypto';
+import { withDurableLock } from './argus/durable-store.js';
 
 const logger = createLogger('EventHistoryService');
 
 /** Maximum events to keep in the index (oldest are pruned) */
 const MAX_EVENTS_IN_INDEX = 1000;
 
+/** Keep each record/index mutation together across service instances and processes.
+ * Validate before the durable lock performs any filesystem operations. */
+function withHistoryLock<T>(projectPath: string, operation: () => Promise<T>): Promise<T> {
+  const indexPath = validatePath(getEventHistoryIndexPath(projectPath));
+  return withDurableLock(indexPath, operation);
+}
+
 /**
  * Atomic file write - write to temp file then rename
  */
 async function atomicWriteJson(filePath: string, data: unknown): Promise<void> {
-  const tempPath = `${filePath}.tmp.${Date.now()}`;
+  const tempPath = `${filePath}.tmp.${randomUUID()}`;
   const content = JSON.stringify(data, null, 2);
 
   try {
@@ -58,10 +71,10 @@ async function readJsonFile<T>(filePath: string, defaultValue: T): Promise<T> {
     return JSON.parse(content) as T;
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-      return defaultValue;
+      return structuredClone(defaultValue);
     }
     logger.error(`Error reading ${filePath}:`, error);
-    return defaultValue;
+    return structuredClone(defaultValue);
   }
 }
 
@@ -96,34 +109,36 @@ export class EventHistoryService {
     // Ensure events directory exists
     await ensureEventHistoryDir(projectPath);
 
-    const eventId = `evt-${Date.now()}-${randomUUID().slice(0, 8)}`;
-    const timestamp = new Date().toISOString();
-    const projectName = this.extractProjectName(projectPath);
+    return withHistoryLock(projectPath, async () => {
+      const eventId = `evt-${Date.now()}-${randomUUID().slice(0, 8)}`;
+      const timestamp = new Date().toISOString();
+      const projectName = this.extractProjectName(projectPath);
 
-    const event: StoredEvent = {
-      id: eventId,
-      trigger,
-      timestamp,
-      projectPath,
-      projectName,
-      featureId,
-      featureName,
-      error,
-      errorType,
-      passes,
-      metadata,
-    };
+      const event: StoredEvent = {
+        id: eventId,
+        trigger,
+        timestamp,
+        projectPath,
+        projectName,
+        featureId,
+        featureName,
+        error,
+        errorType,
+        passes,
+        metadata,
+      };
 
-    // Write the full event to its own file
-    const eventPath = getEventPath(projectPath, eventId);
-    await atomicWriteJson(eventPath, event);
+      // Write the full event to its own file
+      const eventPath = getEventPath(projectPath, eventId);
+      await atomicWriteJson(eventPath, event);
 
-    // Update the index
-    await this.addToIndex(projectPath, event);
+      // Update the index while holding the same project lock.
+      await this.addToIndex(projectPath, event);
 
-    logger.info(`Stored event ${eventId} (${trigger}) for project ${projectName}`);
+      logger.info(`Stored event ${eventId} (${trigger}) for project ${projectName}`);
 
-    return event;
+      return event;
+    });
   }
 
   /**
@@ -200,31 +215,33 @@ export class EventHistoryService {
    * @returns Promise resolving to true if deleted
    */
   async deleteEvent(projectPath: string, eventId: string): Promise<boolean> {
-    // Remove from index
-    const indexPath = getEventHistoryIndexPath(projectPath);
-    const index = await readJsonFile<StoredEventIndex>(indexPath, DEFAULT_EVENT_HISTORY_INDEX);
+    return withHistoryLock(projectPath, async () => {
+      // Remove from index
+      const indexPath = getEventHistoryIndexPath(projectPath);
+      const index = await readJsonFile<StoredEventIndex>(indexPath, DEFAULT_EVENT_HISTORY_INDEX);
 
-    const initialLength = index.events.length;
-    index.events = index.events.filter((e) => e.id !== eventId);
+      const initialLength = index.events.length;
+      index.events = index.events.filter((e) => e.id !== eventId);
 
-    if (index.events.length === initialLength) {
-      return false; // Event not found in index
-    }
-
-    await atomicWriteJson(indexPath, index);
-
-    // Delete the event file
-    const eventPath = getEventPath(projectPath, eventId);
-    try {
-      await secureFs.unlink(eventPath);
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
-        logger.error(`Error deleting event file ${eventId}:`, error);
+      if (index.events.length === initialLength) {
+        return false; // Event not found in index
       }
-    }
 
-    logger.info(`Deleted event ${eventId}`);
-    return true;
+      await atomicWriteJson(indexPath, index);
+
+      // Delete the event file
+      const eventPath = getEventPath(projectPath, eventId);
+      try {
+        await secureFs.unlink(eventPath);
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+          logger.error(`Error deleting event file ${eventId}:`, error);
+        }
+      }
+
+      logger.info(`Deleted event ${eventId}`);
+      return true;
+    });
   }
 
   /**
@@ -234,28 +251,30 @@ export class EventHistoryService {
    * @returns Promise resolving to number of events cleared
    */
   async clearEvents(projectPath: string): Promise<number> {
-    const indexPath = getEventHistoryIndexPath(projectPath);
-    const index = await readJsonFile<StoredEventIndex>(indexPath, DEFAULT_EVENT_HISTORY_INDEX);
+    return withHistoryLock(projectPath, async () => {
+      const indexPath = getEventHistoryIndexPath(projectPath);
+      const index = await readJsonFile<StoredEventIndex>(indexPath, DEFAULT_EVENT_HISTORY_INDEX);
 
-    const count = index.events.length;
+      const count = index.events.length;
 
-    // Delete all event files
-    for (const event of index.events) {
-      const eventPath = getEventPath(projectPath, event.id);
-      try {
-        await secureFs.unlink(eventPath);
-      } catch (error) {
-        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
-          logger.error(`Error deleting event file ${event.id}:`, error);
+      // Delete all event files
+      for (const event of index.events) {
+        const eventPath = getEventPath(projectPath, event.id);
+        try {
+          await secureFs.unlink(eventPath);
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+            logger.error(`Error deleting event file ${event.id}:`, error);
+          }
         }
       }
-    }
 
-    // Reset the index
-    await atomicWriteJson(indexPath, DEFAULT_EVENT_HISTORY_INDEX);
+      // Reset the index
+      await atomicWriteJson(indexPath, structuredClone(DEFAULT_EVENT_HISTORY_INDEX));
 
-    logger.info(`Cleared ${count} events for project`);
-    return count;
+      logger.info(`Cleared ${count} events for project`);
+      return count;
+    });
   }
 
   /**

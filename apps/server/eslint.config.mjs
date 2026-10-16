@@ -18,6 +18,7 @@ const eslintConfig = defineConfig([
         console: 'readonly',
         process: 'readonly',
         Buffer: 'readonly',
+        structuredClone: 'readonly',
         __dirname: 'readonly',
         __filename: 'readonly',
         URL: 'readonly',

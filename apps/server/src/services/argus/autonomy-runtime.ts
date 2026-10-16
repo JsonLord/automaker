@@ -1,3 +1,5 @@
+import { ArgusCampaignManager } from './campaigns.js';
+export const argusCampaigns = new ArgusCampaignManager();
 import type { ArgusAutonomyRunner } from './autonomy-runner.js';
 
 let runner: ArgusAutonomyRunner | undefined;

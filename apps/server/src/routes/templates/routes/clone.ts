@@ -134,7 +134,9 @@ export function createCloneHandler(settingsService?: SettingsService) {
         return;
       }
 
-      logger.info(`[Templates] Cloning ${actualRepoUrl} to ${projectPath}${branchName ? ` (branch: ${branchName})` : ''}`);
+      logger.info(
+        `[Templates] Cloning ${actualRepoUrl} to ${projectPath}${branchName ? ` (branch: ${branchName})` : ''}`
+      );
 
       // Clone the repository
       const cloneResult = await new Promise<{

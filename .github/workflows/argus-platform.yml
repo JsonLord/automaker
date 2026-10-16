@@ -1,0 +1,68 @@
+name: Argus Platform
+on:
+  pull_request:
+  push:
+    branches: [feat/argus-continuous-engineering]
+permissions:
+  contents: read
+concurrency:
+  group: argus-platform-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  deterministic-validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      NODE_ENV: test
+      ARGUS_LOKI_ENABLED: 'false'
+      ARGUS_CONTINUOUS_ENGINEERING_ENABLED: 'false'
+      AUTOMAKER_HIDE_API_KEY: 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Check checkout is clean
+        run: node scripts/check-clean-working-tree.mjs Checkout
+      - run: |
+          npm ci --ignore-scripts
+          node scripts/check-clean-working-tree.mjs 'Dependency installation'
+      - run: |
+          npm rebuild node-pty
+          node scripts/check-clean-working-tree.mjs 'Native module rebuild'
+      - run: |
+          npm run build:server
+          node scripts/check-clean-working-tree.mjs 'Server build'
+      - name: Verify production dependency entry points
+        run: |
+          npm run check:runtime --workspace=apps/server
+          node scripts/check-clean-working-tree.mjs 'Runtime dependency imports'
+      - run: |
+          npm run build --workspace=apps/ui
+          node scripts/check-clean-working-tree.mjs 'UI build'
+      - run: |
+          npm run typecheck
+          node scripts/check-clean-working-tree.mjs Typecheck
+      - run: |
+          npm run lint:server:errors
+          node scripts/check-clean-working-tree.mjs 'Server lint'
+      - run: |
+          npm run lint:errors
+          node scripts/check-clean-working-tree.mjs 'UI lint'
+      - run: |
+          npm run test:server
+          node scripts/check-clean-working-tree.mjs 'Server tests'
+      - run: |
+          npm run test:packages
+          node scripts/check-clean-working-tree.mjs 'Package tests'
+      - name: Diagnose tracked file changes
+        if: always()
+        run: |
+          git status --short --untracked-files=no
+          git diff --stat
+          git diff --cached --stat
+      - name: Validate deployment export
+        run: |
+          node --test scripts/tests/check-clean-working-tree.test.mjs
+          node scripts/export-hf-deployment.mjs /tmp/automaker-hf.tar

@@ -5,6 +5,9 @@
 # BUILD STAGE
 # =============================================================================
 FROM node:22-slim AS builder
+ARG BUILD_GIT_SHA
+ARG BUILD_TIMESTAMP
+ENV BUILD_GIT_SHA=${BUILD_GIT_SHA} BUILD_TIMESTAMP=${BUILD_TIMESTAMP}
 
 # Install build dependencies for native modules (node-pty)
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -31,10 +34,21 @@ RUN npm run build --workspace=apps/ui
 RUN npm run build --workspace=apps/server && \
     npm rebuild node-pty --workspace=apps/server
 
+# Download the browser while build-only tooling is available, then keep its cache
+# without shipping Electron, test runners, or packaging tools in the server image.
+RUN PLAYWRIGHT_BROWSERS_PATH=/opt/playwright ./node_modules/.bin/playwright install chromium
+
+FROM builder AS runtime-dependencies
+RUN npm ci --omit=dev --ignore-scripts --no-audit --no-fund && \
+    npm rebuild node-pty --workspace=apps/server
+
 # =============================================================================
 # FINAL PRODUCTION STAGE
 # =============================================================================
 FROM node:22-slim
+ARG BUILD_GIT_SHA
+ARG BUILD_TIMESTAMP
+ENV BUILD_GIT_SHA=${BUILD_GIT_SHA} BUILD_TIMESTAMP=${BUILD_TIMESTAMP}
 
 WORKDIR /app
 
@@ -64,7 +78,12 @@ ENV HOME=/home/node
 ENV PATH="/opt/argus/bin:/home/node/.local/bin:/home/node/.opencode/bin:${PATH}"
 
 # Install OpenCode CLI
-RUN curl -fsSL https://opencode.ai/install | bash
+ARG OPENCODE_VERSION=1.18.35
+ENV OPENCODE_VERSION=${OPENCODE_VERSION}
+RUN npm install --prefix /home/node/.local/opencode --ignore-scripts --no-audit --no-fund \
+      "opencode-linux-$(node -p process.arch)@${OPENCODE_VERSION}" && \
+    ln -s "/home/node/.local/opencode/node_modules/opencode-linux-$(node -p process.arch)/bin/opencode" /home/node/.local/bin/opencode && \
+    opencode --version | grep -Fx "${OPENCODE_VERSION}"
 
 # Microsoft ArgusAgent 0.1.1 source. Upgrade only by changing both documented pins.
 ARG ARGUS_SOURCE_REVISION=746f76b7a74a1217507c9ee348eecd3b782f7c92
@@ -94,14 +113,15 @@ USER node
 # Copy built artifacts and dependencies from builder
 COPY --from=builder --chown=node:node /app/package*.json ./
 COPY --from=builder --chown=node:node /app/vitest.config.ts ./
-COPY --from=builder --chown=node:node /app/node_modules ./node_modules
+COPY --from=runtime-dependencies --chown=node:node /app/node_modules ./node_modules
+COPY --from=builder --chown=node:node /opt/playwright /opt/playwright
 COPY --from=builder --chown=node:node /app/libs ./libs
 COPY --from=builder --chown=node:node /app/apps/server ./apps/server
 COPY --from=builder --chown=node:node /app/apps/ui/dist ./apps/ui/dist
 COPY --from=builder --chown=node:node /app/scripts ./scripts
 
-# Install Playwright Chromium
-RUN ./node_modules/.bin/playwright install chromium
+# Use the browser cache prepared by the builder; build-only CLI dependencies are pruned.
+ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright
 
 # Create data directory
 RUN mkdir -p /app/data && chown node:node /app/data
@@ -112,6 +132,9 @@ ENV DATA_DIR=/app/data
 ENV ARGUS_SKILL_HOME=/app/data/argus
 ENV NODE_ENV=production
 ENV AUTOMAKER_AUTO_LOGIN=false
+ENV AUTOMAKER_DISABLE_AUTH=false
+ENV AUTOMAKER_HIDE_API_KEY=true
+ENV ALLOWED_ROOT_DIRECTORY=/app/data/projects
 
 # Copy scripts
 COPY --chown=node:node entrypoint.sh ./entrypoint.sh

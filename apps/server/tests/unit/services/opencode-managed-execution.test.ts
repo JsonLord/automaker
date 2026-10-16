@@ -203,6 +203,7 @@ describe('managed OpenCode execution regression', () => {
         args: ['run', '--model', 'automaker-compatible/MiniMax-M2.7', '--format', 'json'],
         stdinData: expect.stringContaining('bounded fixture'),
         maxOutputBytes: 65536,
+        env: expect.objectContaining({ OPENCODE_PERMISSION: JSON.stringify({ '*': 'deny' }) }),
       })
     );
     vi.mocked(spawnProcess).mockResolvedValue({
@@ -210,12 +211,18 @@ describe('managed OpenCode execution regression', () => {
       stdout: '',
       stderr: `Unexpected server error ${process.env.COMPATIBLE_API_KEY}`,
     });
-    await expect(new OpenCodeRoleRunner().execute('bounded task', await temp())).rejects.toThrow(
+    await expect(new OpenCodeRoleRunner().review({ evidence: 'bounded fixture' })).rejects.toThrow(
       'OPENCODE_COMPATIBLE_PROVIDER_FAILED'
     );
     await expect(
-      new OpenCodeRoleRunner().execute('bounded task', await temp())
+      new OpenCodeRoleRunner().review({ evidence: 'bounded fixture' })
     ).rejects.not.toThrow(process.env.COMPATIBLE_API_KEY!);
+  });
+
+  it('refuses untrusted local Senior implementation without an isolated executor', async () => {
+    await expect(new OpenCodeRoleRunner().execute('task', await temp())).rejects.toThrow(
+      'SENIOR_ISOLATED_EXECUTOR_UNAVAILABLE'
+    );
   });
 
   it('migrates bare phase/profile settings on restart and removes the generated inline secret profile', async () => {

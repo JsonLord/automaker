@@ -2,6 +2,11 @@
 # entrypoint.sh - Initialize environment and start Automaker for Hugging Face
 
 echo "Starting Automaker entrypoint script..."
+: "${DATA_DIR:=/app/data}"
+: "${ALLOWED_ROOT_DIRECTORY:=${DATA_DIR}/projects}"
+export DATA_DIR ALLOWED_ROOT_DIRECTORY
+export AUTOMAKER_DISABLE_AUTH=false AUTOMAKER_AUTO_LOGIN=false AUTOMAKER_HIDE_API_KEY=true
+mkdir -p "$ALLOWED_ROOT_DIRECTORY"
 
 # Ensure directories exist
 mkdir -p "$DATA_DIR"
@@ -24,7 +29,7 @@ elif [ -n "$AUTOMAKER_API_KEY" ]; then
 else
     export AUTOMAKER_DISABLE_AUTH=false
     export AUTOMAKER_AUTO_LOGIN=false
-    echo "No AUTHENTICATION_TOKEN secret provided; requiring login via key generated in logs."
+    echo "No AUTHENTICATION_TOKEN secret provided; requiring login via the securely stored generated key."
 fi
 
 # Map HF Space secrets for OpenAI compatible provider if present

@@ -1,3 +1,5 @@
+import { ArgusBoardProjector } from './board-projector.js';
+import { TaskHistoryStore } from './task-history.js';
 import fs from 'fs/promises';
 import path from 'path';
 import type { FeatureLoader } from '../feature-loader.js';
@@ -29,7 +31,26 @@ export class MilestoneEOrchestrator {
     locks.set(projectPath, queued);
     await previous;
     try {
-      await this.reconcileLocked(projectPath);
+      const state = await this.argus.getStatus(projectPath),
+        task = state?.activeTask;
+      if (task && (task.phase === 'merge-ready' || task.mergeIntent?.mergeOutcome === 'unknown')) {
+        task.mergeLease ||= this.git.coordinator.prepare(task);
+        await saveArgusState(projectPath, state!); // intent survives a crash while acquiring ownership
+        try {
+          const authoritative = await this.git.refreshPullRequest(task.repository!, task.prNumber!);
+          if (!authoritative.merged) await this.git.coordinator.acquire(task.mergeLease);
+          await saveArgusState(projectPath, state!);
+          await this.reconcileLocked(projectPath);
+        } catch (error) {
+          await this.block(projectPath, task, (error as Error).message);
+        } finally {
+          if (task.mergeLease?.tagSha && task.mergeIntent?.mergeOutcome !== 'unknown') {
+            await this.git.coordinator.release(task.mergeLease);
+            task.mergeLease = null;
+            await saveArgusState(projectPath, state!);
+          }
+        }
+      } else await this.reconcileLocked(projectPath);
     } finally {
       release();
       if (locks.get(projectPath) === queued) locks.delete(projectPath);
@@ -56,6 +77,7 @@ export class MilestoneEOrchestrator {
         );
         try {
           this.git.assertMergeGate(task, pr, /deployment:\s*disabled/.test(policy));
+          await this.git.coordinator.assertCurrentBase(task, pr, task.mergeLease!);
         } catch (error) {
           return this.block(projectPath, task, (error as Error).message);
         }
@@ -66,6 +88,7 @@ export class MilestoneEOrchestrator {
       const policy = await fs.readFile(path.join(projectPath, '.automaker', 'argus.yaml'), 'utf8');
       try {
         this.git.assertMergeGate(task, pr, /deployment:\s*disabled/.test(policy));
+        await this.git.coordinator.assertCurrentBase(task, pr, task.mergeLease!);
       } catch (error) {
         this.event(task, 'MERGE_GATE_REJECTED');
         if ((error as Error).message === 'MERGE_GATE_STALE_HEAD')
@@ -160,6 +183,8 @@ export class MilestoneEOrchestrator {
     await this.persist(projectPath, task);
   }
   private async stale(projectPath: string, task: ArgusTaskState, head: string) {
+    task.lokiEvidence = null;
+    task.integrationEvidence = null;
     task.prHeadSha = head;
     task.ciHeadSha = null;
     task.ciState = 'pending';
@@ -193,6 +218,7 @@ export class MilestoneEOrchestrator {
         this.event(task, 'OBJECTIVE_SATISFIED');
         await this.persist(projectPath, task, 'verified');
         state.autonomy = 'satisfied';
+        await new TaskHistoryStore().archive(projectPath, task, 'completed');
         state.activeTask = null;
         state.phase = 'objective-satisfied';
         state.latestStatus = 'OBJECTIVE_SATISFIED';
@@ -204,14 +230,12 @@ export class MilestoneEOrchestrator {
       this.event(task, 'SPEC_RENEWAL_STARTED');
       await this.persist(projectPath, task);
       const nextSpec = await this.argus.renewSpecification(projectPath, evaluation);
+      await new TaskHistoryStore().archive(projectPath, task, 'completed');
       await this.specs.renew(projectPath, state, nextSpec, evaluation);
       this.event(task, 'SPEC_RENEWED');
       this.event(task, 'NEXT_CAMPAIGN_STARTED');
-      await this.features.update(projectPath, task.featureId, {
-        status: 'verified',
-        argus: { ...task },
-      });
-      await this.nextCampaign?.reconcileProject(projectPath);
+      await new ArgusBoardProjector(this.features).project(projectPath, task);
+      // The authoritative runner admits the next task after checking campaign budgets.
     } catch (error) {
       await this.block(
         projectPath,
@@ -242,6 +266,6 @@ export class MilestoneEOrchestrator {
     state.phase = task.phase;
     state.latestStatus = task.lastArgusEvent;
     await saveArgusState(projectPath, state);
-    await this.features.update(projectPath, task.featureId, { status, argus: { ...task } });
+    await new ArgusBoardProjector(this.features).project(projectPath, task);
   }
 }

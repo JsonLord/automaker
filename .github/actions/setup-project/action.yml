@@ -31,35 +31,16 @@ runs:
       # This is needed because SSH authentication isn't available in CI
       run: git config --global url."https://github.com/".insteadOf "git@github.com:"
 
-    - name: Auto-fix SSH URLs in lockfile
-      if: inputs.check-lockfile == 'true'
-      shell: bash
-      # Auto-fix any git+ssh:// URLs in package-lock.json before linting
-      # This handles cases where npm reintroduces SSH URLs for git dependencies
-      run: node scripts/fix-lockfile-urls.mjs
-
     - name: Check for SSH URLs in lockfile
       if: inputs.check-lockfile == 'true'
       shell: bash
       run: npm run lint:lockfile
 
-    - name: Install dependencies
+    - name: Install locked dependencies
       shell: bash
-      # Use npm install instead of npm ci to correctly resolve platform-specific
-      # optional dependencies (e.g., @tailwindcss/oxide, lightningcss binaries)
-      # Skip scripts to avoid electron-builder install-app-deps which uses too much memory
-      # Use --force to allow platform-specific dev dependencies like dmg-license on non-darwin platforms
-      run: npm install --ignore-scripts --force
-
-    - name: Install Linux native bindings
-      if: runner.os == 'Linux'
-      shell: bash
-      # Workaround for npm optional dependencies bug (npm/cli#4828)
-      # Explicitly install Linux bindings needed for build tools
-      run: |
-        npm install --no-save --force --ignore-scripts \
-          @rollup/rollup-linux-x64-gnu@4.53.3 \
-          @tailwindcss/oxide-linux-x64-gnu@4.1.17
+      # Keep CI on the audited graph; the lockfile includes native optional packages.
+      # Skip installation scripts; native modules are rebuilt explicitly below.
+      run: npm ci --ignore-scripts
 
     - name: Build shared packages
       shell: bash

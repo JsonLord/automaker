@@ -1148,7 +1148,7 @@ export function TerminalPanel({
           url += `&wsToken=${encodeURIComponent(wsToken)}`;
         } else {
           logger.debug('No wsToken available for terminal WebSocket connection');
-          setIsConnecting(false);
+          setConnectionStatus('auth_failed');
           return;
         }
         // Cookies are also sent automatically with same-origin WebSocket

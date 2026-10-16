@@ -1,3 +1,4 @@
+import { isArgusOwned } from '../argus/board-projector.js';
 /**
  * AutoModeServiceFacade - Clean interface for auto-mode functionality
  *
@@ -98,11 +99,7 @@ export class AutoModeServiceFacade {
     primaryBranch: string | null
   ): boolean {
     // Skip features owned by Argus autonomy to prevent generic Auto Mode double-execution
-    if (
-      feature.category === 'Argus' ||
-      feature.orchestrator === 'argus' ||
-      feature.executionOwner === 'argus-autonomy'
-    ) {
+    if (isArgusOwned(feature)) {
       return false;
     }
 
@@ -650,6 +647,7 @@ export class AutoModeServiceFacade {
     }
   ): Promise<void> {
     try {
+      await this.assertGenericFeature(featureId);
       return await this.executionService.executeFeature(
         this.projectPath,
         featureId,
@@ -670,6 +668,7 @@ export class AutoModeServiceFacade {
    */
   async stopFeature(featureId: string): Promise<boolean> {
     try {
+      await this.assertGenericFeature(featureId);
       // Cancel any pending plan approval for this feature
       this.cancelPlanApproval(featureId);
       return await this.executionService.stopFeature(featureId);
@@ -696,6 +695,7 @@ export class AutoModeServiceFacade {
     // (e.g., feature not found, context read error) that ExecutionService never
     // handled — so calling handleFacadeError here does NOT produce duplicate events.
     try {
+      await this.assertGenericFeature(featureId);
       return await this.recoveryService.resumeFeature(
         this.projectPath,
         featureId,
@@ -727,6 +727,7 @@ export class AutoModeServiceFacade {
       // Load feature to build the prompt context
       const feature = await this.featureStateManager.loadFeature(this.projectPath, featureId);
       if (!feature) throw new Error(`Feature ${featureId} not found`);
+      if (isArgusOwned(feature)) throw new Error('ARGUS_TASK_REQUIRES_RUNNER');
 
       // Read previous agent output as context
       const featureDir = getFeatureDir(this.projectPath, featureId);
@@ -791,6 +792,7 @@ export class AutoModeServiceFacade {
    */
   async verifyFeature(featureId: string): Promise<boolean> {
     const feature = await this.featureStateManager.loadFeature(this.projectPath, featureId);
+    if (isArgusOwned(feature)) throw new Error('ARGUS_TASK_REQUIRES_RUNNER');
     let workDir = this.projectPath;
 
     // Use worktreeResolver to find worktree path (consistent with commitFeature)
@@ -855,6 +857,7 @@ export class AutoModeServiceFacade {
    * @param providedWorktreePath - Optional worktree path
    */
   async commitFeature(featureId: string, providedWorktreePath?: string): Promise<string | null> {
+    await this.assertGenericFeature(featureId);
     let workDir = this.projectPath;
 
     if (providedWorktreePath) {
@@ -1063,6 +1066,7 @@ export class AutoModeServiceFacade {
     editedPlan?: string,
     feedback?: string
   ): Promise<{ success: boolean; error?: string }> {
+    await this.assertGenericFeature(featureId);
     const result = await this.planApprovalService.resolveApproval(featureId, approved, {
       editedPlan,
       feedback,
@@ -1265,5 +1269,11 @@ export class AutoModeServiceFacade {
    */
   private async clearExecutionState(branchName: string | null = null): Promise<void> {
     return this.recoveryService.clearExecutionState(this.projectPath, branchName);
+  }
+
+  private async assertGenericFeature(featureId: string): Promise<void> {
+    if (isArgusOwned(await this.featureLoader.get(this.projectPath, featureId))) {
+      throw new Error('ARGUS_TASK_REQUIRES_RUNNER');
+    }
   }
 }

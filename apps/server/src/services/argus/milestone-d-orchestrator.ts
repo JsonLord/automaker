@@ -1,3 +1,6 @@
+import { ArgusBoardProjector } from './board-projector.js';
+import crypto from 'crypto';
+import { VerificationEvidenceStore, type ArgusExternalVerifier } from './verification.js';
 import type { FeatureLoader } from '../feature-loader.js';
 import { saveArgusState } from './project-lifecycle.js';
 import type { ArgusService, ArgusTaskState, SeniorReview } from './types.js';
@@ -29,7 +32,10 @@ export class MilestoneDOrchestrator {
     private github: GitHubCiObserver,
     private jules: JulesClient,
     private senior: OpenCodeRoleRunner,
-    private worktrees?: SeniorWorktreeAdapter
+    private worktrees?: SeniorWorktreeAdapter,
+    private verifier?: ArgusExternalVerifier,
+    private evidenceStore = new VerificationEvidenceStore(),
+    private allowRepair: (path: string, task: ArgusTaskState) => Promise<boolean> = async () => true
   ) {}
 
   async reconcile(projectPath: string): Promise<void> {
@@ -75,6 +81,9 @@ export class MilestoneDOrchestrator {
     }
     if (task.phase === 'senior-takeover') return this.takeOver(projectPath, task);
     if (task.phase === 'senior-patch-ready' || task.phase === 'merge-ready') return;
+    if (this.verifier?.enabled || this.verifier?.requiredForMerge) {
+      if (!(await this.verifyLoki(projectPath, task, pr.baseSha))) return;
+    }
     task.phase = 'ci-check';
     this.event(task, 'CI_OBSERVATION_STARTED');
     const ci = await this.github.observe(task.repository, task.prHeadSha!);
@@ -96,7 +105,100 @@ export class MilestoneDOrchestrator {
     await this.review(projectPath, task);
   }
 
+  private async verifyLoki(
+    projectPath: string,
+    task: ArgusTaskState,
+    baseSha: string
+  ): Promise<boolean> {
+    if (task.lokiEvidence?.headSha !== task.prHeadSha || task.lokiEvidence?.baseSha !== baseSha) {
+      task.phase = 'loki-gate';
+      this.event(task, 'LOKI_VERIFICATION_STARTED');
+      await this.persist(projectPath, task);
+      const evidence = await this.verifier!.verify({
+        taskId: task.taskId,
+        repository: task.repository!,
+        prNumber: task.prNumber!,
+        headSha: task.prHeadSha!,
+        baseSha,
+      });
+      const current = await this.github.getPullRequest(task.repository!, task.prNumber!);
+      if (current.headSha !== task.prHeadSha || current.baseSha !== baseSha) {
+        this.invalidateEvidence(task);
+        task.prHeadSha = current.headSha;
+        task.phase = 'ci-check';
+        task.nextAction = 'reverify-head';
+        this.event(task, 'LOKI_RESULT_STALE');
+        await this.persist(projectPath, task);
+        return false;
+      }
+      task.lokiEvidence = await this.evidenceStore.save(projectPath, evidence);
+      this.event(task, `LOKI_${evidence.verdict}`);
+      await this.persist(projectPath, task);
+    }
+    const evidence = task.lokiEvidence!;
+    if (evidence.verdict === 'VERIFIED') return true;
+    if (evidence.verdict === 'FAILED' && evidence.findings.some((f) => f.actionable)) {
+      if (task.lokiRepairIntent?.headSha === task.prHeadSha) {
+        task.phase = 'jules-repair';
+        task.nextAction = 'await-repair-head';
+        await this.persist(projectPath, task);
+        return false;
+      }
+      if (
+        (task.lokiRepairAttempts || 0) >= this.verifier!.maxRepairAttempts ||
+        !task.julesSessionId
+      ) {
+        await this.diagnose(projectPath, task);
+        return false;
+      }
+      if (!(await this.allowRepair(projectPath, task))) {
+        await this.block(projectPath, task, 'CAMPAIGN_REPAIR_BUDGET_EXHAUSTED');
+        return false;
+      }
+      const session = await this.jules.getSession(task.julesSessionId);
+      task.julesState = session.state;
+      if (!ACTIVE_JULES.has(session.state)) {
+        this.event(task, 'JULES_TERMINAL_REPAIR_UNSAFE');
+        await this.diagnose(projectPath, task);
+        return false;
+      }
+      task.lokiRepairAttempts = (task.lokiRepairAttempts || 0) + 1;
+      task.lokiRepairIntent = {
+        headSha: task.prHeadSha!,
+        sessionId: task.julesSessionId,
+        attempt: task.lokiRepairAttempts,
+        marker: crypto.randomUUID(),
+        outcome: 'unknown',
+        requestedAt: new Date().toISOString(),
+      };
+      task.phase = 'jules-repair';
+      task.repairAgainstHeadSha = task.prHeadSha;
+      task.nextAction = 'await-repair-head';
+      this.event(task, 'LOKI_REPAIR_REQUESTED');
+      await this.persist(projectPath, task);
+      try {
+        await this.jules.sendMessage(
+          task.julesSessionId,
+          `Repair marker ${task.lokiRepairIntent.marker}. Fix the exact-head Loki findings for ${task.prHeadSha}. Retain this PR and session. Do not deploy or modify ARGUS.md.\n${JSON.stringify(evidence.findings)}`
+        );
+        task.lokiRepairIntent.outcome = 'sent';
+        await this.persist(projectPath, task);
+      } catch {
+        this.event(task, 'LOKI_REPAIR_OUTCOME_UNKNOWN');
+        await this.persist(projectPath, task);
+      }
+      return false;
+    }
+    if (this.verifier!.requiredForMerge) {
+      await this.block(projectPath, task, `LOKI_${evidence.verdict}`);
+      return false;
+    }
+    return true; // Optional policy, with the unavailable verdict retained honestly.
+  }
+
   private async repairOrDiagnose(projectPath: string, task: ArgusTaskState, kind: 'ci' | 'review') {
+    if (!(await this.allowRepair(projectPath, task)))
+      return this.block(projectPath, task, 'CAMPAIGN_REPAIR_BUDGET_EXHAUSTED');
     task.phase = 'ci-failed';
     this.event(task, 'CI_FAILED');
     const active = Boolean(
@@ -122,6 +224,8 @@ export class MilestoneDOrchestrator {
   }
 
   private async diagnose(projectPath: string, task: ArgusTaskState) {
+    if (!(await this.allowRepair(projectPath, task)))
+      return this.block(projectPath, task, 'CAMPAIGN_REPAIR_BUDGET_EXHAUSTED');
     task.phase = 'senior-diagnosis';
     this.event(task, 'SENIOR_DIAGNOSIS_STARTED');
     await this.persist(projectPath, task);
@@ -185,6 +289,8 @@ export class MilestoneDOrchestrator {
   }
 
   private async takeOver(projectPath: string, task: ArgusTaskState) {
+    if (this.senior.canExecuteIsolated === false)
+      return this.block(projectPath, task, 'SENIOR_ISOLATED_EXECUTOR_UNAVAILABLE');
     task.lease = null;
     const now = new Date().toISOString();
     task.lease = { taskId: task.taskId, executor: 'senior', acquiredAt: now, heartbeatAt: now };
@@ -211,6 +317,8 @@ export class MilestoneDOrchestrator {
   }
 
   private invalidateEvidence(task: ArgusTaskState) {
+    task.lokiEvidence = null;
+    task.lokiRepairIntent = null;
     task.ciHeadSha = null;
     task.ciState = 'pending';
     task.ciObservedAt = null;
@@ -264,9 +372,6 @@ export class MilestoneDOrchestrator {
     state.phase = task.phase;
     state.latestStatus = task.lastArgusEvent;
     await saveArgusState(projectPath, state);
-    await this.features.update(projectPath, task.featureId, {
-      status: task.phase === 'blocked' ? 'failed' : 'review',
-      argus: { ...task },
-    });
+    await new ArgusBoardProjector(this.features).project(projectPath, task);
   }
 }

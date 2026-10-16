@@ -1,3 +1,4 @@
+import { isArgusOwned } from '../../services/argus/board-projector.js';
 /**
  * Features routes - HTTP API for feature management
  */
@@ -32,6 +33,42 @@ export function createFeaturesRoutes(
   autoModeService?: AutoModeServiceCompat
 ): Router {
   const router = Router();
+  router.use(async (req, res, next) => {
+    const mutations = [
+      '/update',
+      '/bulk-update',
+      '/delete',
+      '/bulk-delete',
+      '/create',
+      '/import',
+      '/orphaned/resolve',
+      '/orphaned/bulk-resolve',
+    ];
+    if (req.method !== 'POST' || !mutations.includes(req.path)) return next();
+    const body = req.body || {};
+    const incoming = [body.updates, body.feature, body].filter(Boolean);
+    if (incoming.some(isArgusOwned))
+      return res.status(409).json({ error: 'ARGUS_BOARD_IS_PROJECTION' });
+    // Import can replace whole feature directories, so reserve it for non-Argus projects.
+    const ids = [
+      ...(Array.isArray(body.featureIds) ? body.featureIds : []),
+      ...(typeof body.featureId === 'string' ? [body.featureId] : []),
+      ...(typeof body.id === 'string' ? [body.id] : []),
+      ...(typeof body.feature?.id === 'string' ? [body.feature.id] : []),
+    ];
+    if (typeof body.projectPath !== 'string') return next();
+    try {
+      const features =
+        req.path === '/import'
+          ? await featureLoader.getAll(body.projectPath)
+          : await Promise.all(ids.map((id: string) => featureLoader.get(body.projectPath, id)));
+      if (features.some(isArgusOwned))
+        return res.status(409).json({ error: 'ARGUS_BOARD_IS_PROJECTION' });
+      return next();
+    } catch {
+      return res.status(503).json({ error: 'FEATURE_OWNERSHIP_UNAVAILABLE' });
+    }
+  });
 
   router.post(
     '/list',

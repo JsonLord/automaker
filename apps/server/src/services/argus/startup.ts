@@ -22,6 +22,8 @@ export async function discoverAndResumeArgusProjects(
       projectPath: project.path,
       model,
     });
+    const durable = await service.getStatus(project.path);
+    if (durable?.autonomy === 'paused') continue;
     await service.resumeProject(project.path);
     if (featureLoader) {
       const task = await new ArgusOrchestrator(service, featureLoader).reconcileProject(

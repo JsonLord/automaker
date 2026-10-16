@@ -259,7 +259,8 @@ export function OpencodeCliStatus({
             </div>
 
             {/* Authentication Status - consider compatible-provider, direct auth, and dynamic providers */}
-            {status.authMode === 'compatible-provider' || authStatus?.method === 'compatible-provider' ? (
+            {status.authMode === 'compatible-provider' ||
+            authStatus?.method === 'compatible-provider' ? (
               <div className="flex items-center gap-3 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
                 <div className="w-10 h-10 rounded-xl bg-emerald-500/15 flex items-center justify-center border border-emerald-500/20 shrink-0">
                   <CheckCircle2 className="w-5 h-5 text-emerald-500" />
@@ -268,7 +269,8 @@ export function OpencodeCliStatus({
                   <p className="text-sm font-medium text-emerald-400">Ready</p>
                   <div className="text-xs text-emerald-400/70 mt-1.5 space-y-0.5">
                     <p>
-                      Provider: <span className="font-mono">{status.provider || 'automaker-compatible'}</span>
+                      Provider:{' '}
+                      <span className="font-mono">{status.provider || 'automaker-compatible'}</span>
                     </p>
                     {status.model && (
                       <p>
@@ -309,7 +311,9 @@ export function OpencodeCliStatus({
                   <AlertCircle className="w-5 h-5 text-amber-500" />
                 </div>
                 <div className="flex-1">
-                  <p className="text-sm font-medium text-amber-400">OpenCode Compatible Provider Incomplete</p>
+                  <p className="text-sm font-medium text-amber-400">
+                    OpenCode Compatible Provider Incomplete
+                  </p>
                   <p className="text-xs text-amber-400/70 mt-1">{status.reason}</p>
                 </div>
               </div>

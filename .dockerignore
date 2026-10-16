@@ -17,3 +17,21 @@ out/
 **/out/
 .cache/
 **/.cache/
+# Local authority, credentials and mutable runtime state never enter a build context
+.git
+.env
+.env.*
+!.env.example
+!.env.*.example
+**/.env
+**/.env.*
+**/.automaker
+**/.aws
+**/.ssh
+**/.npmrc
+data
+coverage
+**/coverage
+playwright-report
+test-results
+*.patch

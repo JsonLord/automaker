@@ -54,7 +54,7 @@ export class AppErrorBoundary extends Component<Props, State> {
     // Handle dynamic import / chunk load failures caused by deployment updates (stale asset hashes)
     const isChunkLoadError =
       /dynamically imported module/i.test(error.message) ||
-      /failed to fetch/i.test(error.message) && /assets/i.test(error.message) ||
+      (/failed to fetch/i.test(error.message) && /assets/i.test(error.message)) ||
       /importing a module script failed/i.test(error.message);
 
     if (isChunkLoadError) {

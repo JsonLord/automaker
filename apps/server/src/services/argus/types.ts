@@ -1,9 +1,12 @@
+import type { RepositoryMergeLease } from './merge-coordinator.js';
+import type { VerificationEvidence } from './verification.js';
 export type ArgusRole = 'manager' | 'planner' | 'reviewer' | 'senior-engineer';
 export type ArgusPhase =
   | 'idle'
   | 'planning'
   | 'awaiting-executor'
   | 'jules-running'
+  | 'loki-gate'
   | 'pr-open'
   | 'ci-check'
   | 'ci-failed'
@@ -50,6 +53,8 @@ export interface ArgusManagerDecision {
   needsNextSpec: boolean;
 }
 export interface ArgusPlannedTask {
+  experimentId?: string;
+  selectedVariantSha?: string;
   taskId: string;
   title: string;
   objective: string;
@@ -133,6 +138,24 @@ export interface SeniorReview {
   evidence: string[];
 }
 export interface ArgusTaskState extends ArgusPlannedTask {
+  mergeLease?: RepositoryMergeLease | null;
+  integrationEvidence?: {
+    headSha: string;
+    baseSha: string;
+    mergeSha: string;
+    verdict: 'VERIFIED';
+    observedAt: string;
+  } | null;
+  lokiEvidence?: VerificationEvidence | null;
+  lokiRepairAttempts?: number;
+  lokiRepairIntent?: {
+    headSha: string;
+    sessionId: string;
+    attempt: number;
+    marker: string;
+    outcome: 'unknown' | 'sent';
+    requestedAt: string;
+  } | null;
   featureId: string;
   phase: ArgusPhase;
   executor: 'jules' | 'senior' | null;
@@ -200,6 +223,7 @@ export interface ObjectiveEvaluation {
   remainingGaps: ObjectiveGap[];
 }
 export interface ArgusProjectState {
+  stateRevision?: number;
   version: 2;
   automakerProjectId: string;
   argusProjectId: string;
@@ -251,10 +275,14 @@ export interface ArgusService {
   health(): Promise<ArgusRuntimeHealth>;
   createOrResolveProject(input: ArgusProjectInput): Promise<ArgusProjectState>;
   resumeProject(projectPath: string): Promise<ArgusProjectState>;
-  managerHandoff(projectPath: string): Promise<ArgusManagerDecision>;
+  managerHandoff(
+    projectPath: string,
+    context?: Record<string, unknown>
+  ): Promise<ArgusManagerDecision>;
   plannerNextTask(
     projectPath: string,
-    decision: ArgusManagerDecision
+    decision: ArgusManagerDecision,
+    context?: Record<string, unknown>
   ): Promise<ArgusPlannedTask | null>;
   getPendingWork(projectPath: string): Promise<ArgusPlannedTask[]>;
   getRecentEvents(projectPath: string): Promise<Array<Record<string, unknown>>>;

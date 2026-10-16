@@ -1,3 +1,4 @@
+import { ArgusTaskEvidence } from './argus-task-evidence';
 // @ts-nocheck - dnd-kit draggable/droppable ref combination type incompatibilities
 import React, { memo, useLayoutEffect, useState, useCallback } from 'react';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
@@ -164,7 +165,7 @@ export const KanbanCard = memo(function KanbanCard({
     isDragging,
   } = useDraggable({
     id: feature.id,
-    disabled: !isDraggable || isOverlay || isSelectionMode,
+    disabled: !isDraggable || isOverlay || isSelectionMode || feature.orchestrator === 'argus',
   });
 
   // Make the card a drop target for creating dependency links
@@ -210,7 +211,7 @@ export const KanbanCard = memo(function KanbanCard({
   );
 
   const isInteractive = !isDragging && !isOverlay;
-  const hasError = feature.error && !isCurrentAutoTask;
+  const hasError = Boolean(feature.error) && !isCurrentAutoTask;
 
   const innerCardClasses = cn(
     'kanban-card-content h-full relative',
@@ -293,6 +294,7 @@ export const KanbanCard = memo(function KanbanCard({
       />
 
       <CardContent className="px-3 pt-0 pb-0">
+        <ArgusTaskEvidence task={feature.argus} />
         {/* Content Sections */}
         <CardContentSections feature={feature} useWorktrees={useWorktrees} />
 

@@ -133,7 +133,7 @@ def operate(operation, params):
         brief = ("Create ONE bounded next implementation task. Deployment, release, and publishing are prohibited. "
                  "Include concrete acceptance and evidence expectations.\n\n"
                  f"Stable objective:\n{params.get('objective','')[:30000]}\n\nCurrent spec:\n{params.get('spec','')[:30000]}\n\n"
-                 f"Manager decision:\n{json.dumps(params.get('managerDecision',{}))}\nSpec revision: {revision}")
+                 f"Manager decision:\n{json.dumps(params.get('managerDecision',{}))}\nSpec revision: {revision}\nAdmission context: {json.dumps(params.get('context',{}))}")
         plan = plain(invoke_manager("manager_plan", sid=projects[pid]["nativeSid"], text=brief, global_root=params.get("projectPath")))
         if plan.get("error"): raise BridgeFailure("ARGUS_PLANNER_FAILED", str(plan["error"]), True)
         steps = plan.get("steps") or []

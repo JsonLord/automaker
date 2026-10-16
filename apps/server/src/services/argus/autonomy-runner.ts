@@ -1,3 +1,8 @@
+import { ArgusCampaignManager } from './campaigns.js';
+import { sanitizeOpenCodeOutput } from '../../lib/opencode-errors.js';
+import fs from 'fs';
+import path from 'path';
+import { updateDurableJson, readDurableJson } from './durable-store.js';
 import { saveArgusState } from './project-lifecycle.js';
 import type {
   ArgusProjectState,
@@ -14,6 +19,7 @@ const EXECUTOR_PHASES = new Set([
   'senior-guided-repair',
 ]);
 const MILESTONE_D_PHASES = new Set([
+  'loki-gate',
   'pr-open',
   'ci-check',
   'ci-failed',
@@ -51,6 +57,14 @@ export interface AutonomyRunnerHealth {
   nextWakeAt: string | null;
 }
 
+export interface ArgusControlRequest {
+  revision: number;
+  handledRevision: number;
+  desiredAutonomy?: 'enabled' | 'paused';
+  reason: string;
+  requestedAt: string;
+}
+
 export class ArgusAutonomyRunner {
   private projects = new Set<string>();
   private locks = new Map<string, Promise<void>>();
@@ -64,6 +78,8 @@ export class ArgusAutonomyRunner {
     private readonly milestoneD: { reconcile(path: string): Promise<void> } | undefined,
     private readonly milestoneE: { reconcile(path: string): Promise<void> },
     private readonly options: {
+      campaigns?: ArgusCampaignManager;
+      discovery?: { discover(path: string): Promise<boolean> };
       now?: () => number;
       jitter?: () => number;
       setTimer?: typeof setTimeout;
@@ -72,7 +88,7 @@ export class ArgusAutonomyRunner {
   ) {}
 
   register(projectPath: string) {
-    this.projects.add(projectPath);
+    this.projects.add(fs.realpathSync(projectPath));
   }
 
   async start() {
@@ -86,14 +102,61 @@ export class ArgusAutonomyRunner {
     this.timer = null;
   }
 
+  /** Durable, bounded API acknowledgement; remote work only happens in tick/reconcile. */
+  async requestReconcile(
+    projectPath: string,
+    reason = 'explicit-wake',
+    action?: 'pause' | 'resume'
+  ) {
+    projectPath = fs.realpathSync(projectPath);
+    this.register(projectPath);
+    const request = await updateDurableJson<ArgusControlRequest>(
+      this.controlPath(projectPath),
+      (current) => ({
+        ...current,
+        revision: (current?.revision || 0) + 1,
+        handledRevision: current?.handledRevision || 0,
+        desiredAutonomy:
+          action === 'pause'
+            ? 'paused'
+            : action === 'resume'
+              ? 'enabled'
+              : current && current.revision > current.handledRevision
+                ? current.desiredAutonomy
+                : undefined,
+        reason: reason.slice(0, 100),
+        requestedAt: new Date(this.now()).toISOString(),
+      })
+    );
+    this.arm();
+    return request;
+  }
+
+  async control(projectPath: string) {
+    return readDurableJson<ArgusControlRequest>(this.controlPath(projectPath));
+  }
+
+  private controlPath(projectPath: string) {
+    return path.join(projectPath, '.automaker', 'argus-control.json');
+  }
+
+  private async applyControl(projectPath: string, state: ArgusProjectState) {
+    const control = await this.control(projectPath);
+    if (!control) return;
+    if (control.revision > control.handledRevision) {
+      if (control.desiredAutonomy) state.autonomy = control.desiredAutonomy;
+      state.reconciliation.reason = control.reason;
+      await saveArgusState(projectPath, state);
+      await updateDurableJson<ArgusControlRequest>(this.controlPath(projectPath), (latest) => ({
+        ...latest!,
+        handledRevision: Math.max(latest?.handledRevision || 0, control.revision),
+      }));
+    }
+  }
+
   async wake(projectPath: string, reason = 'explicit-wake') {
     this.register(projectPath);
-    const state = await this.argus.getStatus(projectPath);
-    if (state) {
-      state.reconciliation.nextAt = new Date(this.now()).toISOString();
-      state.reconciliation.reason = reason;
-      await saveArgusState(projectPath, state);
-    }
+    await this.requestReconcile(projectPath, reason);
     await this.reconcile(projectPath);
     this.arm();
   }
@@ -104,14 +167,18 @@ export class ArgusAutonomyRunner {
     await Promise.all(
       [...this.projects].map(async (projectPath) => {
         const state = await this.argus.getStatus(projectPath);
-        if (!state?.reconciliation.nextAt) return;
-        if (Date.parse(state.reconciliation.nextAt) <= now) await this.reconcile(projectPath);
+        const control = await this.control(projectPath);
+        if (control && control.revision > control.handledRevision)
+          await this.reconcile(projectPath);
+        else if (state?.reconciliation.nextAt && Date.parse(state.reconciliation.nextAt) <= now)
+          await this.reconcile(projectPath);
       })
     );
     this.arm();
   }
 
   async reconcile(projectPath: string) {
+    projectPath = fs.realpathSync(projectPath);
     const previous = this.locks.get(projectPath) || Promise.resolve();
     let release!: () => void;
     const current = new Promise<void>((resolve) => (release = resolve));
@@ -129,6 +196,8 @@ export class ArgusAutonomyRunner {
   decision(state: ArgusProjectState): ReconcileDecision {
     if (state.autonomy !== 'enabled' || QUIET_PHASES.has(state.phase))
       return { needsReconcile: false, nextReconcileAt: null, reason: state.phase };
+    if (state.phase === 'idle' && !state.activeTask)
+      return { needsReconcile: false, nextReconcileAt: null, reason: 'NO_ACTION' };
     const delay = this.delayFor(state);
     return {
       needsReconcile: true,
@@ -158,8 +227,18 @@ export class ArgusAutonomyRunner {
   private async reconcileLocked(projectPath: string) {
     let before = await this.argus.getStatus(projectPath);
     if (!before) return;
-    if (before.autonomy !== 'enabled' || QUIET_PHASES.has(before.phase)) {
-      before.reconciliation.nextAt = null;
+    await this.applyControl(projectPath, before);
+    const campaign = await this.options.campaigns?.beforeCycle(projectPath, before);
+    if ((!campaign || campaign.allowNewTasks) && before.autonomy === 'satisfied') {
+      await this.options.discovery?.discover(projectPath);
+      before = (await this.argus.getStatus(projectPath))!;
+    }
+    if (
+      campaign?.allowReconcile === false ||
+      before.autonomy !== 'enabled' ||
+      QUIET_PHASES.has(before.phase)
+    ) {
+      before.reconciliation.nextAt = campaign?.nextCheckAt || null;
       before.reconciliation.reason = before.phase;
       before.reconciliation.lastFinishedAt = new Date(this.now()).toISOString();
       await saveArgusState(projectPath, before);
@@ -174,13 +253,23 @@ export class ArgusAutonomyRunner {
       // without busy-polling remote systems.
       for (let transition = 0; transition < 8; transition++) {
         const state = await this.argus.getStatus(projectPath);
+        if (state) await this.applyControl(projectPath, state);
         if (!state || state.autonomy !== 'enabled' || QUIET_PHASES.has(state.phase)) break;
+        const budget = await this.options.campaigns?.beforeCycle(projectPath, state);
+        if (budget?.allowReconcile === false) break;
         const task = state.activeTask;
         if (!task || state.phase === 'planning' || state.phase === 'idle') {
-          await this.planner.reconcileProject(projectPath);
+          if (budget?.allowNewTasks === false) break;
+          const planned = await this.planner.reconcileProject(projectPath);
+          if (!planned) break;
           continue;
         }
         if (task.phase === 'awaiting-executor') {
+          if (
+            this.options.campaigns &&
+            !(await this.options.campaigns.reserveTask(projectPath, task))
+          )
+            break;
           if (task.executor === 'jules' && this.executor)
             await this.executor.dispatch(task, projectPath);
           else {
@@ -240,20 +329,31 @@ export class ArgusAutonomyRunner {
         }
         break;
       }
-      const state = await this.argus.getStatus(projectPath);
+      let state = await this.argus.getStatus(projectPath);
       if (!state) return;
+      const remaining = await this.options.campaigns?.beforeCycle(projectPath, state);
+      if ((!remaining || remaining.allowNewTasks) && state.autonomy === 'satisfied') {
+        await this.options.discovery?.discover(projectPath);
+        state = (await this.argus.getStatus(projectPath))!;
+      }
       const progressed = marker !== this.marker(state);
       state.reconciliation.attempt = progressed ? 0 : state.reconciliation.attempt;
       state.reconciliation.lastFinishedAt = new Date(this.now()).toISOString();
       state.reconciliation.lastError = null;
+      await this.options.campaigns?.observe(projectPath, state);
+      const campaign = await this.options.campaigns?.beforeCycle(projectPath, state);
       const decision = this.decision(state);
-      state.reconciliation.nextAt = decision.nextReconcileAt;
+      state.reconciliation.nextAt = campaign?.exists
+        ? campaign.nextCheckAt
+        : decision.nextReconcileAt;
       state.reconciliation.reason = decision.reason;
       await saveArgusState(projectPath, state);
     } catch (error) {
       const state = await this.argus.getStatus(projectPath);
       if (!state) return;
-      const message = error instanceof Error ? error.message : String(error);
+      const message = sanitizeOpenCodeOutput(
+        error instanceof Error ? error.message : String(error)
+      );
       state.reconciliation.lastFinishedAt = new Date(this.now()).toISOString();
       state.reconciliation.lastError = message.slice(0, 300);
       state.reconciliation.attempt += 1;
@@ -273,6 +373,7 @@ export class ArgusAutonomyRunner {
         state.reconciliation.reason = 'transient-retry';
       }
       await saveArgusState(projectPath, state);
+      await this.options.campaigns?.observe(projectPath, state);
     }
   }
 

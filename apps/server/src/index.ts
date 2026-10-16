@@ -1,3 +1,5 @@
+import { EngineeringScout } from './services/argus/engineering-scout.js';
+import { LokiVerifier, RemoteLokiExecutor } from './services/argus/verification.js';
 /**
  * Automaker Backend Server
  *
@@ -108,7 +110,7 @@ import { MilestoneEOrchestrator } from './services/argus/milestone-e-orchestrato
 import { SpecRenewalService } from './services/argus/spec-renewal-service.js';
 import { ArgusOrchestrator } from './services/argus/orchestrator.js';
 import { ArgusAutonomyRunner } from './services/argus/autonomy-runner.js';
-import { setArgusAutonomyRunner } from './services/argus/autonomy-runtime.js';
+import { argusCampaigns, setArgusAutonomyRunner } from './services/argus/autonomy-runtime.js';
 
 // Load environment variables
 dotenv.config();
@@ -560,7 +562,7 @@ app.use(
 );
 app.use(
   '/api/argus',
-  createArgusRoutes(argusService, async () => argusAutonomyRunner?.health())
+  createArgusRoutes(argusService, async () => argusAutonomyRunner?.health(), settingsService)
 );
 
 // SPA Routing: Serve index.html for all non-API routes
@@ -986,6 +988,14 @@ async function startAutomaker() {
     const julesClient = process.env.JULES_API_KEY
       ? new JulesClient(process.env.JULES_API_KEY)
       : undefined;
+    const loki = new LokiVerifier(
+      process.env.ARGUS_LOKI_WORKER_URL && process.env.ARGUS_LOKI_WORKER_TOKEN
+        ? new RemoteLokiExecutor(
+            process.env.ARGUS_LOKI_WORKER_URL,
+            process.env.ARGUS_LOKI_WORKER_TOKEN
+          )
+        : undefined
+    );
     const milestoneD = julesClient
       ? new MilestoneDOrchestrator(
           argusService,
@@ -993,7 +1003,10 @@ async function startAutomaker() {
           new GitHubCiObserver(),
           julesClient,
           new OpenCodeRoleRunner(),
-          new GitSeniorWorktreeAdapter()
+          new GitSeniorWorktreeAdapter(),
+          loki,
+          undefined,
+          (projectPath, task) => argusCampaigns.allowRepair(projectPath, task)
         )
       : undefined;
     const milestoneE = new MilestoneEOrchestrator(
@@ -1003,17 +1016,12 @@ async function startAutomaker() {
       new SpecRenewalService(),
       new ArgusOrchestrator(argusService, featureLoader)
     );
-    const postPrReconcile = {
-      reconcile: async (projectPath: string) => {
-        await milestoneD?.reconcile(projectPath);
-        await milestoneE.reconcile(projectPath);
-      },
-    };
     const julesExecutor = julesClient
       ? new JulesDeveloperAdapter(julesClient, argusService, featureLoader, {
-          onPullRequest: (projectPath) =>
-            argusAutonomyRunner?.wake(projectPath, 'pull-request-created') ||
-            postPrReconcile.reconcile(projectPath),
+          autoMonitor: false,
+          onPullRequest: async (projectPath) => {
+            await argusAutonomyRunner?.requestReconcile(projectPath, 'pull-request-created');
+          },
         })
       : undefined;
     await discoverAndResumeArgusProjects(
@@ -1026,7 +1034,15 @@ async function startAutomaker() {
       new ArgusOrchestrator(argusService, featureLoader),
       julesExecutor,
       milestoneD,
-      milestoneE
+      milestoneE,
+      {
+        campaigns: argusCampaigns,
+        discovery: new EngineeringScout(
+          argusService,
+          new ArgusOrchestrator(argusService, featureLoader),
+          ideationService
+        ),
+      }
     );
     setArgusAutonomyRunner(argusAutonomyRunner);
     for (const project of settings.projects || []) argusAutonomyRunner.register(project.path);

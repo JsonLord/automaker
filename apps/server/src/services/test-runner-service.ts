@@ -86,6 +86,7 @@ export interface TestRunResult {
  */
 class TestRunnerService {
   private sessions: Map<string, TestRunSession> = new Map();
+  private startingWorktrees = new Set<string>();
   private emitter: EventEmitter | null = null;
 
   /**
@@ -233,6 +234,26 @@ class TestRunnerService {
       testFile?: string;
     }
   ): Promise<TestRunResult> {
+    // Reserve before filesystem validation yields so concurrent requests cannot
+    // both pass the active-session check and spawn in the same worktree.
+    if (this.startingWorktrees.has(worktreePath)) {
+      return { success: false, error: 'Tests are already starting for this worktree' };
+    }
+    this.startingWorktrees.add(worktreePath);
+    try {
+      return await this.startTestsInWorktree(worktreePath, options);
+    } finally {
+      this.startingWorktrees.delete(worktreePath);
+    }
+  }
+
+  private async startTestsInWorktree(
+    worktreePath: string,
+    options: {
+      command: string;
+      testFile?: string;
+    }
+  ): Promise<TestRunResult> {
     const { command, testFile } = options;
 
     // Check if already running
@@ -314,6 +335,18 @@ class TestRunnerService {
 
     // Track if process failed early
     const status = { error: null as string | null, exited: false };
+    let startedEmitted = false;
+    const emitStarted = () => {
+      if (startedEmitted || session.stopping) return;
+      startedEmitted = true;
+      this.emitter?.emit('test-runner:started', {
+        sessionId,
+        worktreePath,
+        command: finalCommand,
+        testFile,
+        timestamp: new Date().toISOString(),
+      });
+    };
 
     // Helper to clean up resources and emit events
     const cleanupAndFinish = (
@@ -321,6 +354,8 @@ class TestRunnerService {
       finalStatus: TestRunStatus,
       errorMessage?: string
     ) => {
+      // A child can emit both error and exit; preserve the first terminal result.
+      if (session.finishedAt) return;
       session.finishedAt = new Date();
       session.exitCode = exitCode;
       session.status = finalStatus;
@@ -359,6 +394,7 @@ class TestRunnerService {
     // Capture stdout
     if (testProcess.stdout) {
       testProcess.stdout.on('data', (data: Buffer) => {
+        if (!session.finishedAt) emitStarted();
         this.handleProcessOutput(session, data);
       });
     }
@@ -366,17 +402,21 @@ class TestRunnerService {
     // Capture stderr
     if (testProcess.stderr) {
       testProcess.stderr.on('data', (data: Buffer) => {
+        if (!session.finishedAt) emitStarted();
         this.handleProcessOutput(session, data);
       });
     }
 
     testProcess.on('error', (error) => {
+      if (session.finishedAt) return;
       logger.error(`Process error for ${sessionId}:`, error);
       status.error = error.message;
       cleanupAndFinish(null, 'error', error.message);
     });
 
     testProcess.on('exit', (code) => {
+      if (session.finishedAt) return;
+      emitStarted();
       logger.info(`Test process for ${worktreePath} exited with code ${code}`);
       status.exited = true;
 
@@ -417,16 +457,8 @@ class TestRunnerService {
       }
     }
 
-    // Emit started event
-    if (this.emitter) {
-      this.emitter.emit('test-runner:started', {
-        sessionId,
-        worktreePath,
-        command: finalCommand,
-        testFile,
-        timestamp: new Date().toISOString(),
-      });
-    }
+    // Quick processes may already have emitted their ordered lifecycle events.
+    emitStarted();
 
     return {
       success: true,
@@ -434,7 +466,7 @@ class TestRunnerService {
         sessionId,
         worktreePath,
         command: finalCommand,
-        status: 'running',
+        status: session.status,
         testFile,
         message: `Tests started: ${finalCommand}`,
       },

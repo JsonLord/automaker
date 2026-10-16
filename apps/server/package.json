@@ -21,7 +21,8 @@
     "test:run": "vitest run",
     "test:cov": "vitest run --coverage",
     "test:watch": "vitest watch",
-    "test:unit": "vitest run tests/unit"
+    "test:unit": "vitest run tests/unit",
+    "check:runtime": "node scripts/check-runtime-dependencies.mjs"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "0.2.32",
@@ -32,17 +33,17 @@
     "@automaker/prompts": "1.0.0",
     "@automaker/types": "1.0.0",
     "@automaker/utils": "1.0.0",
-    "@github/copilot-sdk": "0.1.16",
-    "@modelcontextprotocol/sdk": "1.25.2",
+    "@github/copilot-sdk": "0.2.2",
+    "@modelcontextprotocol/sdk": "1.32.1",
     "@openai/codex-sdk": "^0.98.0",
     "cookie-parser": "1.4.7",
     "cors": "2.8.5",
     "dotenv": "17.2.3",
     "express": "5.2.1",
-    "morgan": "1.10.1",
+    "morgan": "1.12.1",
     "node-pty": "1.1.0-beta41",
-    "ws": "8.18.3",
-    "yaml": "2.7.0"
+    "ws": "8.22.0",
+    "yaml": "2.9.1"
   },
   "devDependencies": {
     "@playwright/test": "1.57.0",
@@ -52,11 +53,13 @@
     "@types/express": "5.0.6",
     "@types/morgan": "1.9.10",
     "@types/node": "22.19.3",
+    "@types/supertest": "6.0.3",
     "@types/ws": "8.18.1",
-    "@vitest/coverage-v8": "4.0.16",
-    "@vitest/ui": "4.0.16",
+    "@vitest/coverage-v8": "4.1.12",
+    "@vitest/ui": "4.1.12",
+    "supertest": "7.1.4",
     "tsx": "4.21.0",
     "typescript": "5.9.3",
-    "vitest": "4.0.16"
+    "vitest": "4.1.12"
   }
 }

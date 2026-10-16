@@ -381,8 +381,10 @@ export async function listStash(worktreePath: string): Promise<StashListResult> 
     if (parts.length < 3) continue;
 
     const refSpec = parts[0].trim(); // e.g., "stash@{0}"
-    const stashMessage = parts[1].trim();
-    const date = parts[2].trim();
+    // The user's message can contain the separator; only the outer fields have
+    // fixed formats (stash ref and ISO date), so preserve every middle segment.
+    const stashMessage = parts.slice(1, -1).join('|||').trim();
+    const date = parts[parts.length - 1].trim();
 
     // Extract index from stash@{N}; skip entries that don't match the expected format
     const indexMatch = refSpec.match(/stash@\{(\d+)\}/);

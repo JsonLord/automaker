@@ -23,6 +23,7 @@ import type { TypedEventBus } from './typed-event-bus.js';
 import type { ConcurrencyManager, RunningFeature } from './concurrency-manager.js';
 import type { SettingsService } from './settings-service.js';
 import type { PipelineStatusInfo } from './pipeline-orchestrator.js';
+import { isArgusOwned } from './argus/board-projector.js';
 
 const logger = createLogger('RecoveryService');
 
@@ -201,6 +202,8 @@ export class RecoveryService {
     _calledInternally = false
   ): Promise<void> {
     if (!_calledInternally && this.isFeatureRunningFn(featureId)) return;
+    const feature = await this.loadFeatureFn(projectPath, featureId);
+    if (isArgusOwned(feature)) throw new Error('ARGUS_TASK_REQUIRES_RUNNER');
     this.acquireRunningFeatureFn({
       featureId,
       projectPath,
@@ -208,7 +211,6 @@ export class RecoveryService {
       allowReuse: _calledInternally,
     });
     try {
-      const feature = await this.loadFeatureFn(projectPath, featureId);
       if (!feature) throw new Error(`Feature ${featureId} not found`);
       const pipelineInfo = await this.detectPipelineStatusFn(
         projectPath,
@@ -271,6 +273,7 @@ export class RecoveryService {
           logRecoveryWarning(result, `Feature ${entry.name}`, logger);
           const feature = result.data;
           if (!feature) continue;
+          if (isArgusOwned(feature)) continue;
 
           // Check if the feature should be resumed:
           // 1. Features still in active states (in_progress, pipeline_*) - not yet reconciled

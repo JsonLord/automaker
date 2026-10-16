@@ -1,156 +1,135 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+vi.hoisted(() => {
+  process.env.AUTOMAKER_API_KEY = 'argus-control-fixture-key';
+  process.env.AUTOMAKER_HIDE_API_KEY = 'true';
+});
 import request from 'supertest';
 import express from 'express';
+import fs from 'fs/promises';
+import os from 'os';
+import path from 'path';
+import { authMiddleware } from '../../src/lib/auth.js';
 import { createArgusRoutes } from '../../src/routes/argus/index.js';
-import * as autonomyRuntime from '../../src/services/argus/autonomy-runtime.js';
-
-describe('Argus Control Endpoints', () => {
-  let app: express.Express;
-  let mockService: any;
-  let mockRunner: any;
-
-  beforeEach(() => {
-    mockService = {
-      getStatus: vi.fn(),
-      saveState: vi.fn(),
-      health: vi.fn(),
-    };
-
-    mockRunner = {
-      register: vi.fn(),
-      wake: vi.fn(),
-      reconcile: vi.fn(),
-    };
-
-    vi.spyOn(autonomyRuntime, 'getArgusAutonomyRunner').mockReturnValue(mockRunner);
-
-    app = express();
-    app.use(express.json());
-    app.use('/api/argus', createArgusRoutes(mockService));
-  });
-
-  it('pause - should pause runner and update state', async () => {
-    mockService.getStatus.mockResolvedValue({ autonomy: 'enabled', reconciliation: {} });
-
-    const res = await request(app).post('/api/argus/pause').send({ projectPath: '/test/path' });
-
-    expect(res.status).toBe(200);
-    expect(res.body.success).toBe(true);
-  });
-
-  it('resume - should resume runner, update state and register/wake', async () => {
-    mockService.getStatus.mockResolvedValue({ autonomy: 'paused', reconciliation: {} });
-
-    // We expect wake to be awaited
-    mockRunner.wake.mockResolvedValue(undefined);
-
-    const res = await request(app).post('/api/argus/resume').send({ projectPath: '/test/path' });
-
-    expect(res.status).toBe(200);
-    expect(res.body.success).toBe(true);
-    expect(mockRunner.register).toHaveBeenCalledWith('/test/path');
-    expect(mockRunner.wake).toHaveBeenCalledWith('/test/path', 'api-resume');
-  });
-
-  it('resume - should generate parseable ISO date string', async () => {
-    mockService.getStatus.mockResolvedValue({ autonomy: 'paused', reconciliation: {} });
-    mockRunner.wake.mockResolvedValue(undefined);
-
-    // Provide a mocked implementation for project lifecycle saveState since we're using dynamic import in the handler
-    vi.mock('../../src/services/argus/project-lifecycle.js', () => ({
-      saveArgusState: vi.fn((path, state) => {
-        // Assert the nextAt inside the mock to catch the state updates
-        expect(Number.isNaN(Date.parse(state.reconciliation.nextAt))).toBe(false);
-      }),
-    }));
-
-    const res = await request(app).post('/api/argus/resume').send({ projectPath: '/test/path' });
-
-    expect(res.status).toBe(200);
-  });
-
-  it('wake - should wake runner with reason', async () => {
-    mockService.getStatus.mockResolvedValue({
-      phase: 'test',
-      latestStatus: 'test',
+import * as runtime from '../../src/services/argus/autonomy-runtime.js';
+let root: string;
+let app: express.Express;
+let service: any;
+let runner: any;
+beforeEach(async () => {
+  root = await fs.mkdtemp(path.join(os.tmpdir(), 'argus-control-'));
+  vi.stubEnv('NODE_ENV', 'production');
+  vi.stubEnv('AUTOMAKER_DISABLE_AUTH', 'false');
+  vi.stubEnv('ALLOWED_ROOT_DIRECTORY', root);
+  service = {
+    health: vi.fn().mockResolvedValue({ running: false }),
+    getStatus: vi.fn().mockResolvedValue({
+      autonomy: 'enabled',
+      phase: 'idle',
       reconciliation: {},
-    });
-    mockRunner.wake.mockResolvedValue(undefined);
-
-    const res = await request(app)
+      activeTask: null,
+    }),
+  };
+  runner = {
+    control: vi.fn().mockResolvedValue(undefined),
+    requestReconcile: vi.fn().mockResolvedValue({ revision: 1 }),
+    reconcile: vi.fn(),
+    wake: vi.fn(),
+  };
+  vi.spyOn(runtime, 'getArgusAutonomyRunner').mockReturnValue(runner);
+  app = express();
+  app.use(express.json());
+  app.use('/api', authMiddleware);
+  app.use(
+    '/api/argus',
+    createArgusRoutes(service, undefined, {
+      getGlobalSettings: async () => ({ projects: [{ id: 'p', path: root }] }),
+    } as any)
+  );
+});
+afterEach(async () => {
+  vi.unstubAllEnvs();
+  await fs.rm(root, { recursive: true, force: true });
+});
+const post = (action: string) =>
+  request(app).post(`/api/argus/${action}`).set('X-API-Key', 'argus-control-fixture-key');
+describe('Argus remote controls', () => {
+  it('rejects unauthorized operations before filesystem/state effects', async () => {
+    const response = await request(app).post('/api/argus/wake').send({ projectPath: root });
+    expect(response.status).toBe(401);
+    expect(service.getStatus).not.toHaveBeenCalled();
+    expect(runner.requestReconcile).not.toHaveBeenCalled();
+  });
+  it('ignores the public disable-auth bypass in production', async () => {
+    vi.stubEnv('AUTOMAKER_DISABLE_AUTH', 'true');
+    expect((await request(app).post('/api/argus/wake').send({ projectPath: root })).status).toBe(
+      401
+    );
+  });
+  it.each(['pause', 'resume', 'wake', 'reconcile'])(
+    'queues %s without waiting for remote execution',
+    async (action) => {
+      runner.reconcile.mockImplementation(() => new Promise(() => {}));
+      const response = await post(action).send({ projectId: 'p' });
+      expect(response.status).toBe(202);
+      expect(response.body.status).toBe('queued');
+      expect(runner.requestReconcile).toHaveBeenCalledWith(
+        root,
+        `api-${action}`,
+        action === 'pause' || action === 'resume' ? action : undefined
+      );
+      expect(runner.reconcile).not.toHaveBeenCalled();
+      expect(runner.wake).not.toHaveBeenCalled();
+    }
+  );
+  it('rejects traversal and unregistered directories before side effects', async () => {
+    expect((await post('wake').send({ projectPath: root + '/../outside' })).status).toBe(400);
+    expect((await post('wake').send({ projectPath: '/tmp' })).status).toBe(404);
+    expect(service.getStatus).not.toHaveBeenCalled();
+    expect(runner.requestReconcile).not.toHaveBeenCalled();
+  });
+  it('rejects registered symlinks escaping the allowed root', async () => {
+    const link = path.join(root, 'outside');
+    await fs.symlink(os.tmpdir(), link);
+    const isolated = express();
+    isolated.use(express.json());
+    isolated.use('/api', authMiddleware);
+    isolated.use(
+      '/api/argus',
+      createArgusRoutes(service, undefined, {
+        getGlobalSettings: async () => ({ projects: [{ id: 'outside', path: link }] }),
+      } as any)
+    );
+    const response = await request(isolated)
       .post('/api/argus/wake')
-      .send({ projectPath: '/test/path', reason: 'manual wake' });
-
-    expect(res.status).toBe(200);
-    expect(res.body.success).toBe(true);
-    expect(mockRunner.wake).toHaveBeenCalledWith('/test/path', 'manual wake');
+      .set('X-API-Key', 'argus-control-fixture-key')
+      .send({ projectId: 'outside' });
+    expect(response.status).toBe(403);
+    expect(service.getStatus).not.toHaveBeenCalled();
   });
-
-  it('wake - should handle wake failure deterministically', async () => {
-    mockService.getStatus.mockResolvedValue({
-      phase: 'test',
-      latestStatus: 'test',
-      reconciliation: {},
+  it('does not resume a paused project through wake or reconcile', async () => {
+    runner.control.mockResolvedValue({
+      revision: 1,
+      handledRevision: 0,
+      desiredAutonomy: 'paused',
     });
-
-    // Reject the wake call
-    mockRunner.wake.mockRejectedValue(new Error('Wake failed inside runner'));
-
-    const res = await request(app).post('/api/argus/wake').send({ projectPath: '/test/path' });
-
-    // It should surface as a 500 error handled by express, without crashing node with an UnhandledPromiseRejection
-    expect(res.status).toBe(500);
+    expect((await post('wake').send({ projectId: 'p' })).status).toBe(409);
+    expect((await post('reconcile').send({ projectId: 'p' })).status).toBe(409);
+    expect(runner.requestReconcile).not.toHaveBeenCalled();
   });
-
-  it('wake - should check if project is missing and return 404 before trying to wake runner', async () => {
-    mockService.getStatus.mockResolvedValue(null);
-
-    const res = await request(app).post('/api/argus/wake').send({ projectPath: '/unknown/path' });
-
-    expect(res.status).toBe(404);
-    expect(mockRunner.wake).not.toHaveBeenCalled();
-  });
-
-  it('reconcile - should run reconcile', async () => {
-    mockService.getStatus.mockResolvedValue({ autonomy: 'enabled', reconciliation: {} });
-
-    const res = await request(app).post('/api/argus/reconcile').send({ projectPath: '/test/path' });
-
-    expect(res.status).toBe(200);
-    expect(res.body.success).toBe(true);
-    expect(mockRunner.reconcile).toHaveBeenCalledWith('/test/path');
-  });
-
-  it('reconcile - paused project should return 409', async () => {
-    mockService.getStatus.mockResolvedValue({ autonomy: 'paused', reconciliation: {} });
-
-    const res = await request(app).post('/api/argus/reconcile').send({ projectPath: '/test/path' });
-
-    expect(res.status).toBe(409);
-    expect(res.body.error).toBe('ARGUS_PAUSED');
-  });
-
-  it('pause - unknown project should return 404', async () => {
-    mockService.getStatus.mockResolvedValue(null);
-
-    const res = await request(app).post('/api/argus/pause').send({ projectPath: '/unknown/path' });
-
-    expect(res.status).toBe(404);
-  });
-
-  it('pause - malformed request should return 400', async () => {
-    const res = await request(app).post('/api/argus/pause').send({});
-
-    expect(res.status).toBe(400);
-  });
-
-  it('pause - unavailable runner should return 503', async () => {
-    mockService.getStatus.mockResolvedValue({ autonomy: 'enabled', reconciliation: {} });
-    vi.spyOn(autonomyRuntime, 'getArgusAutonomyRunner').mockReturnValue(undefined);
-
-    const res = await request(app).post('/api/argus/pause').send({ projectPath: '/test/path' });
-
-    expect(res.status).toBe(503);
-    expect(res.body.error).toBe('ARGUS_RUNNER_UNAVAILABLE');
+  it('supports registered project status and fails closed without access configuration', async () => {
+    expect(
+      (
+        await request(app)
+          .get('/api/argus/status')
+          .set('X-API-Key', 'argus-control-fixture-key')
+          .query({ projectId: 'p' })
+      ).status
+    ).toBe(200);
+    const closed = express();
+    closed.use(express.json());
+    closed.use('/api/argus', createArgusRoutes(service));
+    expect((await request(closed).post('/api/argus/wake').send({ projectId: 'p' })).status).toBe(
+      503
+    );
   });
 });

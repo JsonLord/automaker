@@ -429,12 +429,26 @@ describe('recovery-service.ts', () => {
       );
     });
 
-    it('releases running feature in finally block', async () => {
-      mockLoadFeature.mockRejectedValueOnce(new Error('Feature not found'));
+    it('releases acquired capacity when resumed execution fails', async () => {
+      mockExecuteFeature.mockRejectedValueOnce(new Error('Execution failed'));
 
-      await expect(service.resumeFeature('/test/project', 'feature-1')).rejects.toThrow();
+      await expect(service.resumeFeature('/test/project', 'feature-1')).rejects.toThrow(
+        'Execution failed'
+      );
 
+      expect(mockAcquireRunningFeature).toHaveBeenCalledTimes(1);
       expect(mockReleaseRunningFeature).toHaveBeenCalledWith('feature-1');
+    });
+
+    it('does not release another execution when feature lookup fails before acquisition', async () => {
+      mockLoadFeature.mockRejectedValueOnce(new Error('Feature lookup unavailable'));
+
+      await expect(service.resumeFeature('/test/project', 'feature-1')).rejects.toThrow(
+        'Feature lookup unavailable'
+      );
+
+      expect(mockAcquireRunningFeature).not.toHaveBeenCalled();
+      expect(mockReleaseRunningFeature).not.toHaveBeenCalled();
     });
 
     it('throws error if feature not found', async () => {

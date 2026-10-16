@@ -30,6 +30,7 @@ import type { AutoModeEventType } from './typed-event-bus.js';
 import { getNotificationService } from './notification-service.js';
 import { FeatureLoader } from './feature-loader.js';
 import { pipelineService } from './pipeline-service.js';
+import { isArgusOwned } from './argus/board-projector.js';
 
 const logger = createLogger('FeatureStateManager');
 
@@ -242,6 +243,7 @@ export class FeatureStateManager {
   ): Promise<void> {
     // Load the feature to check its current status
     const feature = await this.loadFeature(projectPath, featureId);
+    if (isArgusOwned(feature)) return;
     const currentStatus = feature?.status;
 
     // Preserve pipeline_* statuses so resumePipelineFeature can resume from the correct step
@@ -312,6 +314,8 @@ export class FeatureStateManager {
 
         const feature = result.data;
         if (!feature) continue;
+        // Argus cards project durable Runner state; generic crash recovery cannot own them.
+        if (isArgusOwned(feature)) continue;
 
         let needsUpdate = false;
         const originalStatus = feature.status;

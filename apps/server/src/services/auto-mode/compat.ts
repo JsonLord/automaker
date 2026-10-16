@@ -73,11 +73,20 @@ export class AutoModeServiceCompat {
   }
 
   getActiveAutoLoopProjects(): string[] {
-    return this.globalService.getActiveAutoLoopProjects();
+    return [...new Set(this.getActiveAutoLoopWorktrees().map((worktree) => worktree.projectPath))];
   }
 
   getActiveAutoLoopWorktrees(): Array<{ projectPath: string; branchName: string | null }> {
-    return this.globalService.getActiveAutoLoopWorktrees();
+    // Each project facade owns the coordinator that actually executes its loop.
+    // The global coordinator only monitors shared running-feature capacity.
+    const worktrees = new Map<string, { projectPath: string; branchName: string | null }>();
+    for (const worktree of [
+      ...this.globalService.getActiveAutoLoopWorktrees(),
+      ...[...this.facadeCache.values()].flatMap((facade) => facade.getActiveAutoLoopWorktrees()),
+    ]) {
+      worktrees.set(JSON.stringify([worktree.projectPath, worktree.branchName]), worktree);
+    }
+    return [...worktrees.values()];
   }
 
   async getRunningAgents(): Promise<RunningAgentInfo[]> {

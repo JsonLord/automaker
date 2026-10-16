@@ -15,3 +15,13 @@ diag_logs.txt
 **/.vite/
 coverage/
 **/coverage/
+.cache/
+**/.cache/
+.local/
+**/.local/
+.config/
+**/.config/
+tests/
+**/tests/
+docs/
+**/docs/

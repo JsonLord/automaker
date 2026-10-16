@@ -6,7 +6,7 @@
  * in a way that works with npm workspaces.
  */
 
-import { execSync } from 'child_process';
+import { execFileSync } from 'child_process';
 import { cpSync, existsSync, mkdirSync, rmSync, writeFileSync, readFileSync, lstatSync } from 'fs';
 import { join, dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
@@ -18,6 +18,7 @@ const APP_DIR = join(__dirname, '..');
 const SERVER_DIR = join(APP_DIR, '..', 'server');
 const LIBS_DIR = join(APP_DIR, '..', '..', 'libs');
 const BUNDLE_DIR = join(APP_DIR, 'server-bundle');
+const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 
 // Local workspace packages that need to be bundled
 const LOCAL_PACKAGES = [
@@ -41,7 +42,11 @@ mkdirSync(BUNDLE_DIR, { recursive: true });
 
 // Step 2: Build the server TypeScript
 console.log('📦 Building server TypeScript...');
-execSync('npm run build', { cwd: SERVER_DIR, stdio: 'inherit' });
+execFileSync(npmCommand, ['run', 'build'], {
+  cwd: SERVER_DIR,
+  stdio: 'inherit',
+  shell: process.platform === 'win32',
+});
 
 // Step 3: Copy server dist
 console.log('📋 Copying server dist...');
@@ -58,8 +63,7 @@ for (const pkgName of LOCAL_PACKAGES) {
   const destDir = join(bundleLibsDir, pkgDir);
 
   if (!existsSync(srcDir)) {
-    console.warn(`⚠️  Warning: Package ${pkgName} not found at ${srcDir}`);
-    continue;
+    throw new Error(`Required package ${pkgName} not found at ${srcDir}`);
   }
 
   mkdirSync(destDir, { recursive: true });
@@ -69,10 +73,22 @@ for (const pkgName of LOCAL_PACKAGES) {
     cpSync(join(srcDir, 'dist'), join(destDir, 'dist'), { recursive: true });
   }
 
-  // Copy package.json
-  if (existsSync(join(srcDir, 'package.json'))) {
-    cpSync(join(srcDir, 'package.json'), join(destDir, 'package.json'));
+  // The copied packages are production artifacts, not development workspaces.
+  // npm still resolves omitted dev peers for file: links; retaining Vitest here
+  // can pull an unrelated test toolchain into standalone dependency resolution.
+  const pkg = JSON.parse(readFileSync(join(srcDir, 'package.json'), 'utf-8'));
+  delete pkg.devDependencies;
+  delete pkg.scripts;
+  for (const section of ['dependencies', 'optionalDependencies']) {
+    for (const name of Object.keys(pkg[section] || {})) {
+      if (!name.startsWith('@automaker/')) continue;
+      if (!LOCAL_PACKAGES.includes(name)) {
+        throw new Error(`Required local dependency ${name} is missing from LOCAL_PACKAGES`);
+      }
+      pkg[section][name] = `file:../${name.replace('@automaker/', '')}`;
+    }
   }
+  writeFileSync(join(destDir, 'package.json'), JSON.stringify(pkg, null, 2) + '\n');
 
   console.log(`   ✓ ${pkgName}`);
 }
@@ -102,13 +118,14 @@ writeFileSync(join(BUNDLE_DIR, 'package.json'), JSON.stringify(bundlePkg, null, 
 
 // Step 6: Install production dependencies
 console.log('📥 Installing server production dependencies...');
-execSync('npm install --omit=dev', {
+execFileSync(npmCommand, ['install', '--omit=dev', '--ignore-scripts', '--workspaces=false'], {
   cwd: BUNDLE_DIR,
   stdio: 'inherit',
+  shell: process.platform === 'win32',
   env: {
     ...process.env,
     // Prevent npm from using workspace resolution
-    npm_config_workspace: '',
+    npm_config_workspaces: 'false',
   },
 });
 
@@ -138,17 +155,12 @@ for (const pkgName of LOCAL_PACKAGES) {
 // Step 7: Rebuild native modules for current architecture
 // This is critical for modules like node-pty that have native bindings
 console.log('🔨 Rebuilding native modules for current architecture...');
-try {
-  execSync('npm rebuild', {
-    cwd: BUNDLE_DIR,
-    stdio: 'inherit',
-  });
-  console.log('✅ Native modules rebuilt successfully');
-} catch (error) {
-  console.warn(
-    '⚠️  Warning: Failed to rebuild native modules. Terminal functionality may not work.'
-  );
-  console.warn('   Error:', error.message);
-}
+execFileSync(npmCommand, ['rebuild', 'node-pty', '--workspaces=false'], {
+  cwd: BUNDLE_DIR,
+  stdio: 'inherit',
+  shell: process.platform === 'win32',
+  env: { ...process.env, npm_config_build_from_source: 'true' },
+});
+console.log('✅ Native modules rebuilt successfully');
 
 console.log('\n✅ Server prepared for bundling at:', BUNDLE_DIR);

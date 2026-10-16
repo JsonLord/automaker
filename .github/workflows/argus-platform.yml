@@ -34,6 +34,10 @@ jobs:
       - run: |
           npm run build:server
           node scripts/check-clean-working-tree.mjs 'Server build'
+      - name: Verify production dependency entry points
+        run: |
+          npm run check:runtime --workspace=apps/server
+          node scripts/check-clean-working-tree.mjs 'Runtime dependency imports'
       - run: |
           npm run build --workspace=apps/ui
           node scripts/check-clean-working-tree.mjs 'UI build'
@@ -52,6 +56,12 @@ jobs:
       - run: |
           npm run test:packages
           node scripts/check-clean-working-tree.mjs 'Package tests'
+      - name: Diagnose tracked file changes
+        if: always()
+        run: |
+          git status --short --untracked-files=no
+          git diff --stat
+          git diff --cached --stat
       - name: Validate deployment export
         run: |
           node --test scripts/tests/check-clean-working-tree.test.mjs

@@ -34,6 +34,14 @@ RUN npm run build --workspace=apps/ui
 RUN npm run build --workspace=apps/server && \
     npm rebuild node-pty --workspace=apps/server
 
+# Download the browser while build-only tooling is available, then keep its cache
+# without shipping Electron, test runners, or packaging tools in the server image.
+RUN PLAYWRIGHT_BROWSERS_PATH=/opt/playwright ./node_modules/.bin/playwright install chromium
+
+FROM builder AS runtime-dependencies
+RUN npm ci --omit=dev --ignore-scripts --no-audit --no-fund && \
+    npm rebuild node-pty --workspace=apps/server
+
 # =============================================================================
 # FINAL PRODUCTION STAGE
 # =============================================================================
@@ -105,14 +113,15 @@ USER node
 # Copy built artifacts and dependencies from builder
 COPY --from=builder --chown=node:node /app/package*.json ./
 COPY --from=builder --chown=node:node /app/vitest.config.ts ./
-COPY --from=builder --chown=node:node /app/node_modules ./node_modules
+COPY --from=runtime-dependencies --chown=node:node /app/node_modules ./node_modules
+COPY --from=builder --chown=node:node /opt/playwright /opt/playwright
 COPY --from=builder --chown=node:node /app/libs ./libs
 COPY --from=builder --chown=node:node /app/apps/server ./apps/server
 COPY --from=builder --chown=node:node /app/apps/ui/dist ./apps/ui/dist
 COPY --from=builder --chown=node:node /app/scripts ./scripts
 
-# Install Playwright Chromium
-RUN ./node_modules/.bin/playwright install chromium
+# Use the browser cache prepared by the builder; build-only CLI dependencies are pruned.
+ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright
 
 # Create data directory
 RUN mkdir -p /app/data && chown node:node /app/data

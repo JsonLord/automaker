@@ -249,19 +249,29 @@ async function bootstrapStarterProjectLocked(
   // Phase 3.5: Configure GitHub Remote
   if (!state.completedPhases.includes('configure-remote') && destinationRepoUrl) {
     try {
-      // Just check that we can set the remote; we don't strictly require GitHub CLI auth for tests to pass
-      // But in reality, Argus requires destination repository to exist.
+      // Must verify the remote actually exists and is accessible.
+      // We do this by attempting to read from it (ls-remote).
+      try {
+        await execGitCommand(['ls-remote', destinationRepoUrl], projectPath);
+      } catch (lsRemoteError) {
+        state.lastError = 'BOOTSTRAP_REMOTE_VERIFICATION_FAILED';
+        await writeAtomicFile(statePath, JSON.stringify(state, null, 2));
+        throw new Error(`Failed to verify destination repository: ${destinationRepoUrl}`);
+      }
+
       await execGitCommand(['remote', 'add', 'origin', destinationRepoUrl], projectPath).catch(
         () => {
-          // If it already exists, set-url instead
           return execGitCommand(['remote', 'set-url', 'origin', destinationRepoUrl], projectPath);
         }
       );
+
       logger.info(`[StarterBootstrap] Configured remote origin: ${destinationRepoUrl}`);
       await markPhase('configure-remote');
+      delete state.lastError;
+      await writeAtomicFile(statePath, JSON.stringify(state, null, 2));
     } catch (error) {
       logger.error(`[StarterBootstrap] Error configuring remote:`, error);
-      // We don't fail the entire bootstrap if this fails, but it will be logged
+      return; // Do not proceed to registration/wake if the core invariant of having a remote failed.
     }
   }
 

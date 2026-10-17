@@ -12,6 +12,7 @@
 
 1. **Build Provenance**: Added `generate-provenance.sh` pre-build step and loaded via `build-identity.ts` during runtime. Replaced feature flag check with the correct `ARGUS_CONTINUOUS_ENGINEERING_ENABLED`.
 2. **GitHub Remote Init**: Updated the `clone.ts` template bootstrap handler to explicitly mandate `destinationRepoUrl` (as well as handling TypeScript interfaces & test invariants properly). Set up safe idempotent creation of the origin.
+3. **Diagnostics Endpoint**: Added `/api/settings/diagnostics/opencode` to safely probe the OpenCode models endpoint without leaking credentials.
 
 ## Live Test Results Table
 

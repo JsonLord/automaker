@@ -104,6 +104,8 @@ describe('bootstrap baseline invariant', () => {
     await fs.mkdir(hookDir, { recursive: true });
     const hook = path.join(hookDir, 'pre-commit');
     await fs.writeFile(hook, '#!/bin/sh\nexit 1\n', { mode: 0o700 });
+    // Ensure core.hooksPath uses the local directory so global mocks don't interfere
+    await execGitCommand(['config', 'core.hooksPath', '.git/hooks'], dir);
     const register = vi.fn();
 
     await bootstrapStarterProject({
@@ -151,6 +153,8 @@ describe('bootstrap baseline invariant', () => {
     await fs.writeFile(path.join(hookDir, 'pre-commit'), '#!/bin/sh\nexit 1\n', {
       mode: 0o700,
     });
+    // Ensure core.hooksPath uses the local directory so global mocks don't interfere
+    await execGitCommand(['config', 'core.hooksPath', '.git/hooks'], dir);
     await bootstrapStarterProject({ ...options(), destinationRepoUrl: undefined });
     expect((await state()).completedPhases).not.toContain('baseline-commit');
   });

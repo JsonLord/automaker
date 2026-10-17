@@ -16,24 +16,25 @@ import type { SettingsService } from '../../../services/settings-service.js';
 export function createCloneHandler(settingsService?: SettingsService) {
   return async (req: Request, res: Response): Promise<void> => {
     try {
-      const { repoUrl, projectName, parentDir, overview } = req.body as {
+      const { repoUrl, projectName, parentDir, overview, destinationRepoUrl } = req.body as {
         repoUrl: string;
         projectName: string;
         parentDir: string;
         overview?: string;
+        destinationRepoUrl: string;
       };
 
       // Validate inputs
-      if (!repoUrl || !projectName || !parentDir) {
+      if (!repoUrl || !projectName || !parentDir || !destinationRepoUrl) {
         res.status(400).json({
           success: false,
-          error: 'repoUrl, projectName, and parentDir are required',
+          error: 'repoUrl, projectName, parentDir, and destinationRepoUrl are required',
         });
         return;
       }
 
       logger.info(
-        `[Templates] Clone request - Repo: ${repoUrl}, Project: ${projectName}, Parent: ${parentDir}`
+        `[Templates] Clone request - Repo: ${repoUrl}, Project: ${projectName}, Parent: ${parentDir}, Dest: ${destinationRepoUrl}`
       );
 
       // Validate repo URL is a valid GitHub URL
@@ -42,6 +43,16 @@ export function createCloneHandler(settingsService?: SettingsService) {
         res.status(400).json({
           success: false,
           error: 'Invalid GitHub repository URL',
+        });
+        return;
+      }
+
+      // Validate destination repo URL is a valid GitHub URL
+      const destGithubUrlPattern = /^https:\/\/github\.com\/[\w-]+\/[\w.-]+(\.git)?$/;
+      if (!destGithubUrlPattern.test(destinationRepoUrl)) {
+        res.status(400).json({
+          success: false,
+          error: 'Invalid destination GitHub repository URL',
         });
         return;
       }
@@ -224,6 +235,7 @@ export function createCloneHandler(settingsService?: SettingsService) {
           projectOverview: overview,
           templateSource: actualRepoUrl,
           templateBranch: branchName || undefined,
+          destinationRepoUrl,
           argusService,
           autonomyRunner: getArgusAutonomyRunner(),
           settingsService,

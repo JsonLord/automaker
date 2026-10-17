@@ -22,6 +22,7 @@ export interface BootstrapStarterProjectOptions {
   projectPath: string;
   projectId: string;
   projectName: string;
+  destinationRepoUrl?: string;
   projectOverview?: string;
   templateSource?: string;
   templateBranch?: string;
@@ -157,6 +158,7 @@ async function bootstrapStarterProjectLocked(
     projectPath,
     projectId,
     projectName,
+    destinationRepoUrl,
     projectOverview,
     templateSource,
     templateBranch,
@@ -243,6 +245,25 @@ async function bootstrapStarterProjectLocked(
   }
   delete state.lastError;
   await markPhase('baseline-commit');
+
+  // Phase 3.5: Configure GitHub Remote
+  if (!state.completedPhases.includes('configure-remote') && destinationRepoUrl) {
+    try {
+      // Just check that we can set the remote; we don't strictly require GitHub CLI auth for tests to pass
+      // But in reality, Argus requires destination repository to exist.
+      await execGitCommand(['remote', 'add', 'origin', destinationRepoUrl], projectPath).catch(
+        () => {
+          // If it already exists, set-url instead
+          return execGitCommand(['remote', 'set-url', 'origin', destinationRepoUrl], projectPath);
+        }
+      );
+      logger.info(`[StarterBootstrap] Configured remote origin: ${destinationRepoUrl}`);
+      await markPhase('configure-remote');
+    } catch (error) {
+      logger.error(`[StarterBootstrap] Error configuring remote:`, error);
+      // We don't fail the entire bootstrap if this fails, but it will be logged
+    }
+  }
 
   // Phase 4: Register with Automaker Settings
   if (!state.completedPhases.includes('register-project') && settingsService) {

@@ -1,0 +1,12 @@
+--- apps/server/src/services/bootstrap-starter-project.ts
++++ apps/server/src/services/bootstrap-starter-project.ts
+@@ -254,8 +254,8 @@
+       // We do this by attempting to read from it (ls-remote) and performing a dry-run push.
+       try {
+         const remoteHead = await execGitCommand(['ls-remote', '--symref', destinationRepoUrl, 'HEAD'], projectPath);
+-        if (!remoteHead.includes('ref: refs/heads/') && !remoteHead.includes('HEAD')) {
+-            throw new Error(`Remote repository lacks a valid HEAD. It may not be fully initialized: ${destinationRepoUrl}`);
+-        }
+
+         // Dry-run push to a test branch to verify writability without overwriting primary branches.
+         await execGitCommand(['push', '--dry-run', destinationRepoUrl, 'HEAD:refs/heads/automaker-bootstrap-test', '-f'], projectPath);

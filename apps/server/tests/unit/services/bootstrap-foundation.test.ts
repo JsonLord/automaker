@@ -34,6 +34,14 @@ beforeEach(async () => {
   await execGitCommand(['commit', '-m', 'fixture commit'], tempWorkspace);
   await execGitCommand(['remote', 'add', 'origin', fixtureRemoteUrl], tempWorkspace);
   await execGitCommand(['push', 'origin', 'master:main'], tempWorkspace);
+
+  // Setup bare repository config to allow pushing to a branch without erroring on "current branch" checks
+  // Even for a bare repo sometimes this helps, though for push to refs/heads/automaker-bootstrap-test it shouldn't matter
+  await execGitCommand(['config', 'receive.denyNonFastForwards', 'false'], fixtureRemoteDir);
+
+  // Tests simulate dry run push to automaker-bootstrap-test, we need a ref to be created or allow dry run pushes.
+  // For file URLs a dry run push is allowed if we have a tracking remote.
+  await execGitCommand(['config', 'receive.denyCurrentBranch', 'ignore'], fixtureRemoteDir);
   await fs.rm(tempWorkspace, { recursive: true, force: true });
 });
 

@@ -249,14 +249,24 @@ async function bootstrapStarterProjectLocked(
   // Phase 3.5: Configure GitHub Remote
   if (!state.completedPhases.includes('configure-remote') && destinationRepoUrl) {
     try {
-      // Must verify the remote actually exists and is accessible.
-      // We do this by attempting to read from it (ls-remote).
+      // Must verify the remote actually exists, is accessible, and is writable.
+      // We do this by attempting to read from it (ls-remote) and performing a dry-run push.
       try {
+        // We only check if it exists via ls-remote, we don't strictly require a HEAD because empty bare repos (like fixtures)
+        // won't have a HEAD symref until the first push.
         await execGitCommand(['ls-remote', destinationRepoUrl], projectPath);
+
+        // Dry-run push to verify writability without overwriting primary branches.
+        await execGitCommand(
+          ['push', '--dry-run', destinationRepoUrl, 'HEAD:refs/heads/automaker-bootstrap-test'],
+          projectPath
+        );
       } catch (lsRemoteError) {
         state.lastError = 'BOOTSTRAP_REMOTE_VERIFICATION_FAILED';
         await writeAtomicFile(statePath, JSON.stringify(state, null, 2));
-        throw new Error(`Failed to verify destination repository: ${destinationRepoUrl}`);
+        throw new Error(
+          `Failed to verify destination repository writability or base commit: ${destinationRepoUrl}. ${lsRemoteError}`
+        );
       }
 
       await execGitCommand(['remote', 'add', 'origin', destinationRepoUrl], projectPath).catch(

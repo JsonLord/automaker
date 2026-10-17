@@ -1,0 +1,25 @@
+--- apps/server/src/services/bootstrap-starter-project.ts
++++ apps/server/src/services/bootstrap-starter-project.ts
+@@ -252,11 +252,19 @@
+       // Must verify the remote actually exists and is accessible.
+       // We do this by attempting to read from it (ls-remote).
+       try {
+-        await execGitCommand(['ls-remote', destinationRepoUrl], projectPath);
++        const remoteHead = await execGitCommand(['ls-remote', '--symref', destinationRepoUrl, 'HEAD'], projectPath);
++        if (!remoteHead.includes('ref: refs/heads/')) {
++            throw new Error(`Remote repository lacks a valid HEAD. It may not be fully initialized: ${destinationRepoUrl}`);
++        }
++
++        // Also attempt a dry-run push to verify writability and base commit compatibility.
++        // Using '+HEAD:refs/heads/automaker-bootstrap-test' ensures we test write access without overwriting main.
++        // We don't fail if the ref already exists (as long as we can push), but this confirms token scopes.
++        // Note: For file:// fixture remotes this dry run might be simpler, but it validates permissions.
++        await execGitCommand(['push', '--dry-run', destinationRepoUrl, 'HEAD:refs/heads/automaker-bootstrap-test'], projectPath);
+       } catch (lsRemoteError) {
+         state.lastError = 'BOOTSTRAP_REMOTE_VERIFICATION_FAILED';
+         await writeAtomicFile(statePath, JSON.stringify(state, null, 2));
+-        throw new Error(`Failed to verify destination repository: ${destinationRepoUrl}`);
++        throw new Error(`Failed to verify destination repository writability/base commit: ${destinationRepoUrl}. ${lsRemoteError}`);
+       }
+
+       await execGitCommand(['remote', 'add', 'origin', destinationRepoUrl], projectPath).catch(

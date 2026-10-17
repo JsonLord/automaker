@@ -17,14 +17,32 @@ export function createDiagnosticsOpencodeHandler() {
           proc.on('close', (code) => {
             if (code === 0) {
               try {
-                const parsed = JSON.parse(stdout);
-                resolve({ success: true, data: parsed });
+                // Ensure output is parsed safely
+                const lines = stdout.split('\n').filter(Boolean);
+                let models = [];
+                for (let line of lines) {
+                  try {
+                    const parsed = JSON.parse(line);
+                    // OpenCode models command prints JSONL of models
+                    if (parsed && typeof parsed === 'object') {
+                      models.push(parsed);
+                    }
+                  } catch {
+                    continue;
+                  }
+                }
+
+                resolve({ success: true, data: models });
               } catch {
                 resolve({ success: false, error: 'Invalid JSON from opencode CLI: ' + stdout });
               }
             } else {
               resolve({ success: false, error: stderr || `Process exited with code ${code}` });
             }
+          });
+
+          proc.on('error', (err) => {
+            resolve({ success: false, error: 'Failed to spawn opencode: ' + err.message });
           });
         }
       );

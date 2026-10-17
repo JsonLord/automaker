@@ -23,14 +23,16 @@ vi.mock('child_process', async (importOriginal) => {
         on: (event: string, cb: (code: number) => void) => {
           if (event === 'close') {
             if (args[0] === 'models') {
+              // Produce JSONL simulating CLI output
               if (callbacks.stdout)
-                callbacks.stdout(Buffer.from(JSON.stringify([{ id: 'test-model' }])));
+                callbacks.stdout(Buffer.from(JSON.stringify({ id: 'test-model' })));
               cb(0);
             } else {
               cb(1);
             }
           }
         },
+        kill: vi.fn(),
       };
       return proc;
     }),

@@ -4,7 +4,7 @@ import { createDiagnosticsOpencodeHandler } from '../../../src/routes/settings/r
 
 // Mock child_process
 vi.mock('child_process', async (importOriginal) => {
-  const actual = (await importOriginal()) as any;
+  const actual = await importOriginal() as any;
   return {
     ...actual,
     spawn: vi.fn((cmd, args) => {
@@ -13,26 +13,28 @@ vi.mock('child_process', async (importOriginal) => {
         stdout: {
           on: (event: string, cb: (data: any) => void) => {
             if (event === 'data') callbacks.stdout = cb;
-          },
+          }
         },
         stderr: {
           on: (event: string, cb: (data: any) => void) => {
-            if (event === 'data') callbacks.stderr = cb;
-          },
+             if (event === 'data') callbacks.stderr = cb;
+          }
         },
         on: (event: string, cb: (code: number) => void) => {
           if (event === 'close') {
             if (args[0] === 'models') {
-              // Produce JSONL simulating CLI output
-              if (callbacks.stdout)
-                callbacks.stdout(Buffer.from(JSON.stringify({ id: 'test-model' })));
-              cb(0);
+               // Produce valid provider/model format simulating CLI output
+               if (callbacks.stdout) callbacks.stdout(Buffer.from("provider/test-model\nprovider/test-model-2\n"));
+               cb(0);
+            } else if (args[0] === 'run') {
+               if (callbacks.stdout) callbacks.stdout(Buffer.from("LOCAL_PROBE_OK\n"));
+               cb(0);
             } else {
-              cb(1);
+               cb(1);
             }
           }
         },
-        kill: vi.fn(),
+        kill: vi.fn()
       };
       return proc;
     }),
@@ -42,7 +44,7 @@ vi.mock('child_process', async (importOriginal) => {
 describe('Diagnostics OpenCode Handler', () => {
   it('returns models successfully', async () => {
     const handler = createDiagnosticsOpencodeHandler();
-    const req = {} as Request;
+    const req = { query: {} } as Request;
     const res = {
       status: vi.fn().mockReturnThis(),
       json: vi.fn(),
@@ -51,6 +53,20 @@ describe('Diagnostics OpenCode Handler', () => {
     await handler(req, res);
 
     expect(res.status).toHaveBeenCalledWith(200);
-    expect(res.json).toHaveBeenCalledWith({ success: true, models: [{ id: 'test-model' }] });
+    expect(res.json).toHaveBeenCalledWith({ success: true, models: ["provider/test-model", "provider/test-model-2"] });
+  });
+
+  it('returns inference probe successfully', async () => {
+    const handler = createDiagnosticsOpencodeHandler();
+    const req = { query: { mode: 'inference' } } as unknown as Request;
+    const res = {
+      status: vi.fn().mockReturnThis(),
+      json: vi.fn(),
+    } as unknown as Response;
+
+    await handler(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith({ success: true, result: "LOCAL_PROBE_OK" });
   });
 });

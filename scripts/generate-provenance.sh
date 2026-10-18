@@ -1,6 +1,5 @@
 #!/bin/sh
 
-# Fail script on errors
 set -e
 
 DEST_DIR="/app/apps/server/dist/assets"
@@ -18,8 +17,8 @@ else
   if [ "${0}" = "${BASH_SOURCE[0]}" ]; then exit 1; else return 1; fi
 fi
 
-if [ -z "$SHA" ] || [ "$SHA" = "unknown" ]; then
-  echo "Error: Exact source SHA is unavailable or evaluated to 'unknown'." >&2
+if ! echo "$SHA" | grep -Eq '^[0-9a-f]{40}$'; then
+  echo "Error: Exact source SHA is unavailable, malformed, or evaluated to unknown: $SHA" >&2
   if [ "${0}" = "${BASH_SOURCE[0]}" ]; then exit 1; else return 1; fi
 fi
 

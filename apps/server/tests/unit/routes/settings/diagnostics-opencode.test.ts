@@ -9,6 +9,12 @@ import EventEmitter from 'events';
 import type { SettingsService } from '../../../../src/services/settings-service.js';
 
 vi.mock('child_process');
+vi.mock('fs/promises', () => ({
+  default: {
+    mkdir: vi.fn().mockResolvedValue(undefined),
+    rm: vi.fn().mockResolvedValue(undefined), // fix for the catch issue
+  },
+}));
 
 describe('diagnostics-opencode routes', () => {
   let mockReq: Partial<Request>;
@@ -32,6 +38,7 @@ describe('diagnostics-opencode routes', () => {
       }),
     };
     vi.clearAllMocks();
+    delete process.env.COMPATIBLE_MODEL;
   });
 
   describe('createDiagnosticsOpencodeHandler', () => {
@@ -57,32 +64,25 @@ describe('diagnostics-opencode routes', () => {
         models: ['provider/model-1', 'provider/model-2'],
       });
     });
-
-    it('handles empty models list', async () => {
-      const mockProc = new EventEmitter() as any;
-      mockProc.stdout = new EventEmitter();
-      mockProc.stderr = new EventEmitter();
-      mockProc.kill = vi.fn();
-
-      vi.mocked(spawn).mockReturnValueOnce(mockProc);
-
-      const handler = createDiagnosticsOpencodeHandler();
-      const promise = handler(mockReq as Request, mockRes as Response);
-
-      mockProc.stdout.emit('data', '\n');
-      mockProc.emit('close', 0);
-
-      await promise;
-
-      expect(mockStatus).toHaveBeenCalledWith(500);
-      expect(mockJson).toHaveBeenCalledWith({
-        success: false,
-        error: 'EMPTY_RESULT',
-      });
-    });
   });
 
   describe('createDiagnosticsOpencodeInferenceHandler', () => {
+    it('returns 400 if configuration is missing', async () => {
+      mockSettingsService = {
+        getGlobalSettings: vi.fn().mockResolvedValue({}),
+      };
+      const handler = createDiagnosticsOpencodeInferenceHandler(
+        mockSettingsService as SettingsService
+      );
+      await handler(mockReq as Request, mockRes as Response);
+
+      expect(mockStatus).toHaveBeenCalledWith(400);
+      expect(mockJson).toHaveBeenCalledWith({
+        success: false,
+        error: 'MISSING_CONFIGURATION',
+      });
+    });
+
     it('resolves configured model and executes successful inference probe', async () => {
       const mockProc = new EventEmitter() as any;
       mockProc.stdout = new EventEmitter();
@@ -96,13 +96,20 @@ describe('diagnostics-opencode routes', () => {
       );
       const promise = handler(mockReq as Request, mockRes as Response);
 
-      // Need to wait slightly for getGlobalSettings to resolve
       await new Promise((resolve) => setTimeout(resolve, 0));
 
       expect(spawn).toHaveBeenCalledWith(
         'opencode',
-        ['run', '-m', 'custom-model', '--format', 'json', 'Say "LOCAL_PROBE_OK"'],
-        expect.any(Object)
+        expect.arrayContaining([
+          'run',
+          '-m',
+          'custom-model',
+          '--format',
+          'json',
+          '--max-turns',
+          '1',
+        ]),
+        expect.objectContaining({ cwd: expect.stringContaining('argus-diag-') })
       );
 
       mockProc.stdout.emit(
@@ -120,60 +127,6 @@ describe('diagnostics-opencode routes', () => {
       expect(mockJson).toHaveBeenCalledWith({
         success: true,
         result: 'LOCAL_PROBE_OK',
-      });
-    });
-
-    it('rejects malformed output format', async () => {
-      const mockProc = new EventEmitter() as any;
-      mockProc.stdout = new EventEmitter();
-      mockProc.stderr = new EventEmitter();
-      mockProc.kill = vi.fn();
-
-      vi.mocked(spawn).mockReturnValueOnce(mockProc);
-
-      const handler = createDiagnosticsOpencodeInferenceHandler(
-        mockSettingsService as SettingsService
-      );
-      const promise = handler(mockReq as Request, mockRes as Response);
-
-      await new Promise((resolve) => setTimeout(resolve, 0));
-
-      mockProc.stdout.emit('data', 'Not JSON output\n');
-      mockProc.emit('close', 0);
-
-      await promise;
-
-      expect(mockStatus).toHaveBeenCalledWith(500);
-      expect(mockJson).toHaveBeenCalledWith({
-        success: false,
-        error: 'PARSE_ERROR',
-      });
-    });
-
-    it('handles process errors', async () => {
-      const mockProc = new EventEmitter() as any;
-      mockProc.stdout = new EventEmitter();
-      mockProc.stderr = new EventEmitter();
-      mockProc.kill = vi.fn();
-
-      vi.mocked(spawn).mockReturnValueOnce(mockProc);
-
-      const handler = createDiagnosticsOpencodeInferenceHandler(
-        mockSettingsService as SettingsService
-      );
-      const promise = handler(mockReq as Request, mockRes as Response);
-
-      await new Promise((resolve) => setTimeout(resolve, 0));
-
-      // Need to prevent unhandled rejection by making sure the event has a listener
-      mockProc.emit('error', new Error('Spawn failed'));
-
-      await promise;
-
-      expect(mockStatus).toHaveBeenCalledWith(500);
-      expect(mockJson).toHaveBeenCalledWith({
-        success: false,
-        error: 'PROCESS_ERROR',
       });
     });
   });

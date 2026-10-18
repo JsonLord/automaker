@@ -66,3 +66,19 @@ jobs:
         run: |
           node --test scripts/tests/check-clean-working-tree.test.mjs
           node scripts/export-hf-deployment.mjs /tmp/automaker-hf.tar
+  pre-deployment-qualification:
+    runs-on: ubuntu-latest
+    needs: deterministic-validation
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Build Docker Image and Validate Provenance
+        run: |
+          export BUILD_GIT_SHA=$(git rev-parse HEAD)
+          export BUILD_TIMESTAMP=$(git show -s --format=%cI HEAD)
+          docker build --build-arg BUILD_GIT_SHA=$BUILD_GIT_SHA --build-arg BUILD_TIMESTAMP=$BUILD_TIMESTAMP -t automaker-test .
+          docker run --rm automaker-test cat /app/apps/server/dist/assets/build-provenance.json | grep -q "$BUILD_GIT_SHA"

@@ -24,6 +24,10 @@ import { createUpdateProjectHandler } from './routes/update-project.js';
 import { createMigrateHandler } from './routes/migrate.js';
 import { createStatusHandler } from './routes/status.js';
 import { createDiscoverAgentsHandler } from './routes/discover-agents.js';
+import {
+  createDiagnosticsOpencodeHandler,
+  createDiagnosticsOpencodeInferenceHandler,
+} from './routes/diagnostics-opencode.js';
 
 /**
  * Create settings router with all endpoints
@@ -76,6 +80,13 @@ export function createSettingsRoutes(settingsService: SettingsService): Router {
 
   // Filesystem agents discovery (read-only)
   router.post('/agents/discover', createDiscoverAgentsHandler());
+
+  // Diagnostics
+  router.get('/diagnostics/opencode', createDiagnosticsOpencodeHandler());
+  router.post(
+    '/diagnostics/opencode/inference',
+    createDiagnosticsOpencodeInferenceHandler(settingsService)
+  );
 
   return router;
 }

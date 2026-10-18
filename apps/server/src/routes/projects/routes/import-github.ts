@@ -19,17 +19,34 @@ export function createImportGithubHandler(settingsService: SettingsService) {
     try {
       const { repoUrl, projectName, parentDir } = req.body as ImportGithubRequest;
 
-      if (!repoUrl || !projectName || !parentDir) {
-        res
-          .status(400)
-          .json({
-            success: false,
-            error: 'Missing required parameters (repoUrl, projectName, parentDir)',
-          });
+      // Basic validation
+      if (!repoUrl || typeof repoUrl !== 'string' || !repoUrl.startsWith('https://github.com/')) {
+        res.status(400).json({ success: false, error: 'repoUrl must be a valid GitHub HTTPS URL' });
         return;
       }
 
-      const projectPath = path.join(parentDir, projectName);
+      if (!projectName || !/^[a-zA-Z0-9-_]+$/.test(projectName)) {
+        res.status(400).json({ success: false, error: 'projectName contains invalid characters' });
+        return;
+      }
+
+      if (!parentDir) {
+        res.status(400).json({
+          success: false,
+          error: 'Missing required parameters (repoUrl, projectName, parentDir)',
+        });
+        return;
+      }
+
+      const allowedBaseDir = process.env.ALLOWED_ROOT_DIRECTORY || '/app/data/projects';
+      const projectPath = path.resolve(parentDir, projectName);
+
+      // Security Check: Ensure projectPath is inside allowed boundaries
+      if (!projectPath.startsWith(path.resolve(allowedBaseDir))) {
+        res.status(403).json({ success: false, error: 'Invalid parentDir or traversal attempted' });
+        return;
+      }
+
       const projectId = randomUUID();
 
       logger.info(`Starting import of ${repoUrl} to ${projectPath}`);
@@ -40,24 +57,17 @@ export function createImportGithubHandler(settingsService: SettingsService) {
         await execGitCommand(['ls-remote', repoUrl], process.cwd());
 
         // Verify we have write permissions by doing a dry-run push against a sentinel branch.
-        // If it's a bare empty repo this might fail if there are no branches, so we only require ls-remote success for pure connectivity,
-        // but we explicitly log that we are doing this.
         await execGitCommand(
           ['push', '--dry-run', repoUrl, 'HEAD:refs/heads/automaker-import-test'],
           process.cwd()
-        ).catch(() => {
-          logger.info(
-            `Dry-run push to ${repoUrl} failed, but ls-remote succeeded. Proceeding with caution.`
-          );
-        });
+        );
       } catch (err) {
-        logger.error(`Failed to verify remote repo ${repoUrl}:`, err);
-        res
-          .status(400)
-          .json({
-            success: false,
-            error: 'Failed to verify destination repository. Please check URL and permissions.',
-          });
+        logger.error(`Failed to verify remote repo ${repoUrl} authorization or connectivity:`, err);
+        res.status(403).json({
+          success: false,
+          error:
+            'Failed to verify destination repository write authorization. Dry-run push failed or repo not found.',
+        });
         return;
       }
 

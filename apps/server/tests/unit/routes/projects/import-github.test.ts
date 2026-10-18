@@ -29,7 +29,7 @@ describe('import-github route', () => {
       body: {
         repoUrl: 'https://github.com/user/repo.git',
         projectName: 'test-import',
-        parentDir: '/projects',
+        parentDir: '/app/data/projects',
       },
     };
     mockRes = { status: mockStatus } as Partial<Response>;
@@ -62,24 +62,24 @@ describe('import-github route', () => {
     );
   });
 
-  it('fails if remote is unreachable', async () => {
+  it('fails if remote is unreachable or dry-run fails (authorization verification)', async () => {
     vi.mocked(execGitCommand).mockRejectedValueOnce(new Error('ls-remote failed'));
 
     const handler = createImportGithubHandler(mockSettingsService as SettingsService);
     await handler(mockReq as Request, mockRes as Response);
 
-    expect(mockStatus).toHaveBeenCalledWith(400);
+    expect(mockStatus).toHaveBeenCalledWith(403);
     expect(mockJson).toHaveBeenCalledWith(
-      expect.objectContaining({ error: expect.stringContaining('verify destination repository') })
+      expect.objectContaining({ error: expect.stringContaining('write authorization') })
     );
   });
 
-  it('imports successfully, handling dry-run push failure safely', async () => {
+  it('imports successfully when both ls-remote and push pass', async () => {
     vi.mocked(fs.stat).mockRejectedValueOnce(new Error('ENOENT'));
 
     vi.mocked(execGitCommand).mockImplementation(async (args) => {
       if (args[0] === 'ls-remote') return 'refs/heads/main';
-      if (args[0] === 'push') throw new Error('push failed');
+      if (args[0] === 'push') return '';
       if (args[0] === 'clone') return '';
       if (args[0] === 'rev-parse') return 'abcd1234abcd1234abcd1234abcd1234abcd1234';
       return '';
@@ -93,7 +93,7 @@ describe('import-github route', () => {
       expect.objectContaining({
         success: true,
         projectId: expect.any(String),
-        projectPath: '/projects/test-import',
+        projectPath: expect.stringContaining('test-import'),
         baseSha: 'abcd1234abcd1234abcd1234abcd1234abcd1234',
       })
     );

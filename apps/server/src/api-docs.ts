@@ -61,6 +61,13 @@ export function handleApiDocs(req: Request, res: Response) {
         response: { success: true },
       },
       {
+        method: 'POST',
+        path: '/api/agent/chat',
+        purpose: 'Send a message to the AI agent',
+        request: { message: 'Hello agent', projectPath: '/app/data/projects/my-project' },
+        response: { sessionId: 'session-123', status: 'started' },
+      },
+      {
         method: 'GET',
         path: '/api/projects',
         purpose: 'List all configured projects',

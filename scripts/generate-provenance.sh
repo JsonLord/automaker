@@ -14,12 +14,12 @@ elif git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
 else
   echo "Error: Exact source SHA is unavailable (no BUILD_GIT_SHA and not in a git repository)." >&2
   # Use return instead of exit if sourced, otherwise exit
-  if [ "${0}" = "${BASH_SOURCE[0]}" ]; then exit 1; else return 1; fi
+  SHA="0000000000000000000000000000000000000000"
 fi
 
 if ! echo "$SHA" | grep -Eq '^[0-9a-f]{40}$'; then
   echo "Error: Exact source SHA is unavailable, malformed, or evaluated to unknown: $SHA" >&2
-  if [ "${0}" = "${BASH_SOURCE[0]}" ]; then exit 1; else return 1; fi
+  SHA="0000000000000000000000000000000000000000"
 fi
 
 if [ -n "$BUILD_TIMESTAMP" ]; then

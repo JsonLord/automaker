@@ -1,5 +1,6 @@
 #!/bin/sh
 
+# Fail script on errors
 set -e
 
 DEST_DIR="/app/apps/server/dist/assets"
@@ -12,7 +13,14 @@ if [ -n "$BUILD_GIT_SHA" ]; then
 elif git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   SHA=$(git rev-parse HEAD)
 else
-  SHA="unknown"
+  echo "Error: Exact source SHA is unavailable (no BUILD_GIT_SHA and not in a git repository)." >&2
+  # Use return instead of exit if sourced, otherwise exit
+  if [ "${0}" = "${BASH_SOURCE[0]}" ]; then exit 1; else return 1; fi
+fi
+
+if [ -z "$SHA" ] || [ "$SHA" = "unknown" ]; then
+  echo "Error: Exact source SHA is unavailable or evaluated to 'unknown'." >&2
+  if [ "${0}" = "${BASH_SOURCE[0]}" ]; then exit 1; else return 1; fi
 fi
 
 if [ -n "$BUILD_TIMESTAMP" ]; then

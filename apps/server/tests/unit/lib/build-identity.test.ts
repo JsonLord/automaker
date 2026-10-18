@@ -4,10 +4,12 @@ import fs from 'fs/promises';
 
 describe('build-identity', () => {
   it('reads from build-provenance.json when valid', async () => {
-    vi.spyOn(fs, 'readFile').mockResolvedValueOnce(JSON.stringify({
-      gitSha: 'a'.repeat(40),
-      buildTimestamp: '2026-10-15T00:00:00Z'
-    }));
+    vi.spyOn(fs, 'readFile').mockResolvedValueOnce(
+      JSON.stringify({
+        gitSha: 'a'.repeat(40),
+        buildTimestamp: '2026-10-15T00:00:00Z',
+      })
+    );
 
     const identity = await readBuildIdentity(async () => '1.18.35');
 

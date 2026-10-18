@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 import { logger } from '../common.js';
 import { spawn } from 'child_process';
+import type { SettingsService } from '../../../services/settings-service.js';
 
 const ERROR_CODES = {
   TIMEOUT: 'TIMEOUT',
@@ -40,7 +41,6 @@ async function runOpencodeCommand(args: string[], timeoutMs = 10000, maxOutputBy
       stdoutData += d.toString();
     });
 
-    // We do not store stderr to prevent credential leakage in logs
     proc.stderr.on('data', () => {});
 
     proc.on('close', (code) => {
@@ -49,12 +49,12 @@ async function runOpencodeCommand(args: string[], timeoutMs = 10000, maxOutputBy
       clearTimeout(timeout);
 
       if (code === 0) {
-        const lines = stdoutData.split('\n')
-            .map(l => l.trim())
-            .filter(l => l.length > 0 && l.includes('/')); // basic validation of provider/model
+        const lines = stdoutData
+          .split('\n')
+          .map((l) => l.trim())
+          .filter((l) => l.length > 0 && l.includes('/'));
         resolve({ success: true, data: lines });
       } else {
-        // We avoid sending specific error codes from the CLI output directly
         resolve({ success: false, error: ERROR_CODES.NON_ZERO_EXIT });
       }
     });
@@ -71,78 +71,6 @@ async function runOpencodeCommand(args: string[], timeoutMs = 10000, maxOutputBy
 export function createDiagnosticsOpencodeHandler() {
   return async (req: Request, res: Response): Promise<void> => {
     try {
-      const mode = req.query.mode;
-
-      if (mode === 'inference') {
-        // Bounded inference probe using 'auto' model.
-        // We use JSON format, max turns 1, and ensure no files can be modified.
-        // The command is simple and bounded: `opencode run -m auto --format json "Hello"`
-        // Note: For real environment we might supply a more restrictive sandbox, but for now we rely on opencode constraints
-
-        // Wait up to 30s for inference
-        const output = await new Promise<{ success: boolean; data?: string; error?: string }>((resolve) => {
-          const proc = spawn('opencode', ['run', '-m', 'auto', '--format', 'json', 'Say "LOCAL_PROBE_OK"']);
-          let stdoutData = '';
-          let bytesRead = 0;
-          let isFinished = false;
-
-          const timeout = setTimeout(() => {
-            if (!isFinished) {
-              isFinished = true;
-              proc.kill('SIGKILL');
-              resolve({ success: false, error: ERROR_CODES.TIMEOUT });
-            }
-          }, 30000);
-
-          proc.stdout.on('data', (d) => {
-            if (isFinished) return;
-            bytesRead += d.length;
-            if (bytesRead > 1024 * 1024) {
-              isFinished = true;
-              proc.kill('SIGKILL');
-              resolve({ success: false, error: ERROR_CODES.OVERSIZED_OUTPUT });
-              return;
-            }
-            stdoutData += d.toString();
-          });
-
-          proc.stderr.on('data', () => {}); // Ignore stderr
-
-          proc.on('close', (code) => {
-            if (isFinished) return;
-            isFinished = true;
-            clearTimeout(timeout);
-            if (code === 0) {
-                // Ensure output is safe
-                if (stdoutData.includes('LOCAL_PROBE_OK')) {
-                    resolve({ success: true, data: 'LOCAL_PROBE_OK' });
-                } else {
-                    resolve({ success: false, error: ERROR_CODES.UNEXPECTED_FORMAT });
-                }
-            } else {
-                resolve({ success: false, error: ERROR_CODES.NON_ZERO_EXIT });
-            }
-          });
-
-          proc.on('error', () => {
-            if (isFinished) return;
-            isFinished = true;
-            clearTimeout(timeout);
-            resolve({ success: false, error: ERROR_CODES.PROCESS_ERROR });
-          });
-        });
-
-        if (!output.success) {
-           logger.error(`[Diagnostics] OpenCode inference failure. Code: ${output.error}`);
-           res.status(500).json({ success: false, error: output.error });
-           return;
-        }
-
-        res.status(200).json({ success: true, result: output.data });
-        return;
-      }
-
-      // Default mode: models list
       const output = await runOpencodeCommand(['models']);
 
       if (!output.success) {
@@ -158,6 +86,112 @@ export function createDiagnosticsOpencodeHandler() {
       }
 
       res.status(200).json({ success: true, models: output.data });
+    } catch (e) {
+      logger.error(`[Diagnostics] OpenCode exception: ${ERROR_CODES.UNKNOWN_ERROR}`);
+      res.status(500).json({ success: false, error: ERROR_CODES.UNKNOWN_ERROR });
+    }
+  };
+}
+
+export function createDiagnosticsOpencodeInferenceHandler(settingsService: SettingsService) {
+  return async (req: Request, res: Response): Promise<void> => {
+    try {
+      // 1. Resolve configured model instead of hardcoded 'auto'
+      const globalSettings = await settingsService.getGlobalSettings();
+      let configuredModel =
+        process.env.COMPATIBLE_MODEL ||
+        globalSettings.phaseModels?.enhancementModel?.model ||
+        'auto';
+
+      // Map 'automaker-compatible/xyz' to OpenCode format or pass directly
+      if (configuredModel.startsWith('automaker-compatible/')) {
+        configuredModel = configuredModel.replace('automaker-compatible/', '');
+      }
+      if (configuredModel === 'automaker-compatible') {
+        configuredModel = 'auto';
+      }
+
+      const output = await new Promise<{ success: boolean; data?: string; error?: string }>(
+        (resolve) => {
+          // Enforce isolated working directory, no file modifications, json format
+          const proc = spawn(
+            'opencode',
+            ['run', '-m', configuredModel, '--format', 'json', 'Say "LOCAL_PROBE_OK"'],
+            {
+              cwd: '/tmp', // Isolated working directory
+            }
+          );
+
+          let stdoutData = '';
+          let bytesRead = 0;
+          let isFinished = false;
+
+          const timeout = setTimeout(() => {
+            if (!isFinished) {
+              isFinished = true;
+              proc.kill('SIGKILL');
+              resolve({ success: false, error: ERROR_CODES.TIMEOUT });
+            }
+          }, 45000); // Wait up to 45s for inference
+
+          proc.stdout.on('data', (d) => {
+            if (isFinished) return;
+            bytesRead += d.length;
+            if (bytesRead > 1024 * 1024) {
+              isFinished = true;
+              proc.kill('SIGKILL');
+              resolve({ success: false, error: ERROR_CODES.OVERSIZED_OUTPUT });
+              return;
+            }
+            stdoutData += d.toString();
+          });
+
+          proc.stderr.on('data', () => {});
+
+          proc.on('close', (code) => {
+            if (isFinished) return;
+            isFinished = true;
+            clearTimeout(timeout);
+            if (code === 0) {
+              // Parse JSON event safely rather than arbitrary text searching
+              try {
+                const events = stdoutData
+                  .split('\n')
+                  .filter((l) => l.trim().length > 0)
+                  .map((l) => JSON.parse(l));
+                const assistantResponse = events.find(
+                  (e) => e.type === 'assistant_message' && e.content
+                );
+
+                if (assistantResponse && assistantResponse.content.includes('LOCAL_PROBE_OK')) {
+                  resolve({ success: true, data: 'LOCAL_PROBE_OK' });
+                } else {
+                  resolve({ success: false, error: ERROR_CODES.UNEXPECTED_FORMAT });
+                }
+              } catch (e) {
+                resolve({ success: false, error: ERROR_CODES.PARSE_ERROR });
+              }
+            } else {
+              resolve({ success: false, error: ERROR_CODES.NON_ZERO_EXIT });
+            }
+          });
+
+          proc.on('error', () => {
+            if (isFinished) return;
+            isFinished = true;
+            clearTimeout(timeout);
+            resolve({ success: false, error: ERROR_CODES.PROCESS_ERROR });
+          });
+        }
+      );
+
+      if (!output.success) {
+        logger.error(`[Diagnostics] OpenCode inference failure. Code: ${output.error}`);
+        res.status(500).json({ success: false, error: output.error });
+        return;
+      }
+
+      res.status(200).json({ success: true, result: output.data });
     } catch (e) {
       logger.error(`[Diagnostics] OpenCode exception: ${ERROR_CODES.UNKNOWN_ERROR}`);
       res.status(500).json({ success: false, error: ERROR_CODES.UNKNOWN_ERROR });

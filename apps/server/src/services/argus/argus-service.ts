@@ -202,8 +202,8 @@ export class SupervisedArgusService implements ArgusService {
     state.managerStatus = 'running';
     await saveArgusState(projectPath, state);
     const [objective, spec] = await Promise.all([
-      fs.readFile(path.join(projectPath, 'ARGUS.md'), 'utf8'),
-      fs.readFile(path.join(projectPath, 'spec.md'), 'utf8'),
+      fsp.readFile(path.join(projectPath, 'ARGUS.md'), 'utf8'),
+      fsp.readFile(path.join(projectPath, 'spec.md'), 'utf8'),
     ]);
     const result = await this.call<ArgusManagerDecision>('manager_handoff', {
       projectId: state.argusCorrelationId,
@@ -237,8 +237,8 @@ export class SupervisedArgusService implements ArgusService {
     state.plannerStatus = 'running';
     await saveArgusState(projectPath, state);
     const [objective, spec] = await Promise.all([
-      fs.readFile(path.join(projectPath, 'ARGUS.md'), 'utf8'),
-      fs.readFile(path.join(projectPath, 'spec.md'), 'utf8'),
+      fsp.readFile(path.join(projectPath, 'ARGUS.md'), 'utf8'),
+      fsp.readFile(path.join(projectPath, 'spec.md'), 'utf8'),
     ]);
     const result = await this.call<ArgusPlannedTask | null>('planner_next_task', {
       projectId: state.argusCorrelationId,
@@ -268,8 +268,8 @@ export class SupervisedArgusService implements ArgusService {
   async evaluateObjective(projectPath: string, evidence: Record<string, unknown>) {
     const state = this.requireProject(projectPath);
     const [objective, spec] = await Promise.all([
-      fs.readFile(path.join(projectPath, 'ARGUS.md'), 'utf8'),
-      fs.readFile(path.join(projectPath, 'spec.md'), 'utf8'),
+      fsp.readFile(path.join(projectPath, 'ARGUS.md'), 'utf8'),
+      fsp.readFile(path.join(projectPath, 'spec.md'), 'utf8'),
     ]);
     return this.call<import('./types.js').ObjectiveEvaluation>('evaluate_objective', {
       projectId: state.argusCorrelationId,
@@ -284,8 +284,8 @@ export class SupervisedArgusService implements ArgusService {
   ) {
     const state = this.requireProject(projectPath);
     const [objective, spec] = await Promise.all([
-      fs.readFile(path.join(projectPath, 'ARGUS.md'), 'utf8'),
-      fs.readFile(path.join(projectPath, 'spec.md'), 'utf8'),
+      fsp.readFile(path.join(projectPath, 'ARGUS.md'), 'utf8'),
+      fsp.readFile(path.join(projectPath, 'spec.md'), 'utf8'),
     ]);
     const result = await this.call<{ spec: string }>('renew_specification', {
       projectId: state.argusCorrelationId,

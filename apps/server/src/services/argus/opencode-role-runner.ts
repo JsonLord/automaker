@@ -57,6 +57,12 @@ export class OpenCodeRoleRunner {
           [
             ...[
               'PATH',
+              'SystemRoot',
+              'WINDIR',
+              'ComSpec',
+              'PATHEXT',
+              'TEMP',
+              'TMP',
               'HTTPS_PROXY',
               'HTTP_PROXY',
               'ALL_PROXY',

@@ -235,6 +235,10 @@ describe('Argus multi-mode integration (real storage, Git, HTTP, bridge and CPU 
     const run = await modes.run(root, approved.id, { repositoryChanges: true, sourceSha: sha });
     expect(run.evaluation).toMatchObject({ verdict: 'PASS', score: 1 });
     expect(run.worktreePath).toBeTruthy();
+    expect(run.tasks[0].evidenceIds).toContain(
+      run.artifacts.find((a) => a.name === 'paper-source.md')!.evidenceId
+    );
+    expect(run.tasks[0].description).toContain(input.paper!.text);
     const file = path.join(run.worktreePath!, 'argus-reference', run.id, 'reference.mjs');
     expect(await fs.readFile(file, 'utf8')).toContain('export function reference');
     expect(

@@ -3,7 +3,8 @@ import { sanitizeOpenCodeOutput } from '../../lib/opencode-errors.js';
 import { realpathSync } from 'fs';
 import { resolveOpenCodeModel } from '@automaker/model-resolver';
 import { spawn, type ChildProcessWithoutNullStreams } from 'child_process';
-import fs from 'fs/promises';
+import fs from 'fs';
+import fsp from 'fs/promises';
 import path from 'path';
 import readline from 'readline';
 import { createLogger } from '@automaker/utils';
@@ -56,7 +57,9 @@ export class SupervisedArgusService implements ArgusService {
   private projects = new Map<string, ArgusProjectState>();
   constructor(
     private bridgePath = process.env.ARGUS_BRIDGE_PATH ||
-      path.resolve(process.cwd(), 'scripts', 'argus_runtime_bridge.py')
+      (fs.existsSync(path.resolve(process.cwd(), 'scripts', 'argus_runtime_bridge.py'))
+        ? path.resolve(process.cwd(), 'scripts', 'argus_runtime_bridge.py')
+        : path.resolve(process.cwd(), '../../scripts', 'argus_runtime_bridge.py'))
   ) {}
 
   async start(): Promise<void> {
@@ -164,7 +167,7 @@ export class SupervisedArgusService implements ArgusService {
       : { running: false, upstreamInstalled: false, error: 'bridge not started' };
   }
   async createOrResolveProject(input: { projectId: string; projectPath: string; model: string }) {
-    input = { ...input, projectPath: await fs.realpath(input.projectPath) };
+    input = { ...input, projectPath: await fsp.realpath(input.projectPath) };
     const state = await resolveState(
       input.projectId,
       input.projectPath,
@@ -294,7 +297,7 @@ export class SupervisedArgusService implements ArgusService {
     return result.spec;
   }
   async getStatus(projectPath: string) {
-    return this.projects.get(await fs.realpath(projectPath));
+    return this.projects.get(await fsp.realpath(projectPath));
   }
   private requireProject(projectPath: string) {
     const state = this.projects.get(realpathSync(projectPath));

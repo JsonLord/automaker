@@ -272,7 +272,7 @@ describe('managed OpenCode execution regression', () => {
       path.join(dir, 'settings.json'),
       JSON.stringify({ claudeCompatibleProviders: [{ id: 'keep' }] })
     );
-    execFileSync('python3', ['update_settings.py', dir, 'MiniMax-M2.7'], {
+    execFileSync('python3', ['../../update_settings.py', dir, 'MiniMax-M2.7'], {
       cwd: process.cwd(),
       stdio: 'pipe',
     });

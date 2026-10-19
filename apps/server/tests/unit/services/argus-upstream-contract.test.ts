@@ -39,7 +39,7 @@ async function bridge(
   requests: object[],
   extraEnv: Record<string, string> = {}
 ) {
-  const child = spawn('python3', ['-u', path.resolve('scripts/argus_runtime_bridge.py')], {
+  const child = spawn('python3', ['-u', path.resolve('../../scripts/argus_runtime_bridge.py')], {
     env: { PATH: process.env.PATH!, PYTHONPATH: root, CALLS: calls, ...extraEnv },
     stdio: ['pipe', 'pipe', 'inherit'],
   });

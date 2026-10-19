@@ -1,40 +1,18 @@
 #!/bin/sh
-
-set -e
-
-DEST_DIR="/app/apps/server/dist/assets"
-DEST_FILE="${DEST_DIR}/build-provenance.json"
-
-mkdir -p "$DEST_DIR"
-
-if [ -n "$BUILD_GIT_SHA" ]; then
-  SHA="$BUILD_GIT_SHA"
-elif git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  SHA=$(git rev-parse HEAD)
-else
-  echo "Error: Exact source SHA is unavailable (no BUILD_GIT_SHA and not in a git repository)." >&2
-  # Use return instead of exit if sourced, otherwise exit
-  if [ "${0}" = "${BASH_SOURCE[0]}" ]; then exit 1; else return 1; fi
-fi
-
-if ! echo "$SHA" | grep -Eq '^[0-9a-f]{40}$'; then
-  echo "Error: Exact source SHA is unavailable, malformed, or evaluated to unknown: $SHA" >&2
-  if [ "${0}" = "${BASH_SOURCE[0]}" ]; then exit 1; else return 1; fi
-fi
-
-if [ -n "$BUILD_TIMESTAMP" ]; then
-  TS="$BUILD_TIMESTAMP"
-elif git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  TS=$(git show -s --format=%cI HEAD)
-else
-  TS=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-fi
-
-cat > "$DEST_FILE" <<JSON
-{
-  "gitSha": "$SHA",
-  "buildTimestamp": "$TS"
-}
-JSON
-
-echo "Generated build provenance at $DEST_FILE: SHA=$SHA, Timestamp=$TS"
+set -eu
+# Override only for isolated build/test fixtures; Docker uses the default path.
+export PROVENANCE_FILE="${PROVENANCE_FILE:-/app/apps/server/dist/assets/build-provenance.json}"
+node --input-type=module <<'JS'
+import fs from 'node:fs';
+import path from 'node:path';
+import { execFileSync } from 'node:child_process';
+const git = args => { try { return execFileSync('git', args, {encoding:'utf8',stdio:['ignore','pipe','ignore']}).trim(); } catch { return null; } };
+const candidate = process.env.BUILD_GIT_SHA || git(['rev-parse','HEAD']);
+const gitSha = /^(?!0{40}$)[0-9a-f]{40}$/i.test(candidate || '') ? candidate.toLowerCase() : null;
+const timestamp = process.env.BUILD_TIMESTAMP || git(['show','-s','--format=%cI','HEAD']);
+const buildTimestamp = timestamp && Number.isFinite(Date.parse(timestamp)) ? timestamp : new Date().toISOString();
+const value = {gitSha,sourceIdentity:gitSha?'known':'unknown',buildTimestamp};
+fs.mkdirSync(path.dirname(process.env.PROVENANCE_FILE),{recursive:true});
+fs.writeFileSync(process.env.PROVENANCE_FILE,JSON.stringify(value,null,2)+'\n');
+console.log(`Generated provenance: source=${value.sourceIdentity}, sha=${gitSha || 'unknown'}`);
+JS

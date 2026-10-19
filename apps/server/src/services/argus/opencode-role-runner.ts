@@ -1,4 +1,5 @@
 import { openCodeFailure, redactOpenCodeOutput } from '../../lib/opencode-errors.js';
+import { upsertCompatibleProvider } from './opencode-config.js';
 import { resolveOpenCodeModel } from '@automaker/model-resolver';
 import crypto from 'crypto';
 import fs from 'fs/promises';
@@ -14,6 +15,9 @@ export interface RoleInvocation {
   prompt: string;
   cwd: string;
   readOnly: boolean;
+  signal?: AbortSignal;
+  isolationDirectory?: string;
+  timeoutMs?: number;
 }
 export type RoleInvoker = (input: RoleInvocation) => Promise<string>;
 
@@ -38,23 +42,73 @@ export class OpenCodeRoleRunner {
   static async invokeCli(input: RoleInvocation) {
     if (!input.readOnly) throw new Error('SENIOR_ISOLATED_EXECUTOR_UNAVAILABLE');
     const abortController = new AbortController();
-    const timer = setTimeout(() => abortController.abort(), 180000);
+    const timer = setTimeout(
+      () => abortController.abort(),
+      Math.min(input.timeoutMs || 180000, 180000)
+    );
+    const abort = () => abortController.abort();
+    input.signal?.addEventListener('abort', abort, { once: true });
+    if (input.signal?.aborted) abort();
     let result;
     try {
       result = await spawnProcess({
         command: 'opencode',
-        args: ['run', '--model', input.model, '--format', 'json'],
+        args: [
+          'run',
+          ...(input.isolationDirectory ? ['--pure', '--title', 'Argus inference probe'] : []),
+          '--model',
+          input.model,
+          '--format',
+          'json',
+        ],
         stdinData: input.prompt,
         maxOutputBytes: 65536,
+        inheritEnv: false,
         abortController,
         cwd: input.cwd,
         env: Object.fromEntries(
           [
-            ['PATH', process.env.PATH],
+            ...[
+              'PATH',
+              'SystemRoot',
+              'WINDIR',
+              'ComSpec',
+              'PATHEXT',
+              'TEMP',
+              'TMP',
+              'HTTPS_PROXY',
+              'HTTP_PROXY',
+              'ALL_PROXY',
+              'NO_PROXY',
+              'https_proxy',
+              'http_proxy',
+              'all_proxy',
+              'no_proxy',
+              'NODE_EXTRA_CA_CERTS',
+              'SSL_CERT_FILE',
+              'OPENCODE_CONFIG',
+              'XDG_CONFIG_HOME',
+              'XDG_DATA_HOME',
+            ].map((name) => [name, process.env[name]]),
             ['OPENCODE_PERMISSION', JSON.stringify({ '*': 'deny' })],
             ['OPENCODE_DISABLE_PROJECT_CONFIG', 'true'],
             ['HOME', process.env.HOME],
             ['COMPATIBLE_API_KEY', process.env.COMPATIBLE_API_KEY],
+            ...(input.isolationDirectory
+              ? [
+                  ['HOME', input.isolationDirectory],
+                  ['XDG_CONFIG_HOME', path.join(input.isolationDirectory, 'config')],
+                  ['XDG_DATA_HOME', path.join(input.isolationDirectory, 'data')],
+                  ['XDG_CACHE_HOME', path.join(input.isolationDirectory, 'cache')],
+                  ['XDG_STATE_HOME', path.join(input.isolationDirectory, 'state')],
+                  ['TMPDIR', input.isolationDirectory],
+                  ['OPENCODE_CONFIG', path.join(input.isolationDirectory, 'opencode.json')],
+                  ['OPENCODE_DISABLE_AUTOUPDATE', 'true'],
+                  ['OPENCODE_DISABLE_MODELS_FETCH', 'true'],
+                  ['OPENCODE_DISABLE_LSP_DOWNLOAD', 'true'],
+                  ['OPENCODE_DISABLE_EXTERNAL_SKILLS', 'true'],
+                ]
+              : []),
           ].filter((entry): entry is [string, string] => Boolean(entry[1]))
         ),
       });
@@ -67,6 +121,7 @@ export class OpenCodeRoleRunner {
       );
     } finally {
       clearTimeout(timer);
+      input.signal?.removeEventListener('abort', abort);
     }
     if (result.exitCode !== 0)
       throw new Error(
@@ -86,7 +141,12 @@ export class OpenCodeRoleRunner {
         continue;
       }
       sessionId = event.sessionID || sessionId;
-      if (event.type === 'error') {
+      if (event.type === 'tool_use' || event.type === 'tool' || event.part?.type === 'tool')
+        throw new Error('OPENCODE_UNEXPECTED_TOOL_EVENT');
+      if (
+        event.type === 'error' ||
+        (event.type === 'step_finish' && event.part?.reason === 'error')
+      ) {
         throw new Error(
           openCodeFailure(
             typeof event.error === 'string'
@@ -115,6 +175,100 @@ export class OpenCodeRoleRunner {
     return redactOpenCodeOutput(text.join(''));
   }
 
+  /** Bounded text-only diagnostic, with no checkout or inherited user configuration. */
+  static async probe(model: string) {
+    const identity = resolveOpenCodeModel(model);
+    const sandbox = await fs.mkdtemp(path.join(os.tmpdir(), 'argus-diag-'));
+    try {
+      let config: Record<string, unknown> = {
+        permission: { '*': 'deny' },
+        plugin: [],
+        instructions: [],
+      };
+      if (identity.provider === 'automaker-compatible') {
+        if (!process.env.COMPATIBLE_URL || !process.env.COMPATIBLE_API_KEY)
+          throw new Error('OPENCODE_MODEL_NOT_CONFIGURED');
+        config = upsertCompatibleProvider(config, process.env.COMPATIBLE_URL, identity.model);
+      }
+      await fs.writeFile(path.join(sandbox, 'opencode.json'), JSON.stringify(config), {
+        mode: 0o600,
+      });
+      const cwd = path.join(sandbox, 'empty');
+      await fs.mkdir(cwd, { mode: 0o555 });
+      const text = await OpenCodeRoleRunner.invokeCli({
+        role: 'diagnostic',
+        contextId: crypto.randomUUID(),
+        model: identity.id,
+        prompt: 'Reply with exactly LOCAL_PROBE_OK. Do not use any tools.',
+        cwd,
+        readOnly: true,
+        isolationDirectory: sandbox,
+        timeoutMs: 45000,
+      });
+      if (text.trim() !== 'LOCAL_PROBE_OK') throw new Error('OPENCODE_UNEXPECTED_PROBE_TEXT');
+      return { model: identity.id, result: 'LOCAL_PROBE_OK' };
+    } finally {
+      await fs.chmod(path.join(sandbox, 'empty'), 0o755).catch(() => {});
+      await fs.rm(sandbox, { recursive: true, force: true });
+    }
+  }
+
+  async analyzePaper(payload: unknown, signal?: AbortSignal) {
+    return this.readOnly(
+      'diagnostic',
+      payload,
+      (value: unknown) => {
+        const result = value as {
+          algorithms?: unknown;
+          equations?: unknown;
+          missingDetails?: unknown;
+          implementationSteps?: unknown;
+        };
+        const boundedStrings = (item: unknown): item is string[] =>
+          Array.isArray(item) &&
+          item.length <= 20 &&
+          item.every((s) => typeof s === 'string' && s.length <= 4000);
+        if (
+          !result ||
+          !boundedStrings(result.algorithms) ||
+          !boundedStrings(result.equations) ||
+          !boundedStrings(result.missingDetails) ||
+          !boundedStrings(result.implementationSteps)
+        )
+          throw new Error('OPENCODE_MALFORMED_PAPER_ANALYSIS');
+        return {
+          algorithms: result.algorithms,
+          equations: result.equations,
+          missingDetails: result.missingDetails,
+          implementationSteps: result.implementationSteps,
+        };
+      },
+      signal
+    );
+  }
+
+  async judge(payload: unknown, signal?: AbortSignal) {
+    return this.readOnly(
+      'reviewer',
+      payload,
+      (value: unknown) => {
+        const result = value as { score?: unknown; reason?: unknown };
+        if (
+          !result ||
+          typeof result.score !== 'number' ||
+          !Number.isFinite(result.score) ||
+          result.score < 0 ||
+          result.score > 1 ||
+          typeof result.reason !== 'string' ||
+          result.reason.length > 4000
+        )
+          throw new Error('OPENCODE_MALFORMED_JUDGE');
+        return { score: result.score, reason: result.reason };
+      },
+      signal
+    );
+  }
+
   async diagnose(payload: unknown): Promise<{ contextId: string; result: SeniorDiagnosis }> {
     return this.readOnly('diagnostic', payload, validateDiagnosis);
   }
@@ -139,7 +293,8 @@ export class OpenCodeRoleRunner {
   private async readOnly<T>(
     role: 'diagnostic' | 'reviewer',
     payload: unknown,
-    validate: (value: unknown) => T
+    validate: (value: unknown) => T,
+    signal?: AbortSignal
   ) {
     const sandbox = await fs.mkdtemp(path.join(os.tmpdir(), `automaker-${role}-`));
     await fs.chmod(sandbox, 0o555);
@@ -152,6 +307,7 @@ export class OpenCodeRoleRunner {
         prompt: `${JSON.stringify(payload)}\nReturn only the required JSON object.`,
         cwd: sandbox,
         readOnly: true,
+        signal,
       });
       return { contextId, result: validate(JSON.parse(extractJson(output))) };
     } finally {

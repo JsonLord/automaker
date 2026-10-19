@@ -1,3 +1,5 @@
+import { createModeRoutes } from './modes.js';
+import { ArgusModeService } from '../../services/argus/modes/service.js';
 import { redactOpenCodeEvent } from '../../lib/opencode-errors.js';
 import { ArgusProjectAccess, ArgusAccessError } from '../../services/argus/project-access.js';
 import type { SettingsService } from '../../services/settings-service.js';
@@ -9,7 +11,8 @@ import { argusCampaigns, getArgusAutonomyRunner } from '../../services/argus/aut
 export function createArgusRoutes(
   service: ArgusService,
   autonomyHealth?: () => Promise<AutonomyRunnerHealth | undefined>,
-  settingsService?: SettingsService
+  settingsService?: SettingsService,
+  modes = new ArgusModeService(service)
 ): Router {
   const router = Router();
   router.get('/health', async (_req, res) =>
@@ -29,6 +32,8 @@ export function createArgusRoutes(
       return res.status(503).json({ error: 'ARGUS_PROJECT_ACCESS_UNAVAILABLE' });
     }
   });
+
+  router.use(createModeRoutes(modes));
 
   for (const action of ['pause', 'resume', 'wake', 'reconcile'] as const) {
     router.post(`/${action}`, async (req, res) => {
@@ -161,6 +166,8 @@ export function createArgusRoutes(
           : null,
         reconciliation: status.reconciliation,
         latestStatus: status.latestStatus,
+        mode: (await modes.state(projectPath)).activeMode,
+        evaluationGate: await modes.gate(projectPath),
       })
     );
   });

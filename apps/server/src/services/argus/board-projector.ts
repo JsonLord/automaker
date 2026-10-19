@@ -89,6 +89,17 @@ export class ArgusBoardProjector {
       dependencies: task.dependencies,
       planningMode: 'skip' as const,
       requirePlanApproval: false,
+      ...(task.modeId && task.modeRunId
+        ? {
+            argusMode: {
+              mode: task.modeId,
+              runId: task.modeRunId,
+              status: task.phase,
+              taskIds: [task.taskId],
+              evidenceIds: task.evidenceRequired,
+            },
+          }
+        : {}),
       argus: redactOpenCodeEvent({ ...task }),
     };
     if (existing) await this.features.update(root, task.featureId, feature);

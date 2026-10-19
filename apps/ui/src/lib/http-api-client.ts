@@ -1,3 +1,12 @@
+import type {
+  ArgusModeConfig,
+  ArgusModeId,
+  ArgusModeInput,
+  ArgusModeState,
+  ArgusModeRun,
+  ArgusModeDescriptor,
+  ArgusModeArtifact,
+} from '@automaker/types';
 /**
  * HTTP API Client for web mode
  *
@@ -1000,6 +1009,47 @@ export class HttpApiClient implements ElectronAPI {
       }
     };
   }
+
+  argusModes = {
+    list: (projectPath: string) =>
+      this.get<{ modes: ArgusModeDescriptor[] }>(
+        `/api/argus/modes?projectPath=${encodeURIComponent(projectPath)}`
+      ),
+    state: (projectPath: string) =>
+      this.get<ArgusModeState>(`/api/argus/mode?projectPath=${encodeURIComponent(projectPath)}`),
+    select: (
+      projectPath: string,
+      mode: ArgusModeId,
+      expectedRevision: number,
+      config?: ArgusModeConfig
+    ) =>
+      this.put<ArgusModeState>('/api/argus/mode', { projectPath, mode, expectedRevision, config }),
+    command: (projectPath: string, command: string) =>
+      this.post<{ mode: ArgusModeId; description: string; message: string }>(
+        '/api/argus/mode/command',
+        { projectPath, command }
+      ),
+    plan: (projectPath: string, input: ArgusModeInput, idempotencyKey: string) =>
+      this.post<ArgusModeRun>('/api/argus/mode/plan', { projectPath, input, idempotencyKey }),
+    run: (
+      projectPath: string,
+      runId: string,
+      approval?: { repositoryChanges: true; sourceSha: string }
+    ) => this.post<ArgusModeRun>('/api/argus/mode/run', { projectPath, runId, approval }),
+    get: (projectPath: string, id: string) =>
+      this.get<ArgusModeRun>(
+        `/api/argus/mode/runs/${encodeURIComponent(id)}?projectPath=${encodeURIComponent(projectPath)}`
+      ),
+    artifacts: (projectPath: string, id: string) =>
+      this.get<{ artifacts: ArgusModeArtifact[] }>(
+        `/api/argus/mode/runs/${encodeURIComponent(id)}/artifacts?projectPath=${encodeURIComponent(projectPath)}`
+      ),
+    approveTask: (projectPath: string, id: string, taskId: string, sourceSha: string) =>
+      this.post<ArgusModeRun>(
+        `/api/argus/mode/runs/${encodeURIComponent(id)}/tasks/${encodeURIComponent(taskId)}/approve`,
+        { projectPath, sourceSha, approved: true }
+      ),
+  };
 
   argus = {
     status: (projectPath: string) =>

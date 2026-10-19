@@ -3,8 +3,9 @@ import { sanitizeOpenCodeOutput } from '../../lib/opencode-errors.js';
 import { realpathSync } from 'fs';
 import { resolveOpenCodeModel } from '@automaker/model-resolver';
 import { spawn, type ChildProcessWithoutNullStreams } from 'child_process';
-import fs from 'fs/promises';
+import fsp from 'fs/promises';
 import path from 'path';
+import { fileURLToPath } from 'node:url';
 import readline from 'readline';
 import { createLogger } from '@automaker/utils';
 import { resolveState, saveArgusState } from './project-lifecycle.js';
@@ -16,6 +17,10 @@ import type {
   ArgusRuntimeHealth,
   ArgusService,
 } from './types.js';
+
+const DEFAULT_BRIDGE_PATH = fileURLToPath(
+  new URL('../../../../../scripts/argus_runtime_bridge.py', import.meta.url)
+);
 
 const logger = createLogger('ArgusService');
 type BridgeResponse = {
@@ -54,10 +59,7 @@ export class SupervisedArgusService implements ArgusService {
   private requests = new Map<number, Pending>();
   private sequence = 0;
   private projects = new Map<string, ArgusProjectState>();
-  constructor(
-    private bridgePath = process.env.ARGUS_BRIDGE_PATH ||
-      path.resolve(process.cwd(), 'scripts', 'argus_runtime_bridge.py')
-  ) {}
+  constructor(private bridgePath = process.env.ARGUS_BRIDGE_PATH || DEFAULT_BRIDGE_PATH) {}
 
   async start(): Promise<void> {
     if (this.child && !this.child.killed) return;
@@ -164,7 +166,7 @@ export class SupervisedArgusService implements ArgusService {
       : { running: false, upstreamInstalled: false, error: 'bridge not started' };
   }
   async createOrResolveProject(input: { projectId: string; projectPath: string; model: string }) {
-    input = { ...input, projectPath: await fs.realpath(input.projectPath) };
+    input = { ...input, projectPath: await fsp.realpath(input.projectPath) };
     const state = await resolveState(
       input.projectId,
       input.projectPath,
@@ -199,8 +201,8 @@ export class SupervisedArgusService implements ArgusService {
     state.managerStatus = 'running';
     await saveArgusState(projectPath, state);
     const [objective, spec] = await Promise.all([
-      fs.readFile(path.join(projectPath, 'ARGUS.md'), 'utf8'),
-      fs.readFile(path.join(projectPath, 'spec.md'), 'utf8'),
+      fsp.readFile(path.join(projectPath, 'ARGUS.md'), 'utf8'),
+      fsp.readFile(path.join(projectPath, 'spec.md'), 'utf8'),
     ]);
     const result = await this.call<ArgusManagerDecision>('manager_handoff', {
       projectId: state.argusCorrelationId,
@@ -234,8 +236,8 @@ export class SupervisedArgusService implements ArgusService {
     state.plannerStatus = 'running';
     await saveArgusState(projectPath, state);
     const [objective, spec] = await Promise.all([
-      fs.readFile(path.join(projectPath, 'ARGUS.md'), 'utf8'),
-      fs.readFile(path.join(projectPath, 'spec.md'), 'utf8'),
+      fsp.readFile(path.join(projectPath, 'ARGUS.md'), 'utf8'),
+      fsp.readFile(path.join(projectPath, 'spec.md'), 'utf8'),
     ]);
     const result = await this.call<ArgusPlannedTask | null>('planner_next_task', {
       projectId: state.argusCorrelationId,
@@ -265,8 +267,8 @@ export class SupervisedArgusService implements ArgusService {
   async evaluateObjective(projectPath: string, evidence: Record<string, unknown>) {
     const state = this.requireProject(projectPath);
     const [objective, spec] = await Promise.all([
-      fs.readFile(path.join(projectPath, 'ARGUS.md'), 'utf8'),
-      fs.readFile(path.join(projectPath, 'spec.md'), 'utf8'),
+      fsp.readFile(path.join(projectPath, 'ARGUS.md'), 'utf8'),
+      fsp.readFile(path.join(projectPath, 'spec.md'), 'utf8'),
     ]);
     return this.call<import('./types.js').ObjectiveEvaluation>('evaluate_objective', {
       projectId: state.argusCorrelationId,
@@ -281,8 +283,8 @@ export class SupervisedArgusService implements ArgusService {
   ) {
     const state = this.requireProject(projectPath);
     const [objective, spec] = await Promise.all([
-      fs.readFile(path.join(projectPath, 'ARGUS.md'), 'utf8'),
-      fs.readFile(path.join(projectPath, 'spec.md'), 'utf8'),
+      fsp.readFile(path.join(projectPath, 'ARGUS.md'), 'utf8'),
+      fsp.readFile(path.join(projectPath, 'spec.md'), 'utf8'),
     ]);
     const result = await this.call<{ spec: string }>('renew_specification', {
       projectId: state.argusCorrelationId,
@@ -294,7 +296,7 @@ export class SupervisedArgusService implements ArgusService {
     return result.spec;
   }
   async getStatus(projectPath: string) {
-    return this.projects.get(await fs.realpath(projectPath));
+    return this.projects.get(await fsp.realpath(projectPath));
   }
   private requireProject(projectPath: string) {
     const state = this.projects.get(realpathSync(projectPath));

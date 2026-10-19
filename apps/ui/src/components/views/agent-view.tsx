@@ -1,3 +1,4 @@
+import { getHttpApiClient } from '@/lib/http-api-client';
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useAppStore } from '@/store/app-store';
 import { useElectronAgent } from '@/hooks/use-electron-agent';
@@ -21,6 +22,7 @@ const LG_BREAKPOINT = 1024;
 export function AgentView() {
   const { currentProject, getCurrentWorktree } = useAppStore();
   const [input, setInput] = useState('');
+  const [modeNotice, setModeNotice] = useState('');
   const [currentTool, setCurrentTool] = useState<string | null>(null);
 
   // Get the current worktree to scope sessions and agent working directory
@@ -114,6 +116,19 @@ export function AgentView() {
 
     if (!input.trim() && selectedImages.length === 0 && selectedTextFiles.length === 0) return;
 
+    if (/^\/(default|rea|paper2code|eval)(?:\s|$)/.test(input.trim()) && currentProject) {
+      try {
+        const result = await getHttpApiClient().argusModes.command(
+          currentProject.path,
+          input.trim()
+        );
+        setModeNotice(`${result.mode}: ${result.description} ${result.message}`);
+        setInput('');
+      } catch (error) {
+        setModeNotice(error instanceof Error ? error.message : 'Mode selection failed');
+      }
+      return;
+    }
     const messageContent = input;
     const messageImages = selectedImages;
     const messageTextFiles = selectedTextFiles;
@@ -129,7 +144,7 @@ export function AgentView() {
     } else {
       await sendMessage(messageContent, messageImages, messageTextFiles);
     }
-  }, [input, fileAttachments, isProcessing, sendMessage, addToServerQueue]);
+  }, [input, fileAttachments, isProcessing, sendMessage, addToServerQueue, currentProject]);
 
   const handleClearChat = async () => {
     if (!confirm('Are you sure you want to clear this conversation?')) return;
@@ -257,6 +272,11 @@ export function AgentView() {
         />
 
         {/* Messages */}
+        {modeNotice && (
+          <p role="status" className="px-4 py-2 text-sm border-b">
+            {modeNotice}
+          </p>
+        )}
         <ChatArea
           currentSessionId={currentSessionId}
           messages={displayMessages}

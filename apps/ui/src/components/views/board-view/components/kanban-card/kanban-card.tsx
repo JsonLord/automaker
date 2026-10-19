@@ -294,6 +294,18 @@ export const KanbanCard = memo(function KanbanCard({
       />
 
       <CardContent className="px-3 pt-0 pb-0">
+        {feature.argusMode && (
+          <div aria-label="Argus mode task" className="mb-2 rounded border p-2 text-[11px]">
+            <strong>
+              {feature.argusMode.mode} · {feature.argusMode.status}
+            </strong>
+            <p>Run {feature.argusMode.runId}</p>
+            <p>
+              {feature.argusMode.taskIds.length} tasks · {feature.argusMode.evidenceIds.length}{' '}
+              evidence references
+            </p>
+          </div>
+        )}
         <ArgusTaskEvidence task={feature.argus} />
         {/* Content Sections */}
         <CardContentSections feature={feature} useWorktrees={useWorktrees} />

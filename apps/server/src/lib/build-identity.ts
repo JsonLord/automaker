@@ -44,7 +44,7 @@ export async function readBuildIdentity(
     );
     const content = await fs.readFile(provenancePath, 'utf8');
     const data = JSON.parse(content);
-    if (/^[0-9a-f]{40}$/i.test(data.gitSha)) {
+    if (/^(?!0{40}$)[0-9a-f]{40}$/i.test(data.gitSha)) {
       gitSha = data.gitSha;
     }
     if (data.buildTimestamp && Number.isFinite(Date.parse(data.buildTimestamp))) {
@@ -52,7 +52,7 @@ export async function readBuildIdentity(
     }
   } catch (error) {
     // Use environment variables if file is missing (e.g. tests or local dev without build)
-    gitSha = /^[0-9a-f]{40}$/i.test(process.env.BUILD_GIT_SHA || '')
+    gitSha = /^(?!0{40}$)[0-9a-f]{40}$/i.test(process.env.BUILD_GIT_SHA || '')
       ? process.env.BUILD_GIT_SHA || null
       : null;
     buildTimestamp =
@@ -64,6 +64,7 @@ export async function readBuildIdentity(
   return {
     applicationVersion: getVersion(),
     gitSha,
+    sourceIdentity: gitSha ? 'known' : 'unknown',
     buildTimestamp,
     argus,
     opencode,

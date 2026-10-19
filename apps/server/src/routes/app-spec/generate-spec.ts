@@ -1,3 +1,4 @@
+import { withModeFence } from '../../services/argus/modes/control.js';
 /**
  * Generate app_spec.txt from project overview
  *
@@ -279,7 +280,10 @@ Your entire response should be valid JSON starting with { and ending with }. No 
   await argusService.resumeProject(projectPath);
   const wake = wakeAutonomousProject(projectPath, 'spec-generated');
   if (wake) await wake;
-  else await new ArgusOrchestrator(argusService, new FeatureLoader()).reconcileProject(projectPath);
+  else
+    await withModeFence(projectPath, () =>
+      new ArgusOrchestrator(argusService, new FeatureLoader()).reconcileProject(projectPath)
+    );
 
   // Verify the file was written
   const savedContent = await secureFs.readFile(specPath, 'utf-8');

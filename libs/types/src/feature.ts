@@ -79,6 +79,13 @@ export interface PlanSpec {
 }
 
 export interface Feature {
+  argusMode?: {
+    mode: import('./argus-modes.js').ArgusModeId;
+    runId: string;
+    status: string;
+    taskIds: string[];
+    evidenceIds: string[];
+  };
   id: string;
   title?: string;
   titleGenerating?: boolean;

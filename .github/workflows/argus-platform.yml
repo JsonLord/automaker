@@ -2,7 +2,8 @@ name: Argus Platform
 on:
   pull_request:
   push:
-    branches: [feat/argus-continuous-engineering]
+    branches:
+      [feat/argus-continuous-engineering, fix/hf-deployment-agent-md-and-build-3606839938468972213]
 permissions:
   contents: read
 concurrency:
@@ -56,6 +57,11 @@ jobs:
       - run: |
           npm run test:packages
           node scripts/check-clean-working-tree.mjs 'Package tests'
+      - name: Qualify Argus modes and unknown-source provenance
+        run: |
+          ./node_modules/.bin/vitest run -c apps/server/vitest.config.ts apps/server/tests/unit/services/argus-modes.integration.test.ts apps/server/tests/unit/lib/build-identity.test.ts
+          node --test scripts/tests/build-provenance.test.mjs scripts/tests/test-hf-runtime.test.mjs
+          node scripts/check-clean-working-tree.mjs 'Mode and provenance qualification'
       - name: Diagnose tracked file changes
         if: always()
         run: |
@@ -82,3 +88,4 @@ jobs:
           export BUILD_TIMESTAMP=$(git show -s --format=%cI HEAD)
           docker build --build-arg BUILD_GIT_SHA=$BUILD_GIT_SHA --build-arg BUILD_TIMESTAMP=$BUILD_TIMESTAMP -t automaker-test .
           docker run --rm --entrypoint cat automaker-test /app/apps/server/dist/assets/build-provenance.json | grep -q "$BUILD_GIT_SHA"
+          docker run --rm --entrypoint node automaker-test scripts/test-opencode-inference.mjs

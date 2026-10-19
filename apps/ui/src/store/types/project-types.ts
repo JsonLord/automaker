@@ -26,6 +26,7 @@ export interface Feature extends Omit<
   | 'reasoningEffort'
   | 'summary'
 > {
+  argusMode?: BaseFeature['argusMode'];
   id: string;
   title?: string;
   titleGenerating?: boolean;

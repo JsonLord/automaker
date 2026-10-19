@@ -18,6 +18,10 @@ import type {
   ArgusService,
 } from './types.js';
 
+const DEFAULT_BRIDGE_PATH = fileURLToPath(
+  new URL('../../../../../scripts/argus_runtime_bridge.py', import.meta.url)
+);
+
 const logger = createLogger('ArgusService');
 type BridgeResponse = {
   requestId: number;
@@ -55,13 +59,7 @@ export class SupervisedArgusService implements ArgusService {
   private requests = new Map<number, Pending>();
   private sequence = 0;
   private projects = new Map<string, ArgusProjectState>();
-  constructor(
-    private bridgePath =
-      process.env.ARGUS_BRIDGE_PATH ||
-      fileURLToPath(
-        new URL('../../../../../scripts/argus_runtime_bridge.py', import.meta.url)
-      )
-  ) {}
+  constructor(private bridgePath = process.env.ARGUS_BRIDGE_PATH || DEFAULT_BRIDGE_PATH) {}
 
   async start(): Promise<void> {
     if (this.child && !this.child.killed) return;

@@ -1,3 +1,4 @@
+import { ArgusModePanel } from './board-view/argus-mode-panel';
 import { ArgusCampaignPanel } from './board-view/argus-campaign-panel';
 import { useEffect, useState, useCallback, useMemo, useRef, startTransition } from 'react';
 import { createLogger } from '@automaker/utils/logger';
@@ -1847,6 +1848,7 @@ export function BoardView({ initialFeatureId, initialProjectPath }: BoardViewPro
       className="flex-1 flex flex-col overflow-hidden content-bg relative"
       data-testid="board-view"
     >
+      <ArgusModePanel key={`modes-${currentProject.path}`} projectPath={currentProject.path} />
       <ArgusCampaignPanel key={currentProject.path} projectPath={currentProject.path} />
       {/* Header */}
       <BoardHeader

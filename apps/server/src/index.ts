@@ -1,3 +1,4 @@
+import { ArgusModeService } from './services/argus/modes/service.js';
 import { EngineeringScout } from './services/argus/engineering-scout.js';
 import { LokiVerifier, RemoteLokiExecutor } from './services/argus/verification.js';
 /**
@@ -527,7 +528,8 @@ import { createRunTestsHandler } from './routes/health/routes/run-tests.js';
 app.get('/api/health/run-tests', createRunTestsHandler());
 
 app.use('/api/fs', createFsRoutes(events));
-app.use('/api/agent', createAgentRoutes(agentService, events));
+const argusModes = new ArgusModeService(argusService, featureLoader);
+app.use('/api/agent', createAgentRoutes(agentService, events, settingsService, argusModes));
 app.use('/api/sessions', createSessionsRoutes(agentService));
 app.use(
   '/api/features',
@@ -562,7 +564,12 @@ app.use(
 );
 app.use(
   '/api/argus',
-  createArgusRoutes(argusService, async () => argusAutonomyRunner?.health(), settingsService)
+  createArgusRoutes(
+    argusService,
+    async () => argusAutonomyRunner?.health(),
+    settingsService,
+    argusModes
+  )
 );
 
 // SPA Routing: Serve index.html for all non-API routes

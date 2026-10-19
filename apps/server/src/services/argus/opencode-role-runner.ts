@@ -14,6 +14,7 @@ export interface RoleInvocation {
   prompt: string;
   cwd: string;
   readOnly: boolean;
+  signal?: AbortSignal;
 }
 export type RoleInvoker = (input: RoleInvocation) => Promise<string>;
 
@@ -39,6 +40,9 @@ export class OpenCodeRoleRunner {
     if (!input.readOnly) throw new Error('SENIOR_ISOLATED_EXECUTOR_UNAVAILABLE');
     const abortController = new AbortController();
     const timer = setTimeout(() => abortController.abort(), 180000);
+    const abort = () => abortController.abort();
+    input.signal?.addEventListener('abort', abort, { once: true });
+    if (input.signal?.aborted) abort();
     let result;
     try {
       result = await spawnProcess({
@@ -46,11 +50,27 @@ export class OpenCodeRoleRunner {
         args: ['run', '--model', input.model, '--format', 'json'],
         stdinData: input.prompt,
         maxOutputBytes: 65536,
+        inheritEnv: false,
         abortController,
         cwd: input.cwd,
         env: Object.fromEntries(
           [
-            ['PATH', process.env.PATH],
+            ...[
+              'PATH',
+              'HTTPS_PROXY',
+              'HTTP_PROXY',
+              'ALL_PROXY',
+              'NO_PROXY',
+              'https_proxy',
+              'http_proxy',
+              'all_proxy',
+              'no_proxy',
+              'NODE_EXTRA_CA_CERTS',
+              'SSL_CERT_FILE',
+              'OPENCODE_CONFIG',
+              'XDG_CONFIG_HOME',
+              'XDG_DATA_HOME',
+            ].map((name) => [name, process.env[name]]),
             ['OPENCODE_PERMISSION', JSON.stringify({ '*': 'deny' })],
             ['OPENCODE_DISABLE_PROJECT_CONFIG', 'true'],
             ['HOME', process.env.HOME],
@@ -67,6 +87,7 @@ export class OpenCodeRoleRunner {
       );
     } finally {
       clearTimeout(timer);
+      input.signal?.removeEventListener('abort', abort);
     }
     if (result.exitCode !== 0)
       throw new Error(
@@ -115,6 +136,62 @@ export class OpenCodeRoleRunner {
     return redactOpenCodeOutput(text.join(''));
   }
 
+  async analyzePaper(payload: unknown, signal?: AbortSignal) {
+    return this.readOnly(
+      'diagnostic',
+      payload,
+      (value: unknown) => {
+        const result = value as {
+          algorithms?: unknown;
+          equations?: unknown;
+          missingDetails?: unknown;
+          implementationSteps?: unknown;
+        };
+        const boundedStrings = (item: unknown): item is string[] =>
+          Array.isArray(item) &&
+          item.length <= 20 &&
+          item.every((s) => typeof s === 'string' && s.length <= 4000);
+        if (
+          !result ||
+          !boundedStrings(result.algorithms) ||
+          !boundedStrings(result.equations) ||
+          !boundedStrings(result.missingDetails) ||
+          !boundedStrings(result.implementationSteps)
+        )
+          throw new Error('OPENCODE_MALFORMED_PAPER_ANALYSIS');
+        return {
+          algorithms: result.algorithms,
+          equations: result.equations,
+          missingDetails: result.missingDetails,
+          implementationSteps: result.implementationSteps,
+        };
+      },
+      signal
+    );
+  }
+
+  async judge(payload: unknown, signal?: AbortSignal) {
+    return this.readOnly(
+      'reviewer',
+      payload,
+      (value: unknown) => {
+        const result = value as { score?: unknown; reason?: unknown };
+        if (
+          !result ||
+          typeof result.score !== 'number' ||
+          !Number.isFinite(result.score) ||
+          result.score < 0 ||
+          result.score > 1 ||
+          typeof result.reason !== 'string' ||
+          result.reason.length > 4000
+        )
+          throw new Error('OPENCODE_MALFORMED_JUDGE');
+        return { score: result.score, reason: result.reason };
+      },
+      signal
+    );
+  }
+
   async diagnose(payload: unknown): Promise<{ contextId: string; result: SeniorDiagnosis }> {
     return this.readOnly('diagnostic', payload, validateDiagnosis);
   }
@@ -139,7 +216,8 @@ export class OpenCodeRoleRunner {
   private async readOnly<T>(
     role: 'diagnostic' | 'reviewer',
     payload: unknown,
-    validate: (value: unknown) => T
+    validate: (value: unknown) => T,
+    signal?: AbortSignal
   ) {
     const sandbox = await fs.mkdtemp(path.join(os.tmpdir(), `automaker-${role}-`));
     await fs.chmod(sandbox, 0o555);
@@ -152,6 +230,7 @@ export class OpenCodeRoleRunner {
         prompt: `${JSON.stringify(payload)}\nReturn only the required JSON object.`,
         cwd: sandbox,
         readOnly: true,
+        signal,
       });
       return { contextId, result: validate(JSON.parse(extractJson(output))) };
     } finally {

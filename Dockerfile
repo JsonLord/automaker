@@ -1,3 +1,7 @@
+# Argus modes run inside the existing Node process; no per-mode daemon or GPU.
+# REA binary/live-probe workers, PDF/OCR ingestion and arbitrary scientific workers
+# are optional external capabilities and are not installed into the base image.
+# See docs/architecture/ARGUS-MULTI-MODE.md before configuring a worker/provider.
 # Automaker Multi-Stage Dockerfile for Hugging Face Spaces
 # Combines built UI and Server into a single production image on port 7860
 

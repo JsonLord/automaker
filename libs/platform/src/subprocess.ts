@@ -18,6 +18,8 @@ export interface SubprocessOptions {
    * Avoids shell interpretation issues when passing data as CLI arguments.
    */
   stdinData?: string;
+  /** Use only the supplied environment for credential-isolated role calls. Defaults to true. */
+  inheritEnv?: boolean;
   /** Optional sanitization of diagnostics before they reach logs or consumers. */
   sanitizeOutput?: (text: string) => string;
   /** Bound collected output for non-streaming probes and role calls. */
@@ -45,8 +47,10 @@ export interface SubprocessResult {
 export async function* spawnJSONLProcess(options: SubprocessOptions): AsyncGenerator<unknown> {
   const { command, args, cwd, env, abortController, timeout = 30000, stdinData } = options;
 
+  if (abortController?.signal.aborted) throw new Error('Process aborted');
+
   const processEnv = {
-    ...process.env,
+    ...(options.inheritEnv === false ? {} : process.env),
     ...env,
   };
 
@@ -325,8 +329,10 @@ export async function* spawnJSONLProcess(options: SubprocessOptions): AsyncGener
 export async function spawnProcess(options: SubprocessOptions): Promise<SubprocessResult> {
   const { command, args, cwd, env, abortController, stdinData } = options;
 
+  if (abortController?.signal.aborted) throw new Error('Process aborted');
+
   const processEnv = {
-    ...process.env,
+    ...(options.inheritEnv === false ? {} : process.env),
     ...env,
   };
 

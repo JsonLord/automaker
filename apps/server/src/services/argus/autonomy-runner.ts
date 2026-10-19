@@ -1,3 +1,4 @@
+import { activeProjectMode, withModeFence } from './modes/control.js';
 import { ArgusCampaignManager } from './campaigns.js';
 import { sanitizeOpenCodeOutput } from '../../lib/opencode-errors.js';
 import fs from 'fs';
@@ -186,7 +187,7 @@ export class ArgusAutonomyRunner {
     this.locks.set(projectPath, queued);
     await previous;
     try {
-      await this.reconcileLocked(projectPath);
+      await withModeFence(projectPath, () => this.reconcileLocked(projectPath));
     } finally {
       release();
       if (this.locks.get(projectPath) === queued) this.locks.delete(projectPath);
@@ -228,8 +229,14 @@ export class ArgusAutonomyRunner {
     let before = await this.argus.getStatus(projectPath);
     if (!before) return;
     await this.applyControl(projectPath, before);
+    const selectedMode = await activeProjectMode(projectPath);
+    if (selectedMode !== 'default' && !before.activeTask) return;
     const campaign = await this.options.campaigns?.beforeCycle(projectPath, before);
-    if ((!campaign || campaign.allowNewTasks) && before.autonomy === 'satisfied') {
+    if (
+      selectedMode === 'default' &&
+      (!campaign || campaign.allowNewTasks) &&
+      before.autonomy === 'satisfied'
+    ) {
       await this.options.discovery?.discover(projectPath);
       before = (await this.argus.getStatus(projectPath))!;
     }
@@ -259,7 +266,11 @@ export class ArgusAutonomyRunner {
         if (budget?.allowReconcile === false) break;
         const task = state.activeTask;
         if (!task || state.phase === 'planning' || state.phase === 'idle') {
-          if (budget?.allowNewTasks === false) break;
+          if (
+            budget?.allowNewTasks === false ||
+            (await activeProjectMode(projectPath)) !== 'default'
+          )
+            break;
           const planned = await this.planner.reconcileProject(projectPath);
           if (!planned) break;
           continue;
@@ -332,7 +343,11 @@ export class ArgusAutonomyRunner {
       let state = await this.argus.getStatus(projectPath);
       if (!state) return;
       const remaining = await this.options.campaigns?.beforeCycle(projectPath, state);
-      if ((!remaining || remaining.allowNewTasks) && state.autonomy === 'satisfied') {
+      if (
+        selectedMode === 'default' &&
+        (!remaining || remaining.allowNewTasks) &&
+        state.autonomy === 'satisfied'
+      ) {
         await this.options.discovery?.discover(projectPath);
         state = (await this.argus.getStatus(projectPath))!;
       }

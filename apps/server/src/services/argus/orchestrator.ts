@@ -1,3 +1,4 @@
+import { activeProjectMode } from './modes/control.js';
 import { EngineeringExperiments } from './engineering-experiments.js';
 import { ArgusBoardProjector } from './board-projector.js';
 import { TaskHistoryStore } from './task-history.js';
@@ -87,6 +88,7 @@ export class ArgusOrchestrator {
       await this.projectCard(projectPath, state.activeTask);
       return state.activeTask;
     }
+    if ((await activeProjectMode(projectPath)) !== 'default') return null;
     const decision = await this.argus.managerHandoff(projectPath);
     this.validateDecision(decision);
     if (!decision.admitted) {

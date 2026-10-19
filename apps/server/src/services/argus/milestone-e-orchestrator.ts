@@ -33,6 +33,13 @@ export class MilestoneEOrchestrator {
     try {
       const state = await this.argus.getStatus(projectPath),
         task = state?.activeTask;
+      if (
+        task?.requiresHumanMerge &&
+        (task.phase === 'merge-ready' || task.mergeIntent?.mergeOutcome === 'unknown')
+      ) {
+        await this.block(projectPath, task, 'MODE_HUMAN_MERGE_REQUIRED');
+        return;
+      }
       if (task && (task.phase === 'merge-ready' || task.mergeIntent?.mergeOutcome === 'unknown')) {
         task.mergeLease ||= this.git.coordinator.prepare(task);
         await saveArgusState(projectPath, state!); // intent survives a crash while acquiring ownership

@@ -53,6 +53,9 @@ export interface ArgusManagerDecision {
   needsNextSpec: boolean;
 }
 export interface ArgusPlannedTask {
+  modeId?: import('@automaker/types').ArgusModeId;
+  modeRunId?: string;
+  requiresHumanMerge?: boolean;
   experimentId?: string;
   selectedVariantSha?: string;
   taskId: string;

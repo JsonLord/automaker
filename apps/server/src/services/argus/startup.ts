@@ -1,3 +1,4 @@
+import { withModeFence } from './modes/control.js';
 import type { ProjectRef } from '../../types/settings.js';
 import type { ArgusService } from './types.js';
 import { migrateArgusControlFiles } from './project-lifecycle.js';
@@ -26,8 +27,8 @@ export async function discoverAndResumeArgusProjects(
     if (durable?.autonomy === 'paused') continue;
     await service.resumeProject(project.path);
     if (featureLoader) {
-      const task = await new ArgusOrchestrator(service, featureLoader).reconcileProject(
-        project.path
+      const task = await withModeFence(project.path, () =>
+        new ArgusOrchestrator(service, featureLoader).reconcileProject(project.path)
       );
       if (task?.executor === 'jules' && executor && isJulesOwnedPhase(task.phase)) {
         if (task.julesSessionId) await executor.reconcile(task, project.path);

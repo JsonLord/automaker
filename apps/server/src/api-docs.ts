@@ -18,6 +18,50 @@ export function handleApiDocs(req: Request, res: Response) {
       envVarForApiKey: 'AUTHENTICATION_TOKEN',
     },
     endpoints: [
+      ...[
+        ['GET', '/api/argus/modes', 'List versioned mode adapters'],
+        ['GET', '/api/argus/mode', 'Read durable project mode state and run history'],
+        [
+          'PUT',
+          '/api/argus/mode',
+          'Select mode/configuration using expectedRevision; does not activate autonomy',
+        ],
+        [
+          'POST',
+          '/api/argus/mode/command',
+          'Select /default, /rea, /paper2code or /eval without executing',
+        ],
+        [
+          'POST',
+          '/api/argus/mode/plan',
+          'Validate mode input and persist idempotent execution plan',
+        ],
+        [
+          'POST',
+          '/api/argus/mode/run',
+          'Explicitly execute a plan; repository changes require SHA-bound approval',
+        ],
+        ['GET', '/api/argus/mode/runs/:id', 'Read a project-owned run'],
+        ['GET', '/api/argus/mode/runs/:id/artifacts', 'Read hashed evidence artifacts as data'],
+        [
+          'POST',
+          '/api/argus/mode/runs/:id/tasks/:taskId/approve',
+          'Explicitly admit a task to the existing Argus workflow',
+        ],
+        [
+          'GET',
+          '/api/argus/mode/gate',
+          'Read current-source evaluation recommendation; never authorizes merge',
+        ],
+      ].map(([method, path, purpose]) => ({
+        method,
+        path,
+        purpose,
+        request: { projectId: 'registered-project-id' },
+        response: {
+          note: 'Existing authentication and registered-project authorization required. See docs/api/ARGUS-MODES.md.',
+        },
+      })),
       {
         method: 'GET',
         path: '/health',

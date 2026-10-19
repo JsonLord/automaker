@@ -14,7 +14,7 @@ choose **Run plan** explicitly. For a reference implementation, enable its capab
 and repository-change permission before planning, then check the approval for this
 plan's SHA. Generated files go into a separate worktree. Unapproved execution
 produces an explicit blocked reproduction report rather than inventing results.
-Task proposals need their own approval to enter existing Argus/Jules, whose autonomy
+Task proposals need repository-change and model-call permissions plus their own approval to enter existing Argus/Jules, whose autonomy
 must already have been enabled independently. Human merge remains mandatory.
 
 Run history, measured scores, task IDs, evidence hashes and escaped artifact content

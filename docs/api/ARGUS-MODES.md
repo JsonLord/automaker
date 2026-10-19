@@ -5,18 +5,18 @@ Every request identifies a registered project with `projectId` or `projectPath`
 (GET query, otherwise JSON body). Arbitrary directories and cross-project run IDs
 are rejected. `/api-docs` also lists these routes.
 
-| Method | Route                                  | Request/result                                                                            |
-| ------ | -------------------------------------- | ----------------------------------------------------------------------------------------- |
-| GET    | `/modes`                               | Mode descriptors, versions and pinned upstream metadata                                   |
-| GET    | `/mode`                                | Current mode, durable revision/configs, runs and history                                  |
-| PUT    | `/mode`                                | `{mode, expectedRevision, config?}`; optimistic revision guard, no autonomy change        |
-| POST   | `/mode/command`                        | `{command: "/rea"}` (or `/default`, `/paper2code`, `/eval`); selection only               |
-| POST   | `/mode/plan`                           | `{input, idempotencyKey}`; creates durable validated plan, never executes it              |
-| POST   | `/mode/run`                            | `{runId, approval?: {repositoryChanges:true,sourceSha}}`; explicit run                    |
-| GET    | `/mode/runs/:id`                       | Project-owned immutable input/config snapshot, status, tasks, events, artifacts           |
-| GET    | `/mode/runs/:id/artifacts`             | `{artifacts:[{name,content,mediaType,sha256,evidenceId}]}`                                |
-| POST   | `/mode/runs/:id/tasks/:taskId/approve` | `{approved:true,sourceSha}`; admission to existing Argus, no autonomy activation or merge |
-| GET    | `/mode/gate`                           | Current-source Eval recommendation and evidence IDs; `authorizesMerge:false`              |
+| Method | Route                                  | Request/result                                                                                                                              |
+| ------ | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/modes`                               | Mode descriptors, versions and pinned upstream metadata                                                                                     |
+| GET    | `/mode`                                | Current mode, durable revision/configs, runs and history                                                                                    |
+| PUT    | `/mode`                                | `{mode, expectedRevision, config?}`; optimistic revision guard, no autonomy change                                                          |
+| POST   | `/mode/command`                        | `{command: "/rea"}` (or `/default`, `/paper2code`, `/eval`); selection only                                                                 |
+| POST   | `/mode/plan`                           | `{input, idempotencyKey}`; creates durable validated plan, never executes it                                                                |
+| POST   | `/mode/run`                            | `{runId, approval?: {repositoryChanges:true,sourceSha}}`; explicit run                                                                      |
+| GET    | `/mode/runs/:id`                       | Project-owned immutable input/config snapshot, status, tasks, events, artifacts                                                             |
+| GET    | `/mode/runs/:id/artifacts`             | `{artifacts:[{name,content,mediaType,sha256,evidenceId}]}`                                                                                  |
+| POST   | `/mode/runs/:id/tasks/:taskId/approve` | `{approved:true,sourceSha}`; admission to existing Argus requires repository-change/model-call permissions, no autonomy activation or merge |
+| GET    | `/mode/gate`                           | Current-source Eval recommendation and evidence IDs; `authorizesMerge:false`                                                                |
 
 Shared TypeScript contracts are in `libs/types/src/argus-modes.ts`; runtime schemas
 are in `apps/server/src/services/argus/modes/contracts.ts`. Unknown fields and

@@ -198,6 +198,14 @@ describe('Argus multi-mode integration (real storage, Git, HTTP, bridge and CPU 
     );
     const card = (await features.getAll(root)).find((f) => f.argusMode?.runId === run.id);
     expect(card?.argusMode?.mode).toBe('rea');
+    const deniedConfig = defaultConfig();
+    deniedConfig.permissions.repositoryChanges = true;
+    await select('rea', deniedConfig);
+    const deniedRun = await modes.run(root, (await plan(rea, 'rea-no-model-permission')).id);
+    await expect(modes.approveTask(root, deniedRun.id, deniedRun.tasks[0].id, sha)).rejects.toThrow(
+      'MODE_MODEL_CALLS_DENIED'
+    );
+    expect((await argus.getStatus(root))!.activeTask).toBeNull();
   });
   it('generates and really tests a paper reference implementation only with SHA-bound approval in a separate worktree', async () => {
     const c = defaultConfig();

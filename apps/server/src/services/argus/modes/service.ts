@@ -340,6 +340,7 @@ export class ArgusModeService {
         'MODE_APPROVAL_REQUIRED',
         403
       );
+      invariant(run.config.permissions.modelCalls, 'MODE_MODEL_CALLS_DENIED', 403);
       const argus = await this.argus.getStatus(root);
       invariant(argus?.autonomy === 'enabled', 'MODE_EXISTING_AUTONOMY_APPROVAL_REQUIRED', 403);
       const admittedId =

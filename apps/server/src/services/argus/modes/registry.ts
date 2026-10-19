@@ -33,7 +33,7 @@ export const MODE_DESCRIPTORS: ArgusModeDescriptor[] = [
     label: 'Eval',
     description:
       'Versioned golden datasets, model comparisons and evidence-linked evaluation gates.',
-    adapterVersion: 'phoenix-compatible-v1',
+    adapterVersion: 'automaker-eval-v1',
     upstream: MODE_UPSTREAMS.eval,
   },
 ];

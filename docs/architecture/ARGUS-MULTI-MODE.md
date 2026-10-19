@@ -69,7 +69,7 @@ falls back to Default without starting anything.
 
 Plan creation is idempotent by project/key/input/configuration snapshot; conflicting
 reuse is rejected. Task admission requires an explicit per-task approval, an exact
-matching current source SHA, the run's repository-change permission, and existing
+matching current source SHA, the run's repository-change and model-call permissions, and existing
 Argus autonomy already enabled independently. Deterministic task IDs recover an
 admission interrupted between Argus-state and mode-state writes. Mode-generated
 cards are protected from generic auto-mode execution by existing Argus ownership.

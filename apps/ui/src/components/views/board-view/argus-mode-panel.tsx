@@ -389,6 +389,7 @@ export function ArgusModePanel({ projectPath }: { projectPath: string }) {
                   busy ||
                   !approve ||
                   !run.config.permissions.repositoryChanges ||
+                  !run.config.permissions.modelCalls ||
                   !!task.admittedTaskId ||
                   !run.sourceSha
                 }

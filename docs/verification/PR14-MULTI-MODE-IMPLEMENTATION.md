@@ -67,8 +67,8 @@ workspace under `/tmp/task2-*.log`):
 | Formatting, lockfile lint, 11 actual production dependency imports | PASS                                                                                                                              |
 | Production backend HTTP smoke                                      | `/health` 200; unauthenticated mode API 401; authenticated registered-project API 200; real REA Plan/Run PASS with four artifacts |
 
-Final server coverage: statements **69.20%**, branches **59.39%**, functions
-**78.25%**, lines **69.58%**. Original thresholds and production coverage scope
+Final server coverage: statements **69.18%**, branches **59.39%**, functions
+**78.25%**, lines **69.56%**. Original thresholds and production coverage scope
 are unchanged. Initial two native-loading suite failures were environment setup:
 frozen installation skips scripts, so the required `node-pty` rebuild was executed
 and full tests rerun successfully. No test was disabled to resolve a failure.

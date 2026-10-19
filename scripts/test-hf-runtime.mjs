@@ -1,377 +1,179 @@
-import fs from 'fs';
-import path from 'path';
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 
-// --- Configuration ---
-const BASE_URL = process.env.AUTOMAKER_BASE_URL || 'https://Leon4gr45-automaker.hf.space';
-const API_KEY = process.env.AUTOMAKER_API_KEY;
-const EXPECTED_GIT_SHA = process.env.EXPECTED_GIT_SHA;
-const TEST_TIMEOUT_MS = parseInt(process.env.TEST_TIMEOUT_MS || '10000', 10);
-const RUN_INFERENCE = process.argv.includes('--inference');
-
-// --- State ---
-const results = [];
-let discoveredEndpoints = [];
-
-// --- Helpers ---
-const reportResult = (name, category, status, details = '', httpCode = '-') => {
-  results.push({ name, category, status, httpCode, details });
-  console.log(`[${status}] ${category} | ${name} | HTTP: ${httpCode} | ${details}`);
-};
-
-const safeFetch = async (urlPath, options = {}) => {
-  const controller = new AbortController();
-  const id = setTimeout(() => controller.abort(), TEST_TIMEOUT_MS);
-  const start = Date.now();
-  try {
-    const res = await fetch(`${BASE_URL}${urlPath}`, { ...options, signal: controller.signal });
-    clearTimeout(id);
-    const text = await res.text();
-    let json = null;
+/** Read-only runtime qualification. No mode selection, task creation or autonomy activation. */
+export async function runSmoke({
+  baseUrl = process.env.AUTOMAKER_BASE_URL || 'https://Leon4gr45-automaker.hf.space',
+  apiKey = process.env.AUTOMAKER_API_KEY,
+  projectId = process.env.AUTOMAKER_PROJECT_ID,
+  expectedSha = process.env.EXPECTED_GIT_SHA,
+  inference = false,
+  timeoutMs = Number(process.env.TEST_TIMEOUT_MS || 10000),
+} = {}) {
+  const target = new URL(baseUrl);
+  if (
+    !['https:', 'http:'].includes(target.protocol) ||
+    target.username ||
+    target.password ||
+    target.search ||
+    target.hash
+  )
+    throw new Error('Invalid runtime base URL');
+  timeoutMs = Math.min(Math.max(Number.isFinite(timeoutMs) ? timeoutMs : 10000, 100), 15000);
+  const results = [];
+  const record = (name, status, httpCode, evidence) =>
+    results.push({ name, status, httpCode, evidence });
+  const headers = apiKey ? { 'X-API-Key': apiKey } : {};
+  async function request(route, options = {}, limit = timeoutMs) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), limit);
     try {
-      json = JSON.parse(text);
-    } catch (e) {}
-
-    return {
-      status: res.status,
-      ok: res.ok,
-      latency: Date.now() - start,
-      text,
-      json,
-    };
-  } catch (err) {
-    clearTimeout(id);
-    return { status: 0, ok: false, error: err.message, latency: Date.now() - start };
-  }
-};
-
-const authHeaders = API_KEY ? { 'X-API-Key': API_KEY } : {};
-
-// --- Tests ---
-
-async function testHealthAndIdentity() {
-  // 1. Root /health
-  let res = await safeFetch('/health');
-  if (res.ok && res.json?.status === 'ok') {
-    reportResult('GET /health', 'Health', 'PASS', `Latency: ${res.latency}ms`, res.status);
-  } else {
-    reportResult('GET /health', 'Health', 'FAIL', res.error || 'Invalid response', res.status);
-  }
-
-  // 2. /api-docs
-  res = await safeFetch('/api-docs');
-  if (res.ok && res.json?.endpoints) {
-    discoveredEndpoints = res.json.endpoints;
-    reportResult(
-      'GET /api-docs',
-      'API Discovery',
-      'PASS',
-      `Found ${discoveredEndpoints.length} endpoints`,
-      res.status
-    );
-  } else {
-    reportResult(
-      'GET /api-docs',
-      'API Discovery',
-      'FAIL',
-      'Failed to retrieve or parse endpoints',
-      res.status
-    );
-  }
-
-  // 3. /api/auth/status
-  res = await safeFetch('/api/auth/status');
-  if (res.ok && res.json) {
-    reportResult(
-      'GET /api/auth/status',
-      'Auth Config',
-      'PASS',
-      `Auth required: ${res.json.required}`,
-      res.status
-    );
-  } else {
-    reportResult(
-      'GET /api/auth/status',
-      'Auth Config',
-      'FAIL',
-      'Failed to read auth status',
-      res.status
-    );
-  }
-
-  // 4. Build Identity
-  // The correct static path in the deployed express app serving from /app/apps/server/dist/assets -> mapped via /assets (?)
-  // Wait, static assets in apps/ui/dist are served at /. So build-provenance is at /assets/build-provenance.json
-  res = await safeFetch('/assets/build-provenance.json');
-  if (res.status === 200 && res.json) {
-    const sha = res.json.gitSha;
-    if (!sha || sha === '0000000000000000000000000000000000000000' || sha.match(/^0+$/)) {
-      reportResult(
-        'Build Provenance',
-        'Build identity',
-        'PROVENANCE_UNVERIFIED',
-        'Dummy/zero SHA found',
-        res.status
-      );
-    } else if (EXPECTED_GIT_SHA && sha !== EXPECTED_GIT_SHA) {
-      reportResult(
-        'Build Provenance',
-        'Build identity',
-        'FAIL',
-        `Expected ${EXPECTED_GIT_SHA}, got ${sha}`,
-        res.status
-      );
-    } else {
-      reportResult('Build Provenance', 'Build identity', 'PASS', `SHA: ${sha}`, res.status);
-    }
-  } else {
-    reportResult(
-      'Build Provenance',
-      'Build identity',
-      'NOT_PROVEN',
-      'Could not locate provenance file',
-      res.status
-    );
-  }
-}
-
-async function testAuthentication() {
-  // Attempt protected route without auth
-  let res = await safeFetch('/api/settings');
-  if (res.status === 401 || res.status === 403) {
-    reportResult(
-      'Unauthenticated Access Rejection',
-      'Authentication',
-      'PASS',
-      'Correctly rejected',
-      res.status
-    );
-  } else {
-    reportResult(
-      'Unauthenticated Access Rejection',
-      'Authentication',
-      'FAIL',
-      'Allowed unauthenticated access or returned wrong code',
-      res.status
-    );
-  }
-
-  if (API_KEY) {
-    res = await safeFetch('/api/settings', { headers: authHeaders });
-    if (res.status === 200) {
-      reportResult(
-        'Authenticated Access',
-        'Authentication',
-        'PASS',
-        'Access granted with key',
-        res.status
-      );
-    } else {
-      reportResult(
-        'Authenticated Access',
-        'Authentication',
-        'FAIL',
-        'Access denied despite key',
-        res.status
-      );
-    }
-  } else {
-    reportResult(
-      'Authenticated Access',
-      'Authentication',
-      'BLOCKED',
-      'No API_KEY provided for test',
-      '-'
-    );
-  }
-
-  // Malformed JSON check (POST without required fields or bad JSON)
-  res = await safeFetch('/api/agent/chat', {
-    method: 'POST',
-    headers: { ...authHeaders, 'Content-Type': 'application/json' },
-    body: '{"malformed": "json"',
-  });
-  if (res.status >= 400 && res.status < 500) {
-    reportResult(
-      'Malformed JSON Rejection',
-      'Authentication',
-      'PASS',
-      'Handled safely',
-      res.status
-    );
-  } else {
-    reportResult(
-      'Malformed JSON Rejection',
-      'Authentication',
-      'FAIL',
-      'Unexpected handling of bad JSON',
-      res.status
-    );
-  }
-}
-
-async function testAutomakerAPIs() {
-  const checkEndpoint = (pathPattern) =>
-    discoveredEndpoints.some((e) => e.path.includes(pathPattern));
-
-  // Projects
-  if (checkEndpoint('/api/projects')) {
-    let res = await safeFetch('/api/projects', { headers: authHeaders });
-    if (res.status === 200 || res.status === 401) {
-      // 401 is fine if we are not testing authenticated
-      reportResult(
-        'List Projects',
-        'Automaker APIs',
-        'PASS',
-        'Endpoint exists and responds',
-        res.status
-      );
-    } else {
-      reportResult('List Projects', 'Automaker APIs', 'FAIL', 'Unexpected response', res.status);
-    }
-  } else {
-    reportResult('List Projects', 'Automaker APIs', 'FAIL', 'Endpoint missing in api-docs', '-');
-  }
-
-  // Agent Chat Route Registration
-  if (checkEndpoint('/api/agent/chat')) {
-    reportResult('Agent Chat Route', 'Automaker APIs', 'PASS', 'Registered in api-docs', '-');
-  } else {
-    reportResult('Agent Chat Route', 'Automaker APIs', 'FAIL', 'Missing in api-docs', '-');
-  }
-
-  // Settings
-  if (checkEndpoint('/api/settings')) {
-    reportResult('Settings Route', 'Automaker APIs', 'PASS', 'Registered in api-docs', '-');
-  } else {
-    reportResult('Settings Route', 'Automaker APIs', 'FAIL', 'Missing in api-docs', '-');
-  }
-}
-
-async function testArgusAndOpenCode() {
-  let res = await safeFetch('/api/argus/health', { headers: authHeaders });
-  if (res.status === 200) {
-    reportResult('Argus Health', 'Argus', 'PASS', `Version: ${res.json?.version}`, res.status);
-    if (res.json?.roleBackends?.MANAGER === 'opencode') {
-      reportResult(
-        'OpenCode Provider Integration',
-        'OpenCode provider',
-        'PASS',
-        'Manager backend is opencode',
-        res.status
-      );
-    } else {
-      reportResult(
-        'OpenCode Provider Integration',
-        'OpenCode provider',
-        'FAIL',
-        'Manager backend is not opencode',
-        res.status
-      );
-    }
-  } else if (res.status === 401 || res.status === 403) {
-    reportResult('Argus Health', 'Argus', 'BLOCKED', 'Authentication required to test', res.status);
-    reportResult(
-      'OpenCode Provider Integration',
-      'OpenCode provider',
-      'BLOCKED',
-      'Authentication required to test',
-      res.status
-    );
-  } else {
-    reportResult('Argus Health', 'Argus', 'FAIL', 'Failed to retrieve argus health', res.status);
-  }
-}
-
-async function testFutureModes() {
-  const modes = ['/default', '/rea', '/paper2code', '/eval'];
-  for (const mode of modes) {
-    let res = await safeFetch(mode);
-    // Assuming the UI serves these routes. If it returns index.html, it's a 200.
-    // If it's a backend 404, it might return a specific error.
-    if (res.status === 200 || res.status === 404) {
-      reportResult(
-        `Mode ${mode}`,
-        'Mode availability',
-        'NOT_IMPLEMENTED',
-        'Checked existence (not failing baseline)',
-        res.status
-      );
-    } else {
-      reportResult(`Mode ${mode}`, 'Mode availability', 'ERROR', 'Unexpected status', res.status);
+      const response = await fetch(new URL(route, target), {
+        ...options,
+        redirect: 'error',
+        signal: controller.signal,
+      });
+      if (!response.headers.get('content-type')?.includes('application/json'))
+        return { status: response.status };
+      const reader = response.body.getReader();
+      let size = 0;
+      const chunks = [];
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        size += value.length;
+        if (size > 262144) {
+          await reader.cancel();
+          return { status: response.status };
+        }
+        chunks.push(Buffer.from(value));
+      }
+      return { status: response.status, json: JSON.parse(Buffer.concat(chunks).toString()) };
+    } catch {
+      return { status: 0 };
+    } finally {
+      clearTimeout(timer);
     }
   }
-}
-
-async function testInference() {
-  if (RUN_INFERENCE) {
-    if (!API_KEY) {
-      reportResult('Inference Probe', 'Inference', 'BLOCKED', 'No API_KEY provided', '-');
-      return;
-    }
-    // Attempting a bounded inference probe.
-    // The exact endpoint for diagnostics/inference varies; we will try to reach
-    // a known endpoint if available, like /api/agent/chat or a diagnostic provider.
-    // For now we will report BLOCKED as we do not have an exact inference probe endpoint detailed.
-    reportResult(
-      'Inference Probe',
-      'Inference',
-      'NOT_IMPLEMENTED',
-      'Bounded inference probe not implemented yet',
-      '-'
-    );
-  }
-}
-
-async function generateReport() {
-  let markdown = `# Automaker HF Runtime Baseline Report\n\n`;
-  markdown += `**Target URL:** ${BASE_URL}\n`;
-  markdown += `**Generated:** ${new Date().toISOString()}\n\n`;
-
-  markdown += `| Test | Status | HTTP/result | Evidence |\n`;
-  markdown += `|---|---|---|---|\n`;
-
-  let hasFailures = false;
-
-  for (const r of results) {
-    markdown += `| ${r.name} | ${r.status} | ${r.httpCode} | ${r.details} |\n`;
-    if (r.status === 'FAIL') hasFailures = true;
-  }
-
-  const reportPath = path.join(process.cwd(), 'docs', 'verification', 'HF-RUNTIME-BASELINE.md');
-  fs.mkdirSync(path.dirname(reportPath), { recursive: true });
-  fs.writeFileSync(reportPath, markdown);
-
-  const outJsonPath = path.join(process.cwd(), 'docs', 'verification', 'HF-RUNTIME-BASELINE.json');
-  fs.writeFileSync(outJsonPath, JSON.stringify(results, null, 2));
-
-  console.log(`\nReport written to ${reportPath}`);
-  return hasFailures;
-}
-
-// --- Main ---
-async function runAll() {
-  console.log(`Starting smoke tests against ${BASE_URL}`);
-  await testHealthAndIdentity();
-  await testAuthentication();
-  await testAutomakerAPIs();
-  await testArgusAndOpenCode();
-  await testFutureModes();
-  await testInference();
-
-  reportResult(
-    'Playwright Rendering',
-    'UI',
-    'NOT_IMPLEMENTED',
-    'Headless manual test stubbed',
-    '-'
+  const health = await request('/api/health');
+  const sha = health.json?.build?.gitSha;
+  const knownSha = typeof sha === 'string' && /^(?!0{40}$)[a-f0-9]{40}$/i.test(sha);
+  record(
+    'Runtime health and identity',
+    health.status === 200 &&
+      health.json?.status === 'ok' &&
+      knownSha &&
+      (!expectedSha || expectedSha === sha)
+      ? 'PASS'
+      : 'FAIL',
+    health.status,
+    knownSha
+      ? { gitSha: sha, matchesExpected: !expectedSha || sha === expectedSha }
+      : { identity: 'unverified' }
   );
-
-  const failed = await generateReport();
-  if (failed) {
-    console.error('Baseline verification failed. Review the report.');
-    process.exit(1);
+  const query = new URLSearchParams(projectId ? { projectId } : {}).toString();
+  const unauthenticated = await request(`/api/argus/modes?${query}`);
+  record(
+    'Unauthenticated project API rejection',
+    [401, 403].includes(unauthenticated.status) ? 'PASS' : 'FAIL',
+    unauthenticated.status,
+    'Protected API must reject missing credentials'
+  );
+  if (!apiKey || !projectId) {
+    record(
+      'Authenticated project modes',
+      'BLOCKED',
+      null,
+      'AUTOMAKER_API_KEY and AUTOMAKER_PROJECT_ID are required'
+    );
+  } else {
+    for (const [route, validate] of [
+      [
+        'modes',
+        (value) =>
+          Array.isArray(value?.modes) &&
+          ['default', 'rea', 'paper2code', 'eval'].every((id) =>
+            value.modes.some((mode) => mode.id === id)
+          ),
+      ],
+      [
+        'mode',
+        (value) =>
+          ['default', 'rea', 'paper2code', 'eval'].includes(value?.activeMode) &&
+          Number.isInteger(value?.revision) &&
+          Array.isArray(value?.runs),
+      ],
+      [
+        'mode/gate',
+        (value) => value && ['PASS', 'BLOCKED', 'FAIL', 'NOT_PROVEN'].includes(value.verdict),
+      ],
+    ]) {
+      const result = await request(`/api/argus/${route}?${query}`, { headers });
+      record(
+        `Authenticated project ${route}`,
+        [401, 403].includes(result.status)
+          ? 'BLOCKED'
+          : result.status === 200 && validate(result.json)
+            ? 'PASS'
+            : 'FAIL',
+        result.status,
+        'Validated project-scoped JSON response; execution is not qualified by route availability'
+      );
+    }
   }
-  process.exit(0);
+  if (inference) {
+    if (!apiKey) record('Bounded inference', 'BLOCKED', null, 'AUTOMAKER_API_KEY is required');
+    else {
+      const result = await request(
+        '/api/settings/diagnostics/opencode/inference',
+        { method: 'POST', headers },
+        50000
+      );
+      const valid =
+        result.status === 200 &&
+        result.json?.success === true &&
+        result.json.result === 'LOCAL_PROBE_OK' &&
+        typeof result.json.model === 'string' &&
+        result.json.model.includes('/');
+      record(
+        'Bounded inference',
+        [401, 403, 429].includes(result.status) ? 'BLOCKED' : valid ? 'PASS' : 'FAIL',
+        result.status,
+        valid
+          ? 'Genuine text probe completed with deny-all tools and isolated configuration'
+          : 'Inference was not proven'
+      );
+    }
+  } else
+    record(
+      'Bounded inference',
+      'NOT_RUN',
+      null,
+      'Use --inference to invoke one bounded text-only model request'
+    );
+  // Only fixed messages, validated SHA and numeric HTTP status are recorded. Never serialize response bodies,
+  // credentials, project identifiers, provider endpoints, prompts or arbitrary error messages.
+  return {
+    schemaVersion: 1,
+    target: target.origin,
+    generatedAt: new Date().toISOString(),
+    scope:
+      'Authenticated API and optional text inference; does not prove a live Jules engineering cycle',
+    conclusion: results.every((item) => item.status === 'PASS' || item.status === 'NOT_RUN')
+      ? 'PASS'
+      : 'NO_GO',
+    results,
+  };
 }
 
-runAll();
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  const report = await runSmoke({ inference: process.argv.includes('--inference') });
+  const reportPath = path.resolve(
+    process.env.RUNTIME_REPORT_PATH || '/tmp/automaker-hf-runtime.json'
+  );
+  await fs.mkdir(path.dirname(reportPath), { recursive: true });
+  await fs.writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`, { mode: 0o600 });
+  console.log(JSON.stringify(report, null, 2));
+  process.exitCode = report.conclusion === 'PASS' ? 0 : 1;
+}

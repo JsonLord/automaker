@@ -23,7 +23,8 @@ function runtime(req, res) {
     return res.end('{}');
   }
   const url = new URL(req.url, 'http://localhost');
-  if (url.pathname === '/api/settings/diagnostics/opencode/inference' && req.method === 'POST')
+  if (url.pathname === '/api/settings/diagnostics/opencode/inference' && req.method === 'POST') {
+    assert.equal(req.headers['content-type'], 'application/json');
     return res.end(
       JSON.stringify({
         success: true,
@@ -31,6 +32,7 @@ function runtime(req, res) {
         model: 'automaker-compatible/model',
       })
     );
+  }
   assert.equal(url.searchParams.get('projectId'), 'registered');
   if (url.pathname === '/api/argus/modes')
     return res.end(

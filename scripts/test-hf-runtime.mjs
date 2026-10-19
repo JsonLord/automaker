@@ -127,7 +127,7 @@ export async function runSmoke({
     else {
       const result = await request(
         '/api/settings/diagnostics/opencode/inference',
-        { method: 'POST', headers },
+        { method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' }, body: '{}' },
         50000
       );
       const valid =

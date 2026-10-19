@@ -3,9 +3,9 @@ import { sanitizeOpenCodeOutput } from '../../lib/opencode-errors.js';
 import { realpathSync } from 'fs';
 import { resolveOpenCodeModel } from '@automaker/model-resolver';
 import { spawn, type ChildProcessWithoutNullStreams } from 'child_process';
-import fs from 'fs';
 import fsp from 'fs/promises';
 import path from 'path';
+import { fileURLToPath } from 'node:url';
 import readline from 'readline';
 import { createLogger } from '@automaker/utils';
 import { resolveState, saveArgusState } from './project-lifecycle.js';
@@ -56,10 +56,9 @@ export class SupervisedArgusService implements ArgusService {
   private sequence = 0;
   private projects = new Map<string, ArgusProjectState>();
   constructor(
-    private bridgePath = process.env.ARGUS_BRIDGE_PATH ||
-      (fs.existsSync(path.resolve(process.cwd(), 'scripts', 'argus_runtime_bridge.py'))
-        ? path.resolve(process.cwd(), 'scripts', 'argus_runtime_bridge.py')
-        : path.resolve(process.cwd(), '../../scripts', 'argus_runtime_bridge.py'))
+    private bridgePath =
+      process.env.ARGUS_BRIDGE_PATH ||
+      fileURLToPath(new URL('../../../../../scripts/argus_runtime_bridge.py', import.meta.url))
   ) {}
 
   async start(): Promise<void> {

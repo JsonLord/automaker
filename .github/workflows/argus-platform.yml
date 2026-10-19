@@ -27,7 +27,7 @@ jobs:
       - name: Check checkout is clean
         run: node scripts/check-clean-working-tree.mjs Checkout
       - run: |
-          npm ci --ignore-scripts
+          npm install --ignore-scripts
           node scripts/check-clean-working-tree.mjs 'Dependency installation'
       - run: |
           npm rebuild node-pty

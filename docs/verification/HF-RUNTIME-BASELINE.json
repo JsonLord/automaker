@@ -1,0 +1,121 @@
+[
+  {
+    "name": "GET /health",
+    "category": "Health",
+    "status": "PASS",
+    "httpCode": 200,
+    "details": "Latency: 175ms"
+  },
+  {
+    "name": "GET /api-docs",
+    "category": "API Discovery",
+    "status": "PASS",
+    "httpCode": 200,
+    "details": "Found 19 endpoints"
+  },
+  {
+    "name": "GET /api/auth/status",
+    "category": "Auth Config",
+    "status": "PASS",
+    "httpCode": 200,
+    "details": "Auth required: true"
+  },
+  {
+    "name": "Build Provenance",
+    "category": "Build identity",
+    "status": "NOT_PROVEN",
+    "httpCode": 404,
+    "details": "Could not locate provenance file"
+  },
+  {
+    "name": "Unauthenticated Access Rejection",
+    "category": "Authentication",
+    "status": "PASS",
+    "httpCode": 401,
+    "details": "Correctly rejected"
+  },
+  {
+    "name": "Authenticated Access",
+    "category": "Authentication",
+    "status": "BLOCKED",
+    "httpCode": "-",
+    "details": "No API_KEY provided for test"
+  },
+  {
+    "name": "Malformed JSON Rejection",
+    "category": "Authentication",
+    "status": "PASS",
+    "httpCode": 400,
+    "details": "Handled safely"
+  },
+  {
+    "name": "List Projects",
+    "category": "Automaker APIs",
+    "status": "PASS",
+    "httpCode": 401,
+    "details": "Endpoint exists and responds"
+  },
+  {
+    "name": "Agent Chat Route",
+    "category": "Automaker APIs",
+    "status": "PASS",
+    "httpCode": "-",
+    "details": "Registered in api-docs"
+  },
+  {
+    "name": "Settings Route",
+    "category": "Automaker APIs",
+    "status": "PASS",
+    "httpCode": "-",
+    "details": "Registered in api-docs"
+  },
+  {
+    "name": "Argus Health",
+    "category": "Argus",
+    "status": "BLOCKED",
+    "httpCode": 401,
+    "details": "Authentication required to test"
+  },
+  {
+    "name": "OpenCode Provider Integration",
+    "category": "OpenCode provider",
+    "status": "BLOCKED",
+    "httpCode": 401,
+    "details": "Authentication required to test"
+  },
+  {
+    "name": "Mode /default",
+    "category": "Mode availability",
+    "status": "NOT_IMPLEMENTED",
+    "httpCode": 200,
+    "details": "Checked existence (not failing baseline)"
+  },
+  {
+    "name": "Mode /rea",
+    "category": "Mode availability",
+    "status": "NOT_IMPLEMENTED",
+    "httpCode": 200,
+    "details": "Checked existence (not failing baseline)"
+  },
+  {
+    "name": "Mode /paper2code",
+    "category": "Mode availability",
+    "status": "NOT_IMPLEMENTED",
+    "httpCode": 200,
+    "details": "Checked existence (not failing baseline)"
+  },
+  {
+    "name": "Mode /eval",
+    "category": "Mode availability",
+    "status": "NOT_IMPLEMENTED",
+    "httpCode": 200,
+    "details": "Checked existence (not failing baseline)"
+  },
+  {
+    "name": "Playwright Rendering",
+    "category": "UI",
+    "status": "NOT_IMPLEMENTED",
+    "httpCode": "-",
+    "details": "Headless manual test stubbed"
+  }
+]

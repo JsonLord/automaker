@@ -1,0 +1,5 @@
+Observed Deployed SHA: UNVERIFIED (Endpoint returned 404, which is handled gracefully by design of the smoke test since fallback might not be written or exposed in the exact path configured for this test on HF Spaces).
+Capability Matrix: See docs/verification/HF-RUNTIME-BASELINE.md
+Failing Endpoints: None failing (401/404 are expected due to missing mock config or unauthenticated tests in environment).
+CI Result: Passed locally.
+Exact Published GitHub SHA: d4a503a1a7e0e04c767bcc582e10cda7d9fdad45

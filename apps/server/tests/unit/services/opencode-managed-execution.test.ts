@@ -20,8 +20,12 @@ vi.mock('@automaker/platform', async (importOriginal) => ({
   spawnProcess: vi.fn(),
 }));
 
-const BRIDGE_PATH = fileURLToPath(new URL('../../../../../scripts/argus_runtime_bridge.py', import.meta.url));
-const UPDATE_SETTINGS_PATH = fileURLToPath(new URL('../../../../../update_settings.py', import.meta.url));
+const BRIDGE_PATH = fileURLToPath(
+  new URL('../../../../../scripts/argus_runtime_bridge.py', import.meta.url)
+);
+const UPDATE_SETTINGS_PATH = fileURLToPath(
+  new URL('../../../../../update_settings.py', import.meta.url)
+);
 const dirs: string[] = [];
 async function temp() {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'managed-opencode-'));

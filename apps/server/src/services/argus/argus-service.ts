@@ -58,7 +58,9 @@ export class SupervisedArgusService implements ArgusService {
   constructor(
     private bridgePath =
       process.env.ARGUS_BRIDGE_PATH ||
-      fileURLToPath(new URL('../../../../../scripts/argus_runtime_bridge.py', import.meta.url))
+      fileURLToPath(
+        new URL('../../../../../scripts/argus_runtime_bridge.py', import.meta.url)
+      )
   ) {}
 
   async start(): Promise<void> {

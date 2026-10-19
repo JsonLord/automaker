@@ -4,8 +4,10 @@ import fs from 'fs/promises';
 import os from 'os';
 import path from 'path';
 import readline from 'readline';
+import { fileURLToPath } from 'node:url';
 import { ARGUS_UPSTREAM_CONTRACT } from '../../../src/services/argus/index.js';
 
+const BRIDGE_PATH = fileURLToPath(new URL('../../../../../scripts/argus_runtime_bridge.py', import.meta.url));
 const dirs: string[] = [];
 afterEach(async () => {
   await Promise.all(dirs.splice(0).map((dir) => fs.rm(dir, { recursive: true, force: true })));
@@ -39,7 +41,7 @@ async function bridge(
   requests: object[],
   extraEnv: Record<string, string> = {}
 ) {
-  const child = spawn('python3', ['-u', path.resolve('../../scripts/argus_runtime_bridge.py')], {
+  const child = spawn('python3', ['-u', BRIDGE_PATH], {
     env: { PATH: process.env.PATH!, PYTHONPATH: root, CALLS: calls, ...extraEnv },
     stdio: ['pipe', 'pipe', 'inherit'],
   });

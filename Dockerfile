@@ -70,7 +70,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxfixes3 libxrandr2 libgbm1 libasound2 libcairo2 \
     libx11-6 libx11-xcb1 libxcb1 libxext6 libxrender1 libxss1 libxtst6 \
     libxshmfence1 libgtk-3-0 libexpat1 libfontconfig1 fonts-liberation \
-    xdg-utils libpangocairo-1.0-0 libpangoft2-1.0-0 libu2f-udev libvulkan1 \
+    xdg-utils libpango-1.0-0 libpangocairo-1.0-0 libpangoft2-1.0-0 libu2f-udev libvulkan1 \
     && rm -rf /var/lib/apt/lists/*
 
 # Enable corepack and prepare pnpm

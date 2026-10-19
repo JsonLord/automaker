@@ -3,6 +3,7 @@ import fs from 'fs/promises';
 import os from 'os';
 import path from 'path';
 import { execFileSync } from 'child_process';
+import { fileURLToPath } from 'node:url';
 import { spawnProcess } from '@automaker/platform';
 import { AgentExecutor } from '../../../src/services/agent-executor.js';
 import { OpencodeProvider } from '../../../src/providers/opencode-provider.js';
@@ -19,6 +20,12 @@ vi.mock('@automaker/platform', async (importOriginal) => ({
   spawnProcess: vi.fn(),
 }));
 
+const BRIDGE_PATH = fileURLToPath(
+  new URL('../../../../../scripts/argus_runtime_bridge.py', import.meta.url)
+);
+const UPDATE_SETTINGS_PATH = fileURLToPath(
+  new URL('../../../../../update_settings.py', import.meta.url)
+);
 const dirs: string[] = [];
 async function temp() {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'managed-opencode-'));
@@ -140,7 +147,7 @@ describe('managed OpenCode execution regression', () => {
     managedEnv();
     vi.stubEnv('ARGUS_BRIDGE_FAKE', '1');
     vi.stubEnv('DATA_DIR', await temp());
-    const service = new SupervisedArgusService(path.resolve('scripts/argus_runtime_bridge.py'));
+    const service = new SupervisedArgusService(BRIDGE_PATH);
     try {
       await service.start();
       expect(await service.health()).toMatchObject({
@@ -161,7 +168,7 @@ describe('managed OpenCode execution regression', () => {
     vi.stubEnv('COMPATIBLE_API_KEY', undefined);
     vi.stubEnv('ARGUS_SKILL_OPENCODE_PROVIDER', 'opencode');
     vi.stubEnv('ARGUS_SKILL_MODEL', 'big-pickle');
-    const native = new SupervisedArgusService(path.resolve('scripts/argus_runtime_bridge.py'));
+    const native = new SupervisedArgusService(BRIDGE_PATH);
     try {
       await native.start();
       expect(await native.health()).toMatchObject({ provider: 'opencode', model: 'big-pickle' });
@@ -272,7 +279,7 @@ describe('managed OpenCode execution regression', () => {
       path.join(dir, 'settings.json'),
       JSON.stringify({ claudeCompatibleProviders: [{ id: 'keep' }] })
     );
-    execFileSync('python3', ['update_settings.py', dir, 'MiniMax-M2.7'], {
+    execFileSync('python3', [UPDATE_SETTINGS_PATH, dir, 'MiniMax-M2.7'], {
       cwd: process.cwd(),
       stdio: 'pipe',
     });

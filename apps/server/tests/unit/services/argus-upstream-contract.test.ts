@@ -7,7 +7,9 @@ import readline from 'readline';
 import { fileURLToPath } from 'node:url';
 import { ARGUS_UPSTREAM_CONTRACT } from '../../../src/services/argus/index.js';
 
-const BRIDGE_PATH = fileURLToPath(new URL('../../../../../scripts/argus_runtime_bridge.py', import.meta.url));
+const BRIDGE_PATH = fileURLToPath(
+  new URL('../../../../../scripts/argus_runtime_bridge.py', import.meta.url)
+);
 const dirs: string[] = [];
 afterEach(async () => {
   await Promise.all(dirs.splice(0).map((dir) => fs.rm(dir, { recursive: true, force: true })));

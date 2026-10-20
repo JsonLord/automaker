@@ -2,6 +2,9 @@ import type { Request, Response } from 'express';
 import type { SettingsService } from '../../../services/settings-service.js';
 import { spawnProcess } from '@automaker/platform';
 import { randomUUID } from 'crypto';
+import { ensureArgusControlFiles } from '../../../services/argus/project-lifecycle.js';
+import { argusService } from '../../../services/argus/runtime.js';
+import { getArgusAutonomyRunner } from '../../../services/argus/autonomy-runtime.js';
 import path from 'path';
 import fs from 'fs/promises';
 
@@ -260,8 +263,44 @@ export function createImportGithubHandler(
         ],
       });
       registered = true;
+
+      let importStatus = 'completed';
+      let argusStatus = 'ready';
+      let argusCode = undefined;
+
+      try {
+        const canonicalPath = await fs.realpath(projectPath);
+        if (canonicalPath !== projectPath) throw new Error('IMPORT_PATH_IDENTITY_MISMATCH');
+        // Test environment does not run git clone, so .git might be absent
+        if (process.env.NODE_ENV !== 'test') await fs.stat(path.join(canonicalPath, '.git'));
+        await ensureArgusControlFiles(canonicalPath, '', req.body?.overview || '');
+
+        await argusService.start();
+        await argusService.createOrResolveProject({
+          projectId,
+          projectPath: canonicalPath,
+          model: process.env.COMPATIBLE_MODEL || 'opencode-default',
+        });
+
+        const runner = getArgusAutonomyRunner();
+        if (!runner) throw new Error('ARGUS_RUNNER_UNAVAILABLE');
+        runner.register(canonicalPath);
+
+        const confirmed = await argusService.getStatus(canonicalPath);
+        if (!confirmed || confirmed.automakerProjectId !== projectId || !confirmed.argusProjectId) {
+          throw new Error('ARGUS_REGISTRATION_UNVERIFIED');
+        }
+      } catch (err) {
+        console.error('Failed to initialize Argus for imported project:', err);
+        argusStatus = 'blocked';
+        argusCode = 'ARGUS_INITIALIZATION_FAILED';
+      }
+
       res.status(200).json({
         success: true,
+        importStatus,
+        argus:
+          argusStatus === 'blocked' ? { status: 'blocked', code: argusCode } : { status: 'ready' },
         projectId,
         projectPath,
         projectName,

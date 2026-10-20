@@ -299,7 +299,8 @@ export function createImportGithubHandler(
       res.status(200).json({
         success: true,
         importStatus,
-        argus: argusStatus === 'blocked' ? { status: 'blocked', code: argusCode } : { status: 'ready' },
+        argus:
+          argusStatus === 'blocked' ? { status: 'blocked', code: argusCode } : { status: 'ready' },
         projectId,
         projectPath,
         projectName,

@@ -75,10 +75,13 @@ export async function readDurableJson<T>(file: string): Promise<T | undefined> {
   }
 }
 
-/** Caller holds its transaction lock. Unique temp files and fsync prevent truncated state. */
+/** Linux no-clobber publication: a fully synced inode is linked into place atomically.
+ * EEXIST preserves any existing directory entry, including empty files and symlinks.
+ * A crash-left temporary file is never treated as authoritative on retry. */
 export async function writeAtomicFileExclusive(file: string, content: string): Promise<void> {
   await guardMetadataPath(file);
-  await fs.mkdir(path.dirname(file), { recursive: true, mode: 0o700 });
+  const parent = path.dirname(file);
+  await fs.mkdir(parent, { recursive: true, mode: 0o700 });
   const temp = `${file}.tmp.${crypto.randomUUID()}`;
   let handle: Awaited<ReturnType<typeof fs.open>> | undefined;
   try {
@@ -87,26 +90,22 @@ export async function writeAtomicFileExclusive(file: string, content: string): P
     await handle.sync();
     await handle.close();
     handle = undefined;
-
-    // Check if the target file already exists before moving
     try {
-      await fs.stat(file);
-      // File exists, we shouldn't overwrite it
-      return;
-    } catch (err: any) {
-      if (err.code !== 'ENOENT') throw err;
+      await fs.link(temp, file);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
     }
-
-    await fs.rename(temp, file);
-    const directory = await fs.open(path.dirname(file), 'r');
+  } finally {
+    await handle?.close();
+    await fs.unlink(temp).catch((error: NodeJS.ErrnoException) => {
+      if (error.code !== 'ENOENT') throw error;
+    });
+    const directory = await fs.open(parent, 'r');
     try {
       await directory.sync();
     } finally {
       await directory.close();
     }
-  } finally {
-    await handle?.close();
-    await fs.unlink(temp).catch(() => {});
   }
 }
 

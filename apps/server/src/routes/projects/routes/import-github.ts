@@ -3,10 +3,9 @@ import type { SettingsService } from '../../../services/settings-service.js';
 import { spawnProcess } from '@automaker/platform';
 import { randomUUID } from 'crypto';
 import { ensureArgusControlFiles } from '../../../services/argus/project-lifecycle.js';
-import { argusService } from '../../../services/argus/runtime.js';
-import { getArgusAutonomyRunner } from '../../../services/argus/autonomy-runtime.js';
-import { ensureArgusControlFiles } from '../../../services/argus/project-lifecycle.js';
-import { argusService } from '../../../services/argus/runtime.js';
+import type { ArgusService } from '../../../services/argus/types.js';
+import type { ArgusAutonomyRunner } from '../../../services/argus/autonomy-runner.js';
+import { argusService as defaultArgusService } from '../../../services/argus/runtime.js';
 import { getArgusAutonomyRunner } from '../../../services/argus/autonomy-runtime.js';
 import path from 'path';
 import fs from 'fs/promises';
@@ -74,9 +73,15 @@ export async function githubMetadata(endpoint: string) {
 
 // Serialize registration and destination reservation across handler instances in this server.
 let importing = false;
+export interface ImportGithubDependencies {
+  argusService?: ArgusService;
+  getRunner?: () => Pick<ArgusAutonomyRunner, 'register'> | undefined;
+}
+
 export function createImportGithubHandler(
   settingsService: SettingsService,
-  metadata: MetadataReader = githubMetadata
+  metadata: MetadataReader = githubMetadata,
+  dependencies: ImportGithubDependencies = {}
 ) {
   return async (req: Request, res: Response): Promise<void> => {
     if (importing) {
@@ -267,15 +272,18 @@ export function createImportGithubHandler(
       });
       registered = true;
 
-      let importStatus = 'completed';
+      const importStatus = 'completed';
       let argusStatus = 'ready';
       let argusCode = undefined;
 
       try {
         const canonicalPath = await fs.realpath(projectPath);
         if (canonicalPath !== projectPath) throw new Error('IMPORT_PATH_IDENTITY_MISMATCH');
-        // Test environment does not run git clone, so .git might be absent
-        if (process.env.NODE_ENV !== 'test') await fs.stat(path.join(canonicalPath, '.git'));
+        if (!(await fs.lstat(path.join(canonicalPath, '.git'))).isDirectory())
+          throw new Error('IMPORT_CHECKOUT_UNVERIFIED');
+        const runner = (dependencies.getRunner || getArgusAutonomyRunner)();
+        if (!runner) throw new Error('ARGUS_RUNNER_UNAVAILABLE');
+        const argusService = dependencies.argusService || defaultArgusService;
         await ensureArgusControlFiles(canonicalPath, '', req.body?.overview || '');
 
         await argusService.start();
@@ -285,16 +293,19 @@ export function createImportGithubHandler(
           model: process.env.COMPATIBLE_MODEL || 'opencode-default',
         });
 
-        const runner = getArgusAutonomyRunner();
-        if (!runner) throw new Error('ARGUS_RUNNER_UNAVAILABLE');
-        runner.register(canonicalPath);
-
         const confirmed = await argusService.getStatus(canonicalPath);
-        if (!confirmed || confirmed.automakerProjectId !== projectId || !confirmed.argusProjectId) {
+        if (
+          !confirmed ||
+          confirmed.automakerProjectId !== projectId ||
+          !confirmed.argusProjectId ||
+          confirmed.autonomy !== 'paused' ||
+          confirmed.phase !== 'planning'
+        ) {
           throw new Error('ARGUS_REGISTRATION_UNVERIFIED');
         }
+        runner.register(canonicalPath);
       } catch (err) {
-        console.error('Failed to initialize Argus for imported project:', err);
+        // Registration failure must not expose provider diagnostics or advertise readiness.
         argusStatus = 'blocked';
         argusCode = 'ARGUS_INITIALIZATION_FAILED';
       }

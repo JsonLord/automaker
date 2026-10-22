@@ -42,12 +42,8 @@ async function fixture() {
   await argus.resumeProject(dir);
   const features = new FeatureLoader();
   await enableFixtureAutonomy(argus, dir);
-  let task = await new ArgusOrchestrator(argus, features).reconcileProject(dir);
-  if (!task) {
-    await argus.resumeProject(dir);
-    task = await new ArgusOrchestrator(argus, features).reconcileProject(dir);
-  }
-  task = task || {};
+  const task = await new ArgusOrchestrator(argus, features).reconcileProject(dir);
+  if (!task) throw new Error('TEST_EXPECTED_PLANNED_TASK');
   return { dir, argus, features, task: task! };
 }
 afterEach(async () => {

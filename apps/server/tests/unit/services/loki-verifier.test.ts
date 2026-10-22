@@ -8,7 +8,6 @@ import {
   RemoteLokiExecutor,
 } from '../../../src/services/argus/verification.js';
 import { FeatureLoader } from '../../../src/services/feature-loader.js';
-import { saveArgusState } from '../../../src/services/argus/index.js';
 
 async function enableFixtureAutonomy(
   argus: SupervisedArgusService,

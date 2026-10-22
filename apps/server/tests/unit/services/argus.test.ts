@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import fs from 'fs/promises';
 import os from 'os';
 import path from 'path';
@@ -8,8 +8,10 @@ import {
   migrateArgusControlFiles,
   readArgusEnvironment,
   resolveState,
+  saveArgusState,
   SupervisedArgusService,
   ArgusOrchestrator,
+  ArgusAutonomyRunner,
 } from '../../../src/services/argus/index.js';
 import { FeatureLoader } from '../../../src/services/feature-loader.js';
 
@@ -71,7 +73,7 @@ describe('Argus Milestones A/B', () => {
     const charter = await fs.readFile(path.join(dir, 'ARGUS.md'), 'utf8');
     await ensureArgusControlFiles(dir, '# campaign two', 'rewritten objective');
     expect(await fs.readFile(path.join(dir, 'ARGUS.md'), 'utf8')).toBe(charter);
-    expect(await fs.readFile(path.join(dir, 'spec.md'), 'utf8')).toBe('# campaign two');
+    expect(await fs.readFile(path.join(dir, 'spec.md'), 'utf8')).toBe('# campaign one');
     const policy = await fs.readFile(path.join(dir, '.automaker', 'argus.yaml'), 'utf8');
     expect(policy).toContain('enabled: true');
     expect(policy).toContain('deployment: disabled');
@@ -95,6 +97,8 @@ describe('Argus Milestones A/B', () => {
     const second = await resolveState('project-1', dir, 'brain');
     expect(second.argusProjectId).toBe(first.argusProjectId);
     expect(second.specRevision).toBe(1);
+    expect(second.autonomy).toBe('paused');
+    expect(second.phase).toBe('planning');
     expect(new Set(Object.values(first.roles).map((role) => role.contextId)).size).toBe(4);
     expect(first.roles.reviewer.readOnly).toBe(true);
     expect(first.roles.manager.readOnly).toBe(false);
@@ -148,6 +152,102 @@ describe('Argus Milestones A/B', () => {
     await restarted.stop();
   });
 
+  it('keeps new registration paused and external objective/specification changes cannot authorize work', async () => {
+    process.env.ARGUS_BRIDGE_FAKE = '1';
+    const dir = await temp();
+    await ensureArgusControlFiles(dir, '# spec', 'objective');
+    const service = new SupervisedArgusService(path.resolve('scripts/argus_runtime_bridge.py'));
+    await service.start();
+    try {
+      const state = await service.createOrResolveProject({
+        projectId: 'paused',
+        projectPath: dir,
+        model: 'brain',
+      });
+      expect(state).toMatchObject({ autonomy: 'paused', phase: 'planning', activeTask: null });
+      await fs.writeFile(path.join(dir, 'spec.md'), '# externally changed spec');
+      await fs.writeFile(path.join(dir, 'ARGUS.md'), '# externally changed objective');
+      await service.createOrResolveProject({
+        projectId: 'paused',
+        projectPath: dir,
+        model: 'brain',
+      });
+      expect(await service.getStatus(dir)).toMatchObject({
+        autonomy: 'paused',
+        phase: 'planning',
+        activeTask: null,
+      });
+      const planner = { reconcileProject: vi.fn() };
+      const executor = { dispatch: vi.fn(), reconcile: vi.fn() };
+      const runner = new ArgusAutonomyRunner(service, planner, executor as never, undefined, {
+        reconcile: vi.fn(),
+      });
+      runner.register(dir);
+      await runner.tick();
+      expect(planner.reconcileProject).not.toHaveBeenCalled();
+      expect(executor.dispatch).not.toHaveBeenCalled();
+      expect(executor.reconcile).not.toHaveBeenCalled();
+    } finally {
+      await service.stop();
+    }
+  });
+
+  it.each(['native', 'persistence', 'identity'] as const)(
+    'never publishes false ready state after %s failure and recovers the same identity',
+    async (failure) => {
+      process.env.ARGUS_BRIDGE_FAKE = '1';
+      const dir = await temp();
+      await ensureArgusControlFiles(dir, '# spec', 'objective');
+      const service = new SupervisedArgusService(path.resolve('scripts/argus_runtime_bridge.py'));
+      await service.start();
+      const call = vi.spyOn(service as any, 'call');
+      const originalRename = fs.rename.bind(fs);
+      let stateWrites = 0;
+      const rename = vi.spyOn(fs, 'rename').mockImplementation(async (from, to) => {
+        if (
+          String(to).endsWith('argus-state.json') &&
+          ++stateWrites === 2 &&
+          failure === 'persistence'
+        )
+          throw new Error('fixture disk failure');
+        return originalRename(from, to);
+      });
+      if (failure === 'native') call.mockRejectedValueOnce(new Error('fixture native failure'));
+      if (failure === 'identity')
+        call.mockResolvedValueOnce({
+          projectId: 'wrong-native',
+          correlationId: 'wrong-correlation',
+        });
+      try {
+        const input = { projectId: 'recoverable', projectPath: dir, model: 'brain' };
+        await expect(service.createOrResolveProject(input)).rejects.toThrow(
+          failure === 'identity' ? 'identity mismatch' : 'fixture'
+        );
+        expect(await service.getStatus(dir)).toBeUndefined();
+        const disk = JSON.parse(
+          await fs.readFile(path.join(dir, '.automaker', 'argus-state.json'), 'utf8')
+        );
+        expect(disk).toMatchObject({ automakerProjectId: input.projectId, autonomy: 'paused' });
+        const recovered = await service.createOrResolveProject(input);
+        expect(recovered.automakerProjectId).toBe(disk.automakerProjectId);
+        expect(recovered.argusCorrelationId).toBe(disk.argusCorrelationId);
+        expect(
+          call.mock.calls
+            .filter(([operation]) => operation === 'ensure_project')
+            .map(([, params]) => params.projectId)
+        ).toEqual([disk.argusCorrelationId, disk.argusCorrelationId]);
+        expect(await service.getStatus(dir)).toBe(recovered);
+        await expect(
+          service.createOrResolveProject({ ...input, projectId: 'different' })
+        ).rejects.toThrow('identity mismatch');
+      } finally {
+        rename.mockRestore();
+        call.mockRestore();
+        await service.stop();
+      }
+    }
+  );
+
   it('runs Manager then Planner and idempotently projects one existing Kanban feature', async () => {
     const dir = await temp();
     await ensureArgusControlFiles(dir, '# bounded campaign', '# stable objective');
@@ -161,6 +261,8 @@ describe('Argus Milestones A/B', () => {
       projectPath: dir,
       model: 'brain',
     });
+    firstState.autonomy = 'enabled';
+    await saveArgusState(dir, firstState);
     await service.resumeProject(dir);
     const orchestrator = new ArgusOrchestrator(service, new FeatureLoader());
     const first = await orchestrator.reconcileProject(dir);

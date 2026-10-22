@@ -1,5 +1,10 @@
 import { redactOpenCodeEvent } from '../../lib/opencode-errors.js';
-import { withDurableLock, readDurableJson, writeAtomicFile } from './durable-store.js';
+import {
+  withDurableLock,
+  readDurableJson,
+  writeAtomicFile,
+  writeAtomicFileExclusive,
+} from './durable-store.js';
 import { resolveOpenCodeModel } from '@automaker/model-resolver';
 import crypto from 'crypto';
 import fs from 'fs/promises';
@@ -83,14 +88,14 @@ export async function ensureArgusControlFiles(
   objective?: string
 ) {
   const charterPath = path.join(projectPath, 'ARGUS.md');
-  if (!(await readOptional(charterPath))) {
+  if (objective?.trim() || spec.trim()) {
     const charter = `# Project Objective\n\n## North-star objective\n${objective || spec.slice(0, 500)}\n\n## Success conditions\n- The current specification is implemented and verified.\n\n## Architecture constraints\n- Preserve the existing architecture unless the specification requires change.\n\n## Non-goals\n- Deployment and publishing are excluded.\n\n## Quality and test expectations\n- Relevant tests, type checking, and builds must pass.\n\n## Definition of done\n- The objective is satisfied with reviewable evidence.\n`;
-    await writeAtomicFile(charterPath, charter);
+    await writeAtomicFileExclusive(charterPath, charter);
   }
-  await writeAtomicFile(path.join(projectPath, 'spec.md'), spec);
+  if (spec.trim()) await writeAtomicFileExclusive(path.join(projectPath, 'spec.md'), spec);
   const automakerDir = await ensureArgusMetadataDirectory(projectPath);
   const policyPath = path.join(automakerDir, 'argus.yaml');
-  if (!(await readOptional(policyPath))) await writeAtomicFile(policyPath, YAML.stringify(POLICY));
+  await writeAtomicFileExclusive(policyPath, YAML.stringify(POLICY));
 }
 
 export async function migrateArgusControlFiles(projectPath: string): Promise<boolean> {

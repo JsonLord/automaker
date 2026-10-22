@@ -5,6 +5,9 @@ import { randomUUID } from 'crypto';
 import { ensureArgusControlFiles } from '../../../services/argus/project-lifecycle.js';
 import { argusService } from '../../../services/argus/runtime.js';
 import { getArgusAutonomyRunner } from '../../../services/argus/autonomy-runtime.js';
+import { ensureArgusControlFiles } from '../../../services/argus/project-lifecycle.js';
+import { argusService } from '../../../services/argus/runtime.js';
+import { getArgusAutonomyRunner } from '../../../services/argus/autonomy-runtime.js';
 import path from 'path';
 import fs from 'fs/promises';
 

@@ -342,7 +342,11 @@ export class ArgusModeService {
       );
       invariant(run.config.permissions.modelCalls, 'MODE_MODEL_CALLS_DENIED', 403);
       const argus = await this.argus.getStatus(root);
-      invariant(argus?.autonomy === 'enabled', 'MODE_EXISTING_AUTONOMY_APPROVAL_REQUIRED', 403);
+      invariant(
+        argus?.autonomy === 'enabled' || argus?.autonomy === 'paused',
+        'MODE_EXISTING_AUTONOMY_APPROVAL_REQUIRED',
+        403
+      );
       const admittedId =
         run.mode === 'default' ? task.id : `mode-${run.id}-${digest(task.id).slice(0, 12)}`;
       if (!argus.activeTask || argus.activeTask.taskId !== admittedId) {

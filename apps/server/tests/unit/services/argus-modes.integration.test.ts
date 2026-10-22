@@ -120,6 +120,12 @@ afterEach(async () => {
 
 describe('Argus multi-mode integration (real storage, Git, HTTP, bridge and CPU subprocess)', () => {
   it('preserves the default workflow and idempotently admits a reviewed task without activating autonomy', async () => {
+    await argus.resumeProject(root);
+    const st = await argus.getStatus(root);
+    if (st) {
+      st.autonomy = 'enabled';
+      await saveArgusState(root, st);
+    }
     expect((await modes.state(root)).activeMode).toBe('default');
     const before = (await argus.getStatus(root))!;
     const autonomy = before.autonomy;

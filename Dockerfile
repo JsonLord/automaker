@@ -29,7 +29,7 @@ COPY scripts/generate-provenance.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/generate-provenance.sh && generate-provenance.sh
 
 # Install all dependencies using the root package-lock.json
-RUN npm install --ignore-scripts
+RUN npm ci --ignore-scripts
 
 # Build shared libraries
 RUN npm run build:packages
@@ -48,7 +48,7 @@ RUN npm run build --workspace=apps/server && \
 RUN PLAYWRIGHT_BROWSERS_PATH=/opt/playwright ./node_modules/.bin/playwright install chromium
 
 FROM builder AS runtime-dependencies
-RUN npm install --omit=dev --ignore-scripts --no-audit --no-fund && \
+RUN npm ci --omit=dev --ignore-scripts --no-audit --no-fund && \
     npm rebuild node-pty --workspace=apps/server
 
 # =============================================================================

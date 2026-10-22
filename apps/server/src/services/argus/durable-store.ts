@@ -76,6 +76,41 @@ export async function readDurableJson<T>(file: string): Promise<T | undefined> {
 }
 
 /** Caller holds its transaction lock. Unique temp files and fsync prevent truncated state. */
+export async function writeAtomicFileExclusive(file: string, content: string): Promise<void> {
+  await guardMetadataPath(file);
+  await fs.mkdir(path.dirname(file), { recursive: true, mode: 0o700 });
+  const temp = `${file}.tmp.${crypto.randomUUID()}`;
+  let handle: Awaited<ReturnType<typeof fs.open>> | undefined;
+  try {
+    handle = await fs.open(temp, 'wx', 0o600);
+    await handle.writeFile(content);
+    await handle.sync();
+    await handle.close();
+    handle = undefined;
+
+    // Check if the target file already exists before moving
+    try {
+      await fs.stat(file);
+      // File exists, we shouldn't overwrite it
+      return;
+    } catch (err: any) {
+      if (err.code !== 'ENOENT') throw err;
+    }
+
+    await fs.rename(temp, file);
+    const directory = await fs.open(path.dirname(file), 'r');
+    try {
+      await directory.sync();
+    } finally {
+      await directory.close();
+    }
+  } finally {
+    await handle?.close();
+    await fs.unlink(temp).catch(() => {});
+  }
+}
+
+/** Caller holds its transaction lock. Unique temp files and fsync prevent truncated state. */
 export async function writeAtomicFile(file: string, content: string): Promise<void> {
   await guardMetadataPath(file);
   await fs.mkdir(path.dirname(file), { recursive: true, mode: 0o700 });

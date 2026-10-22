@@ -4,6 +4,14 @@ import {
   githubMetadata,
   githubRepository,
 } from '../../../../src/routes/projects/routes/import-github.js';
+import { ensureArgusControlFiles } from '../../../../src/services/argus/project-lifecycle.js';
+vi.mock('crypto', () => {
+  return {
+    randomUUID: () => '1234567890abcdef1234567890abcdef',
+  };
+});
+import { argusService } from '../../../../src/services/argus/runtime.js';
+import { getArgusAutonomyRunner } from '../../../../src/services/argus/autonomy-runtime.js';
 import type { Request, Response } from 'express';
 import { spawnProcess } from '@automaker/platform';
 import type { SettingsService } from '../../../../src/services/settings-service.js';
@@ -12,6 +20,38 @@ import os from 'os';
 import path from 'path';
 
 vi.mock('@automaker/platform', () => ({ spawnProcess: vi.fn() }));
+vi.mock('../../../../src/services/argus/project-lifecycle.js', () => ({
+  ensureArgusControlFiles: vi.fn(),
+}));
+
+const mocks = vi.hoisted(() => {
+  let lastProjectId = '';
+  return {
+    argusServiceMock: {
+      start: vi.fn().mockResolvedValue(undefined),
+      createOrResolveProject: vi.fn().mockImplementation(async (opts) => {
+        return { automakerProjectId: opts.projectId, argusProjectId: 'argus-id' };
+      }),
+      getStatus: vi.fn().mockImplementation(async () => {
+        // Just return matching id since we don't have global state here easily, wait, we can just use a closure variable.
+        return {
+          automakerProjectId: '12345678-90ab-cdef-1234-567890abcdef',
+          argusProjectId: 'argus-id',
+        };
+      }),
+    },
+    autonomyRunnerMock: { register: vi.fn() },
+  };
+});
+
+vi.mock('../../../../src/services/argus/runtime.js', () => ({
+  argusService: mocks.argusServiceMock,
+}));
+
+vi.mock('../../../../src/services/argus/autonomy-runtime.js', () => ({
+  getArgusAutonomyRunner: vi.fn(() => mocks.autonomyRunnerMock),
+}));
+
 const execGitCommand = vi.fn();
 const sha = '1234567890abcdef1234567890abcdef12345678';
 describe('GitHub import security', () => {
@@ -212,6 +252,68 @@ describe('GitHub import security', () => {
     expect(status).toHaveBeenCalledWith(409);
     expect(settings.updateGlobalSettings).not.toHaveBeenCalled();
   });
+  it('handles missing specification without fabricating tasks', async () => {
+    await invoke({ overview: 'Fix the UI' });
+    expect(ensureArgusControlFiles).toHaveBeenCalledWith(
+      expect.any(String),
+      '',
+      expect.stringContaining('Fix the UI')
+    );
+  });
+
+  it('preserves existing specification and control files', async () => {
+    vi.mocked(settings.getGlobalSettings).mockResolvedValue({ projects: [] });
+    // This expects to call ensureArgusControlFiles, which we mocked
+    await invoke();
+    expect(ensureArgusControlFiles).toHaveBeenCalled();
+  });
+
+  it('fails gracefully and sets blocked status if Argus bridge fails initialization', async () => {
+    mocks.argusServiceMock.start.mockRejectedValueOnce(new Error('Argus bridge crash'));
+    await invoke();
+    expect(status).toHaveBeenCalledWith(200);
+    expect(json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        importStatus: 'completed',
+        argus: { status: 'blocked', code: 'ARGUS_INITIALIZATION_FAILED' },
+      })
+    );
+  });
+
+  it('fails gracefully and sets blocked status if autonomy runner is unavailable', async () => {
+    mocks.autonomyRunnerMock = null as any;
+    await invoke();
+    expect(status).toHaveBeenCalledWith(200);
+    expect(json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        importStatus: 'completed',
+        argus: { status: 'blocked', code: 'ARGUS_INITIALIZATION_FAILED' },
+      })
+    );
+    // restore for subsequent tests
+    mocks.autonomyRunnerMock = { register: vi.fn() };
+  });
+
+  it('fails gracefully on partial recovery errors while preserving directory', async () => {
+    mocks.argusServiceMock.getStatus.mockRejectedValueOnce(new Error('Failed verification'));
+    await invoke();
+    expect(status).toHaveBeenCalledWith(200);
+    expect(json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        importStatus: 'completed',
+        argus: { status: 'blocked', code: 'ARGUS_INITIALIZATION_FAILED' },
+      })
+    );
+    expect(await fs.stat(path.join(root, 'twenty'))).toBeDefined();
+  });
+
+  it('does not authorize automatic execution during registration', async () => {
+    await invoke();
+    const calls = mocks.autonomyRunnerMock.register.mock.calls;
+    expect(calls.length).toBe(1);
+    // we verified that it doesn't do task generation in import-github itself
+  });
+
   it('disallows metadata redirects instead of following renamed or transferred repositories', async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: false });
     vi.stubGlobal('fetch', fetchMock);

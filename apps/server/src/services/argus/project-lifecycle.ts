@@ -175,7 +175,9 @@ export async function resolveState(
       existing.objectiveHash = nextObjectiveHash;
       existing.activeTask = null;
       existing.phase = 'planning';
-      existing.autonomy = 'enabled';
+      if (existing.autonomy !== 'enabled') {
+        existing.autonomy = 'paused';
+      }
       existing.latestStatus = 'External objective change requires Manager reconciliation.';
     }
     for (const role of Object.values(existing.roles)) {
@@ -203,7 +205,7 @@ export async function resolveState(
     objectiveHash: hash(objective),
     specHash: hash(spec),
     specRevision: 1,
-    autonomy: 'enabled',
+    autonomy: 'paused',
     phase: 'planning',
     executor: 'jules',
     retryCounters: { julesRepair: 0, seniorFeedback: 0 },

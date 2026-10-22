@@ -3,6 +3,20 @@ import fs from 'fs/promises';
 import os from 'os';
 import path from 'path';
 import { FeatureLoader } from '../../../src/services/feature-loader.js';
+import { saveArgusState } from '../../../src/services/argus/index.js';
+
+async function enableFixtureAutonomy(
+  argus: SupervisedArgusService,
+  projectPath: string
+): Promise<void> {
+  await argus.resumeProject(projectPath);
+  const state = await argus.getStatus(projectPath);
+  if (!state) throw new Error('TEST_ARGUS_STATE_MISSING');
+  if (state.autonomy !== 'paused') throw new Error(`TEST_EXPECTED_PAUSED_STATE: ${state.autonomy}`);
+  state.autonomy = 'enabled';
+  await saveArgusState(projectPath, state);
+}
+
 import {
   ensureArgusControlFiles,
   SupervisedArgusService,
@@ -29,7 +43,7 @@ it('one Jules session and PR survive Loki repair, fresh verification, CI, Senior
   services.push(argus);
   await argus.start();
   await argus.createOrResolveProject({ projectId: 'p', projectPath: dir, model: 'opencode/model' });
-  await argus.resumeProject(dir);
+  await enableFixtureAutonomy(argus, dir);
   const features = new FeatureLoader();
   const task = (await new ArgusOrchestrator(argus, features).reconcileProject(dir))!;
   const base = 'b'.repeat(40),

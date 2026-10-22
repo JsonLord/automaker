@@ -172,6 +172,7 @@ export class SupervisedArgusService implements ArgusService {
       input.projectPath,
       resolveOpenCodeModel(input.model).id
     );
+    this.projects.set(input.projectPath, state);
     const native = await this.call<{ projectId: string; correlationId: string }>('ensure_project', {
       projectId: state.argusCorrelationId,
       nativeProjectId:
@@ -183,7 +184,6 @@ export class SupervisedArgusService implements ArgusService {
     state.argusCorrelationId = native.correlationId;
     state.argusProjectId = native.projectId;
     await saveArgusState(input.projectPath, state);
-    this.projects.set(input.projectPath, state);
     return state;
   }
   async resumeProject(projectPath: string) {

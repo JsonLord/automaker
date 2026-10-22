@@ -20,10 +20,23 @@ async function fixture() {
   dirs.push(dir);
   await ensureArgusControlFiles(dir, '# Campaign 1', '# Immutable objective');
   const state = await resolveState('project', dir, 'model');
+  state.autonomy = 'enabled';
   const service = {
     getStatus: vi.fn(async () => state),
   } as any;
   return { dir, state, service };
+}
+
+async function enableFixtureAutonomy(
+  argus: SupervisedArgusService,
+  projectPath: string
+): Promise<void> {
+  await argus.resumeProject(projectPath);
+  const state = await argus.getStatus(projectPath);
+  if (!state) throw new Error('TEST_ARGUS_STATE_MISSING');
+  if (state.autonomy !== 'paused') throw new Error(`TEST_EXPECTED_PAUSED_STATE: ${state.autonomy}`);
+  state.autonomy = 'enabled';
+  await require('../../../src/services/argus/index.js').saveArgusState(projectPath, state);
 }
 
 function task(revision: number): ArgusTaskState {

@@ -40,7 +40,7 @@ runs:
       shell: bash
       # Keep CI on the audited graph; the lockfile includes native optional packages.
       # Skip installation scripts; native modules are rebuilt explicitly below.
-      run: npm install --ignore-scripts --no-save
+      run: npm ci --ignore-scripts
 
     - name: Build shared packages
       shell: bash

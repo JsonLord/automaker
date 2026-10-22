@@ -17,9 +17,9 @@ This file serves as a guide for further agents regarding deployment best practic
 
 ### HF Token
 
-- The environment variable **`$HF_TOKEN` will always be provided at execution time**.
+- The HF token environment variable will always be provided at execution time.
 - Never hardcode the token. Always read it from the environment.
-- All monitoring and log‑streaming commands rely on `$HF_TOKEN`.
+- All monitoring and log‑streaming commands rely on the HF token.
 
 ### Required Files
 
@@ -33,7 +33,7 @@ This file serves as a guide for further agents regarding deployment best practic
   ---
   ```
 - `.hfignore` to exclude unnecessary files
-- This `Agent.md` file (must be committed before deployment)
+- `Agent.md`
 
 ---
 
@@ -170,14 +170,14 @@ This file serves as a guide for further agents regarding deployment best practic
 
 ## 3. Deployment Workflow
 
-Precondition: Use the huggingface hub cli hf to check that the space is empty of files nd delete any which are still in there and not belonging to the project to be uploaded.
+Precondition: Inspect the existing Space without deleting files. Preserve existing content, settings, secrets and history. Repository clearing is never a deployment prerequisite; any destructive cleanup requires a separately reviewed, explicit instruction.
 
 ### Standard Deployment Command
 
 After any code change, run:
 
 ```bash
-hf upload Leon4gr45/automaker --repo-type=space
+hf upload Leon4gr45/automaker . --repo-type=space --token <HF_TOKEN>
 ```
 
 ### Monitoring Logs
@@ -187,18 +187,16 @@ Scan build and run logs:
 - Get build logs (SSE):
 
 ```bash
-curl -N -H "Authorization: Bearer $HF_TOKEN" "https://huggingface.co/api/spaces/Leon4gr45/automaker/logs/build"
+curl -N -H "Authorization: Bearer <HF_TOKEN>" "https://huggingface.co/api/spaces/Leon4gr45/automaker/logs/build"
 ```
 
 - Get run logs (SSE) once the build logs succeed:
 
 ```bash
-curl -N -H "Authorization: Bearer $HF_TOKEN" "https://huggingface.co/api/spaces/Leon4gr45/automaker/logs/run"
+curl -N -H "Authorization: Bearer <HF_TOKEN>" "https://huggingface.co/api/spaces/Leon4gr45/automaker/logs/run"
 ```
 
 Monitor for 300 seconds to see if the deployment has been successful. If any logs indicate failure, fix these issues in the codebase via code modifications, redeploy, and monitor again until the space is running and reacts to API endpoints.
-
----
 
 ## Argus multi-mode operation (PR #14)
 

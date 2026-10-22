@@ -120,6 +120,12 @@ afterEach(async () => {
 
 describe('Argus multi-mode integration (real storage, Git, HTTP, bridge and CPU subprocess)', () => {
   it('preserves the default workflow and idempotently admits a reviewed task without activating autonomy', async () => {
+    await argus.resumeProject(root);
+    const st = await argus.getStatus(root);
+    if (st) {
+      st.autonomy = 'enabled';
+      await saveArgusState(root, st);
+    }
     expect((await modes.state(root)).activeMode).toBe('default');
     const before = (await argus.getStatus(root))!;
     const autonomy = before.autonomy;
@@ -160,6 +166,21 @@ describe('Argus multi-mode integration (real storage, Git, HTTP, bridge and CPU 
       'MODE_HUMAN_MERGE_REQUIRED'
     );
     await expect(select('rea')).rejects.toThrow('MODE_ENGINEERING_TASK_ACTIVE');
+  });
+  it('refuses engineering task admission for a paused project even with mode permissions and exact SHA approval', async () => {
+    const c = config();
+    c.permissions.repositoryChanges = true;
+    await select('default', c);
+    const run = await modes.run(root, (await plan({ question: 'Propose a bounded task' })).id);
+    expect(run.tasks).toHaveLength(1);
+    await expect(modes.approveTask(root, run.id, run.tasks[0].id, sha)).rejects.toThrow(
+      'MODE_EXISTING_AUTONOMY_APPROVAL_REQUIRED'
+    );
+    expect(await argus.getStatus(root)).toMatchObject({
+      autonomy: 'paused',
+      activeTask: null,
+      phase: 'planning',
+    });
   });
   it('executes REA experiments on an authorized fixture, versions evidence, persists artifacts and blocks native tools', async () => {
     await select('rea');

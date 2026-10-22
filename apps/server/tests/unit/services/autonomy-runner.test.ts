@@ -20,6 +20,7 @@ async function fixture() {
   dirs.push(dir);
   await ensureArgusControlFiles(dir, '# Campaign 1', '# Immutable objective');
   const state = await resolveState('project', dir, 'model');
+  state.autonomy = 'enabled';
   const service = {
     getStatus: vi.fn(async () => state),
   } as any;

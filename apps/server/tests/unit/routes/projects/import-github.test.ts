@@ -4,6 +4,7 @@ import {
   githubMetadata,
   githubRepository,
 } from '../../../../src/routes/projects/routes/import-github.js';
+import type { ArgusService, ArgusProjectState } from '../../../../src/services/argus/types.js';
 import type { Request, Response } from 'express';
 import { spawnProcess } from '@automaker/platform';
 import type { SettingsService } from '../../../../src/services/settings-service.js';
@@ -16,12 +17,33 @@ const execGitCommand = vi.fn();
 const sha = '1234567890abcdef1234567890abcdef12345678';
 describe('GitHub import security', () => {
   let root: string;
+  let service: ArgusService;
+  let runner: { register: ReturnType<typeof vi.fn> } | undefined;
+  let registeredState: ArgusProjectState | undefined;
   let settings: SettingsService;
   let metadata: ReturnType<typeof vi.fn>;
   let status: ReturnType<typeof vi.fn>;
   let json: ReturnType<typeof vi.fn>;
   beforeEach(async () => {
     vi.clearAllMocks();
+    registeredState = undefined;
+    runner = { register: vi.fn() };
+    service = {
+      start: vi.fn().mockResolvedValue(undefined),
+      createOrResolveProject: vi.fn(async (input) => {
+        registeredState = {
+          automakerProjectId: input.projectId,
+          argusProjectId: 'native-id',
+          autonomy: 'paused',
+          phase: 'planning',
+        } as ArgusProjectState;
+        return registeredState;
+      }),
+      getStatus: vi.fn(async () => registeredState),
+      resumeProject: vi.fn(),
+      managerHandoff: vi.fn(),
+      plannerNextTask: vi.fn(),
+    } as unknown as ArgusService;
     vi.mocked(spawnProcess).mockImplementation(async (options) => ({
       stdout: await execGitCommand(options.args, options.cwd, options.env, options.abortController),
       stderr: '',
@@ -51,6 +73,10 @@ describe('GitHub import security', () => {
     vi.mocked(execGitCommand).mockImplementation(async (args) => {
       if (args.includes('ls-remote'))
         return `ref: refs/heads/main\tHEAD\n${sha}\tHEAD\n${sha}\trefs/heads/main\n`;
+      if (args.includes('clone')) {
+        await fs.mkdir(path.join(root, 'twenty', '.git'));
+        return '';
+      }
       if (args.includes('rev-parse')) return sha;
       if (args.includes('symbolic-ref')) return 'main';
       if (args.includes('remote')) return 'https://github.com/JsonLord/twenty.git';
@@ -63,7 +89,10 @@ describe('GitHub import security', () => {
     await fs.rm(root, { recursive: true, force: true });
   });
   const invoke = async (overrides = {}) => {
-    await createImportGithubHandler(settings, metadata)(
+    await createImportGithubHandler(settings, metadata, {
+      argusService: service,
+      getRunner: () => runner,
+    })(
       {
         body: {
           repoUrl: 'https://github.com/JsonLord/twenty',
@@ -212,6 +241,157 @@ describe('GitHub import security', () => {
     expect(status).toHaveBeenCalledWith(409);
     expect(settings.updateGlobalSettings).not.toHaveBeenCalled();
   });
+  it('handles missing specification without fabricating tasks', async () => {
+    await invoke({ overview: 'Fix the UI' });
+    expect(await fs.readFile(path.join(root, 'twenty', 'ARGUS.md'), 'utf8')).toContain(
+      'Fix the UI'
+    );
+    await expect(fs.stat(path.join(root, 'twenty', 'spec.md'))).rejects.toMatchObject({
+      code: 'ENOENT',
+    });
+  });
+
+  it('preserves existing specification and control files', async () => {
+    vi.mocked(settings.getGlobalSettings).mockResolvedValue({ projects: [] });
+    await invoke();
+    expect(
+      await fs.readFile(path.join(root, 'twenty', '.automaker', 'argus.yaml'), 'utf8')
+    ).toContain('autonomy:');
+    await expect(fs.stat(path.join(root, 'twenty', 'spec.md'))).rejects.toMatchObject({
+      code: 'ENOENT',
+    });
+  });
+
+  it('fails gracefully and sets blocked status if Argus bridge fails initialization', async () => {
+    vi.mocked(service.start).mockRejectedValueOnce(new Error('Argus bridge crash'));
+    await invoke();
+    expect(status).toHaveBeenCalledWith(200);
+    expect(json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        importStatus: 'completed',
+        argus: { status: 'blocked', code: 'ARGUS_INITIALIZATION_FAILED' },
+      })
+    );
+  });
+
+  it('fails gracefully and sets blocked status if autonomy runner is unavailable', async () => {
+    runner = undefined;
+    await invoke();
+    expect(status).toHaveBeenCalledWith(200);
+    expect(json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        importStatus: 'completed',
+        argus: { status: 'blocked', code: 'ARGUS_INITIALIZATION_FAILED' },
+      })
+    );
+    // restore for subsequent tests
+    runner = { register: vi.fn() };
+  });
+
+  it('fails gracefully on partial recovery errors while preserving directory', async () => {
+    vi.mocked(service.getStatus).mockRejectedValueOnce(new Error('Failed verification'));
+    await invoke();
+    expect(status).toHaveBeenCalledWith(200);
+    expect(json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        importStatus: 'completed',
+        argus: { status: 'blocked', code: 'ARGUS_INITIALIZATION_FAILED' },
+      })
+    );
+    expect(await fs.stat(path.join(root, 'twenty'))).toBeDefined();
+  });
+
+  it('does not authorize automatic execution during registration', async () => {
+    await invoke();
+    const calls = runner!.register.mock.calls;
+    expect(calls.length).toBe(1);
+    expect(service.resumeProject).not.toHaveBeenCalled();
+    expect(service.managerHandoff).not.toHaveBeenCalled();
+    expect(service.plannerNextTask).not.toHaveBeenCalled();
+    expect(registeredState?.autonomy).toBe('paused');
+  });
+
+  it('captures the actual generated UUID and never accepts a different identity', async () => {
+    vi.mocked(service.getStatus).mockResolvedValueOnce({
+      automakerProjectId: 'wrong-id',
+      argusProjectId: 'native-id',
+      autonomy: 'paused',
+      phase: 'planning',
+    } as ArgusProjectState);
+    await invoke();
+    const projectId = vi.mocked(service.createOrResolveProject).mock.calls[0][0].projectId;
+    expect(projectId).toMatch(/^[a-f0-9-]{36}$/);
+    expect(json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        projectId,
+        argus: { status: 'blocked', code: 'ARGUS_INITIALIZATION_FAILED' },
+      })
+    );
+    expect(runner!.register).not.toHaveBeenCalled();
+  });
+
+  it('does not register an unexpectedly enabled imported project with the runner', async () => {
+    vi.mocked(service.getStatus).mockImplementationOnce(async () => ({
+      ...registeredState!,
+      autonomy: 'enabled',
+    }));
+    await invoke();
+    expect(json).toHaveBeenCalledWith(
+      expect.objectContaining({ argus: { status: 'blocked', code: 'ARGUS_INITIALIZATION_FAILED' } })
+    );
+    expect(runner!.register).not.toHaveBeenCalled();
+  });
+
+  it('requires a real Git directory even under NODE_ENV=test', async () => {
+    const original = execGitCommand.getMockImplementation()!;
+    execGitCommand.mockImplementation(async (...args) =>
+      args[0].includes('clone') ? '' : original(...args)
+    );
+    await invoke();
+    expect(json).toHaveBeenCalledWith(
+      expect.objectContaining({ argus: { status: 'blocked', code: 'ARGUS_INITIALIZATION_FAILED' } })
+    );
+    expect(service.start).not.toHaveBeenCalled();
+    expect(runner!.register).not.toHaveBeenCalled();
+  });
+
+  it('preserves an existing specification through successful registration', async () => {
+    const original = execGitCommand.getMockImplementation()!;
+    execGitCommand.mockImplementation(async (...args) => {
+      const result = await original(...args);
+      if (args[0].includes('clone'))
+        await fs.writeFile(path.join(root, 'twenty', 'spec.md'), 'repository-owned specification');
+      return result;
+    });
+    await invoke({ overview: 'New objective' });
+    expect(await fs.readFile(path.join(root, 'twenty', 'spec.md'), 'utf8')).toBe(
+      'repository-owned specification'
+    );
+    expect(json).toHaveBeenCalledWith(expect.objectContaining({ argus: { status: 'ready' } }));
+  });
+
+  it('retains the original registered identity after native failure; duplicate import cannot replace it', async () => {
+    vi.mocked(service.createOrResolveProject).mockRejectedValueOnce(
+      new Error('native registration failed')
+    );
+    await invoke();
+    const first = json.mock.calls.at(-1)![0];
+    expect(first.argus.status).toBe('blocked');
+    expect(runner!.register).not.toHaveBeenCalled();
+    vi.mocked(settings.getGlobalSettings).mockResolvedValue({
+      projects: [{ id: first.projectId, name: 'twenty', path: first.projectPath }],
+    } as any);
+    await invoke();
+    expect(status).toHaveBeenLastCalledWith(409);
+    await service.createOrResolveProject({
+      projectId: first.projectId,
+      projectPath: first.projectPath,
+      model: 'brain',
+    });
+    expect(registeredState?.automakerProjectId).toBe(first.projectId);
+    expect(settings.updateGlobalSettings).toHaveBeenCalledTimes(1);
+  });
+
   it('disallows metadata redirects instead of following renamed or transferred repositories', async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: false });
     vi.stubGlobal('fetch', fetchMock);

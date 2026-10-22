@@ -75,6 +75,40 @@ export async function readDurableJson<T>(file: string): Promise<T | undefined> {
   }
 }
 
+/** Linux no-clobber publication: a fully synced inode is linked into place atomically.
+ * EEXIST preserves any existing directory entry, including empty files and symlinks.
+ * A crash-left temporary file is never treated as authoritative on retry. */
+export async function writeAtomicFileExclusive(file: string, content: string): Promise<void> {
+  await guardMetadataPath(file);
+  const parent = path.dirname(file);
+  await fs.mkdir(parent, { recursive: true, mode: 0o700 });
+  const temp = `${file}.tmp.${crypto.randomUUID()}`;
+  let handle: Awaited<ReturnType<typeof fs.open>> | undefined;
+  try {
+    handle = await fs.open(temp, 'wx', 0o600);
+    await handle.writeFile(content);
+    await handle.sync();
+    await handle.close();
+    handle = undefined;
+    try {
+      await fs.link(temp, file);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+    }
+  } finally {
+    await handle?.close();
+    await fs.unlink(temp).catch((error: NodeJS.ErrnoException) => {
+      if (error.code !== 'ENOENT') throw error;
+    });
+    const directory = await fs.open(parent, 'r');
+    try {
+      await directory.sync();
+    } finally {
+      await directory.close();
+    }
+  }
+}
+
 /** Caller holds its transaction lock. Unique temp files and fsync prevent truncated state. */
 export async function writeAtomicFile(file: string, content: string): Promise<void> {
   await guardMetadataPath(file);

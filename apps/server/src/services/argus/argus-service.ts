@@ -172,6 +172,12 @@ export class SupervisedArgusService implements ArgusService {
       input.projectPath,
       resolveOpenCodeModel(input.model).id
     );
+    if (state.automakerProjectId !== input.projectId)
+      throw new ArgusOperationError(
+        'ARGUS_REGISTRATION_UNVERIFIED',
+        'Project identity mismatch',
+        false
+      );
     const native = await this.call<{ projectId: string; correlationId: string }>('ensure_project', {
       projectId: state.argusCorrelationId,
       nativeProjectId:
@@ -180,6 +186,16 @@ export class SupervisedArgusService implements ArgusService {
       projectPath: input.projectPath,
       roles: state.roles,
     });
+    if (
+      typeof native?.projectId !== 'string' ||
+      !native.projectId ||
+      native.correlationId !== state.argusCorrelationId
+    )
+      throw new ArgusOperationError(
+        'ARGUS_REGISTRATION_UNVERIFIED',
+        'Native registration identity mismatch',
+        false
+      );
     state.argusCorrelationId = native.correlationId;
     state.argusProjectId = native.projectId;
     await saveArgusState(input.projectPath, state);

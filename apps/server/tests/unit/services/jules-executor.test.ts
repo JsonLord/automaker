@@ -3,6 +3,7 @@ import fs from 'fs/promises';
 import os from 'os';
 import path from 'path';
 import { FeatureLoader } from '../../../src/services/feature-loader.js';
+import { saveArgusState } from '../../../src/services/argus/index.js';
 import {
   ArgusOrchestrator,
   JulesClient,
@@ -12,6 +13,18 @@ import {
   ensureArgusControlFiles,
   normalizeGitHubRepository,
 } from '../../../src/services/argus/index.js';
+
+async function enableFixtureAutonomy(
+  argus: SupervisedArgusService,
+  projectPath: string
+): Promise<void> {
+  await argus.resumeProject(projectPath);
+  const state = await argus.getStatus(projectPath);
+  if (!state) throw new Error('TEST_ARGUS_STATE_MISSING');
+  if (state.autonomy !== 'paused') throw new Error(`TEST_EXPECTED_PAUSED_STATE: ${state.autonomy}`);
+  state.autonomy = 'enabled';
+  await saveArgusState(projectPath, state);
+}
 
 const dirs: string[] = [];
 const response = (body: unknown, status = 200) =>
@@ -28,7 +41,9 @@ async function fixture() {
   await argus.createOrResolveProject({ projectId: 'p', projectPath: dir, model: 'm' });
   await argus.resumeProject(dir);
   const features = new FeatureLoader();
+  await enableFixtureAutonomy(argus, dir);
   const task = await new ArgusOrchestrator(argus, features).reconcileProject(dir);
+  if (!task) throw new Error('TEST_EXPECTED_PLANNED_TASK');
   return { dir, argus, features, task: task! };
 }
 afterEach(async () => {

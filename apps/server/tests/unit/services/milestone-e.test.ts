@@ -388,6 +388,45 @@ describe('Milestone E merge and autonomous campaigns', () => {
     }
   });
 
+  it.each(['merged', 'done'] as const)(
+    'recovers a crash after persisted %s without fabricating an intent or duplicate completion',
+    async (phase) => {
+      const { dir, argus, features, task } = await fixture();
+      task.phase = phase;
+      task.mergeCommitSha = 'd'.repeat(40);
+      if (phase === 'done') {
+        task.localSyncedSha = 'r'.repeat(40);
+        task.events.push({ type: 'TASK_DONE', at: new Date().toISOString() });
+      }
+      const state = (await argus.getStatus(dir))!;
+      state.phase = phase;
+      await saveArgusState(dir, state);
+      await argus.stop();
+      const restarted = new SupervisedArgusService(path.resolve('scripts/argus_runtime_bridge.py'));
+      await restarted.start();
+      try {
+        await restarted.createOrResolveProject({ projectId: 'p', projectPath: dir, model: 'm' });
+        const recovered = (await restarted.getStatus(dir))!.activeTask!;
+        const a = adapters(pull({ merged: true, state: 'CLOSED', mergeCommitSha: 'd'.repeat(40) }));
+        vi.spyOn(restarted, 'evaluateObjective').mockResolvedValue({
+          satisfied: true,
+          reasoning: 'done',
+          evidence: [],
+          remainingGaps: [],
+        });
+        await new MilestoneEOrchestrator(restarted, features, a.git).reconcile(dir);
+        expect(recovered.events.filter((event) => event.type === 'TASK_DONE')).toHaveLength(1);
+        expect(recovered.externalMerge?.mergeCommitSha).toBe('d'.repeat(40));
+        expect(recovered.mergeIntent).toBeNull();
+        expect(a.github.mergePullRequest).not.toHaveBeenCalled();
+        expect(a.local.synchronize).toHaveBeenCalledTimes(phase === 'merged' ? 1 : 0);
+        expect((await restarted.getStatus(dir))!.activeTask).toBeNull();
+      } finally {
+        await restarted.stop();
+      }
+    }
+  );
+
   it('requires configured Loki evidence before waiting or completing', async () => {
     const { dir, argus, features, task } = await fixture();
     const a = adapters();

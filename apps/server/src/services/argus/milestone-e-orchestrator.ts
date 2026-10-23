@@ -208,7 +208,7 @@ export class MilestoneEOrchestrator {
       mergeCommitSha: sha,
       observedAt: new Date().toISOString(),
     };
-    task.phase = 'merged';
+    if (!['local-sync', 'local-synced', 'done'].includes(task.phase)) task.phase = 'merged';
     this.event(task, 'MERGE_CONFIRMED');
     await this.persist(projectPath, task);
   }

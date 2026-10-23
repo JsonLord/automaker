@@ -219,6 +219,7 @@ export class JulesDeveloperAdapter implements DeveloperExecutor {
       '- Only change spec.md if the orchestration task explicitly grants spec authority.',
       '- Respect the repository architecture and ARGUS.md constraints.',
       '- Commit the implementation and create a pull request.',
+      '- Never merge a pull request. Only a human maintainer may merge through GitHub.',
       '- Do not deploy, release, or publish anything.',
     ].join('\n\n');
   }

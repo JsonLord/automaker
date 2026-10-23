@@ -126,6 +126,9 @@ describe('JulesDeveloperAdapter', () => {
       }),
     });
     await adapter.dispatch(task, dir);
+    expect(JSON.parse(fetcher.mock.calls[2][1].body).prompt).toContain(
+      'Never merge a pull request. Only a human maintainer may merge through GitHub.'
+    );
     expect((await argus.getStatus(dir))?.activeTask?.julesSessionId).toBe('session-1');
     expect((await features.get(dir, task.featureId))?.argus).toMatchObject({
       julesSessionId: 'session-1',

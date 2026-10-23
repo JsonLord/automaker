@@ -47,7 +47,7 @@
   ],
   "blockers": [
     "GitHub Actions disabled: all six exact-head hosted qualifications missing, including Docker qualification.",
-    "Production health endpoint returned HTTP 503; application identity unavailable.",
+    "Live health recovered to HTTP 200, but gitSha is null and sourceIdentity is unknown; deployed source provenance is unverified.",
     "No authorized HF staging target or authenticated configuration/state inventory is available.",
     "main and hyp-import are not protected; repository maintainers must govern external merge actors separately."
   ],
@@ -61,5 +61,15 @@
     "browserPassed": 72,
     "browserExistingSkipped": 2
   },
-  "liveMutationsPerformed": false
+  "liveMutationsPerformed": false,
+  "liveHealthObservation": {
+    "httpStatus": 200,
+    "status": "ok",
+    "applicationVersion": "1.0.0",
+    "gitSha": null,
+    "sourceIdentity": "unknown",
+    "argusVersion": "0.1.1",
+    "opencodeVersion": "1.18.35",
+    "lokiAdapterAvailable": false
+  }
 }

@@ -22,10 +22,33 @@ Public `GET https://huggingface.co/api/spaces/Leon4gr45/automaker` returned:
 }
 ```
 
-Unauthenticated `GET https://leon4gr45-automaker.hf.space/api/health` returned
-HTTP 503 and a non-JSON body. No running application version, source identity or
-healthy application can be established from that response. RUNNING is hosting
-metadata, not an application health result.
+The first unauthenticated `GET /api/health` returned HTTP 503/non-JSON. A later
+read-only recheck on the same date recovered to HTTP 200 with genuine JSON:
+
+```json
+{
+  "status": "ok",
+  "version": "1.0.0",
+  "build": {
+    "gitSha": null,
+    "sourceIdentity": "unknown",
+    "buildTimestamp": "2026-10-19T14:35:51.468Z",
+    "argus": { "installed": true, "version": "0.1.1" },
+    "opencode": { "installed": true, "version": "1.18.35" },
+    "lokiAdapterAvailable": false,
+    "capabilitiesEnabled": {
+      "loki": false,
+      "continuousEngineering": false,
+      "workerWaves": false,
+      "foreman": false
+    }
+  }
+}
+```
+
+The application is responsive at recheck, but its exact running source is unknown.
+Hosting RUNNING metadata and installed CLI versions do not establish candidate
+identity or authenticated import success.
 
 The managed session reports no configured HF secret/runtime-variable/outbound
 identity bindings. Consequently existing Space variable/secret names, actual disk
@@ -109,4 +132,4 @@ For a future authorized staging deployment: keep the previous image/revision and
 volume snapshots; roll back source/image through the normal Space revision
 workflow, retain persistent data, restore state only through a separately reviewed
 recovery operation, and verify health/identity plus paused registration. Production
-rollback cannot be certified while its health endpoint returns 503.
+rollback cannot be certified from health alone while deployed source identity is unknown.

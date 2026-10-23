@@ -199,6 +199,25 @@ export interface ArgusTaskState extends ArgusPlannedTask {
   seniorExecutionContextId: string | null;
   nextAction: string | null;
   events: Array<{ type: string; at: string; details?: Record<string, unknown> }>;
+  /** Readiness evidence only; never an authorization to merge. */
+  humanMergeGate?: {
+    repository: string;
+    prNumber: number;
+    headSha: string;
+    baseBranch: string;
+    baseSha: string;
+    url: string;
+    readyAt: string;
+  } | null;
+  /** Authoritative externally observed merge; no fabricated human actor. */
+  externalMerge?: {
+    repository: string;
+    prNumber: number;
+    headSha: string;
+    baseBranch: string;
+    mergeCommitSha: string;
+    observedAt: string;
+  } | null;
   mergeIntent: MergeIntent | null;
   mergeExpectedHeadSha: string | null;
   mergeAttemptedAt: string | null;

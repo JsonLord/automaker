@@ -1,0 +1,75 @@
+{
+  "verdict": "NO_GO — BLOCKERS_REMAIN",
+  "HUMAN_MERGE_ENFORCEMENT": "PASS",
+  "STACK_INTEGRATION": "FAIL",
+  "STAGING_DEPLOYMENT": "NOT_AUTHORIZED",
+  "TWENTY_IMPORT_SMOKE": "NOT_RUN",
+  "AUTONOMOUS_EXECUTION_AUTHORIZED": "NO",
+  "PRODUCTION_RELEASE_AUTHORIZED": "NO",
+  "qualifiedPr19Sha": "8298262e39b9b30da1fbb5006220cdd96d8b4625",
+  "sourceSha": "0380b0856fe1629c4691b3777b16ab82abce6238",
+  "integrationSourceSha": "0380b0856fe1629c4691b3777b16ab82abce6238",
+  "integrationBaseSha": "d37ced1c6ee44f721fc80930dfb5baefd7871dde",
+  "integrationBranch": "integration/argus-human-merge-qualification",
+  "correctivePr": "https://github.com/JsonLord/automaker/pull/20",
+  "publishedEvidenceCommit": "Resolve the final PR #20 HEAD; final exact-commit validation manifest and remote equality are attached to the PR report. These documents do not self-embed their own commit hash.",
+  "hostedWorkflows": [
+    {
+      "name": "Argus Platform",
+      "conclusion": "NOT_RUN",
+      "reason": "Repository Actions disabled; dispatch returned HTTP 422; no check runs exist for this candidate."
+    },
+    {
+      "name": "PR Build Check",
+      "conclusion": "NOT_RUN",
+      "reason": "Repository Actions disabled; dispatch returned HTTP 422; no check runs exist for this candidate."
+    },
+    {
+      "name": "Format Check",
+      "conclusion": "NOT_RUN",
+      "reason": "Repository Actions disabled; dispatch returned HTTP 422; no check runs exist for this candidate."
+    },
+    {
+      "name": "Test Suite",
+      "conclusion": "NOT_RUN",
+      "reason": "Repository Actions disabled; dispatch returned HTTP 422; no check runs exist for this candidate."
+    },
+    {
+      "name": "E2E Tests",
+      "conclusion": "NOT_RUN",
+      "reason": "Repository Actions disabled; dispatch returned HTTP 422; no check runs exist for this candidate."
+    },
+    {
+      "name": "Security Audit",
+      "conclusion": "NOT_RUN",
+      "reason": "Repository Actions disabled; dispatch returned HTTP 422; no check runs exist for this candidate."
+    }
+  ],
+  "blockers": [
+    "GitHub Actions disabled: all six exact-head hosted qualifications missing, including Docker qualification.",
+    "Live health recovered to HTTP 200, but gitSha is null and sourceIdentity is unknown; deployed source provenance is unverified.",
+    "No authorized HF staging target or authenticated configuration/state inventory is available.",
+    "main and hyp-import are not protected; repository maintainers must govern external merge actors separately."
+  ],
+  "observedHfRevision": "4345261eb957cd1a99e1f26bd80b3af38b1558a9",
+  "localTestTotals": {
+    "serverPassed": 3003,
+    "serverExistingSkipped": 23,
+    "packagesUiPassed": 1004,
+    "focusedIntegrationPassed": 155,
+    "provenancePassed": 11,
+    "browserPassed": 72,
+    "browserExistingSkipped": 2
+  },
+  "liveMutationsPerformed": false,
+  "liveHealthObservation": {
+    "httpStatus": 200,
+    "status": "ok",
+    "applicationVersion": "1.0.0",
+    "gitSha": null,
+    "sourceIdentity": "unknown",
+    "argusVersion": "0.1.1",
+    "opencodeVersion": "1.18.35",
+    "lokiAdapterAvailable": false
+  }
+}

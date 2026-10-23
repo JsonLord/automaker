@@ -77,21 +77,6 @@ export class GitHubCiObserver {
     };
   }
 
-  async mergePullRequest(repository: string, number: number, expectedHeadSha: string) {
-    return JSON.parse(
-      await this.runner([
-        'api',
-        '--method',
-        'PUT',
-        `repos/${repository}/pulls/${number}/merge`,
-        '-f',
-        `sha=${expectedHeadSha}`,
-        '-f',
-        'merge_method=merge',
-      ])
-    ) as { merged: boolean; sha?: string; message?: string };
-  }
-
   async getPullRequestDiff(repository: string, number: number): Promise<string> {
     return (
       await this.runner([

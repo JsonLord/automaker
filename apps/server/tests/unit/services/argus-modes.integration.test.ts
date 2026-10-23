@@ -22,6 +22,7 @@ import {
 import { ArgusModeService } from '../../../src/services/argus/modes/service.js';
 import { defaultConfig } from '../../../src/services/argus/modes/contracts.js';
 import { modeStateFile } from '../../../src/services/argus/modes/control.js';
+import { GitIntegrationService } from '../../../src/services/argus/git-integration-service.js';
 import { FeatureLoader } from '../../../src/services/feature-loader.js';
 import { ArgusAutonomyRunner } from '../../../src/services/argus/autonomy-runner.js';
 import { MilestoneEOrchestrator } from '../../../src/services/argus/milestone-e-orchestrator.js';
@@ -153,18 +154,43 @@ describe('Argus multi-mode integration (real storage, Git, HTTP, bridge and CPU 
     });
     const cards = await features.getAll(root);
     expect(cards.filter((f) => f.id === state.activeTask!.featureId)).toHaveLength(1);
-    state.activeTask!.phase = 'merge-ready';
-    state.activeTask!.repository = 'fixture/repo';
-    state.activeTask!.prNumber = 1;
+    Object.assign(state.activeTask!, {
+      phase: 'merge-ready',
+      repository: 'fixture/repo',
+      prNumber: 1,
+      baseBranch: 'main',
+      prHeadSha: sha,
+      ciHeadSha: sha,
+      ciState: 'success',
+      reviewedHeadSha: sha,
+      reviewVerdict: 'approve',
+      lease: null,
+      blockedReason: null,
+    });
     await saveArgusState(root, state);
     const merge = vi.fn();
-    await new MilestoneEOrchestrator(argus, features, {
+    const github = {
       mergePullRequest: merge,
-    } as never).reconcile(root);
+      getPullRequest: async () => ({
+        repository: 'fixture/repo',
+        number: 1,
+        baseBranch: 'main',
+        baseSha: sha,
+        headSha: sha,
+        headBranch: 'work',
+        state: 'OPEN',
+        merged: false,
+        mergeCommitSha: null,
+        url: 'https://github.com/fixture/repo/pull/1',
+      }),
+    };
+    await new MilestoneEOrchestrator(
+      argus,
+      features,
+      new GitIntegrationService(github as never)
+    ).reconcile(root);
     expect(merge).not.toHaveBeenCalled();
-    expect((await argus.getStatus(root))!.activeTask!.blockedReason).toBe(
-      'MODE_HUMAN_MERGE_REQUIRED'
-    );
+    expect((await argus.getStatus(root))!.activeTask!.nextAction).toBe('human-merge-required');
     await expect(select('rea')).rejects.toThrow('MODE_ENGINEERING_TASK_ACTIVE');
   });
   it('refuses engineering task admission for a paused project even with mode permissions and exact SHA approval', async () => {

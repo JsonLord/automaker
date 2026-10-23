@@ -1,9 +1,12 @@
+import { FeatureLoader } from '../../../src/services/feature-loader.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import fs from 'fs/promises';
 import os from 'os';
 import path from 'path';
 import {
   ArgusAutonomyRunner,
+  MilestoneEOrchestrator,
+  GitIntegrationService,
   ensureArgusControlFiles,
   resolveState,
   type ArgusProjectState,
@@ -130,10 +133,86 @@ describe('ArgusAutonomyRunner', () => {
     runner.stop();
   });
 
+  it.each(['enabled', 'paused'] as const)(
+    'startup and scheduler preserve the human gate for %s projects',
+    async (autonomy) => {
+      const { dir, state, service } = await fixture();
+      state.autonomy = autonomy;
+      state.activeTask = task(1);
+      Object.assign(state.activeTask, {
+        repository: 'o/r',
+        prNumber: 7,
+        baseBranch: 'main',
+        phase: 'merge-ready',
+        prHeadSha: 'a'.repeat(40),
+        ciHeadSha: 'a'.repeat(40),
+        reviewedHeadSha: 'a'.repeat(40),
+        reviewVerdict: 'approve',
+        ciState: 'success',
+      });
+      state.phase = 'merge-ready';
+      state.reconciliation.nextAt = new Date(0).toISOString();
+      let now = Date.parse('2026-10-23T00:00:00Z');
+      const github = {
+        mergePullRequest: vi.fn(),
+        getPullRequest: vi.fn(async () => ({
+          repository: 'o/r',
+          number: 7,
+          baseBranch: 'main',
+          baseSha: 'b'.repeat(40),
+          headSha: 'a'.repeat(40),
+          headBranch: 'work',
+          state: 'OPEN',
+          merged: false,
+          mergeCommitSha: null,
+          url: 'https://github.com/o/r/pull/7',
+        })),
+      };
+      const planner = { reconcileProject: vi.fn() };
+      const dispatch = vi.fn();
+      const observer = new MilestoneEOrchestrator(
+        service,
+        new FeatureLoader(),
+        new GitIntegrationService(github as never)
+      );
+      const createRunner = () =>
+        new ArgusAutonomyRunner(
+          service,
+          planner,
+          { id: 'jules', dispatch, reconcile: vi.fn() },
+          undefined,
+          observer,
+          { now: () => now, jitter: () => 0, setTimer: (() => ({ unref() {} })) as any }
+        );
+      const first = createRunner();
+      first.register(dir);
+      await first.start();
+      first.stop();
+      expect(github.getPullRequest).toHaveBeenCalledTimes(autonomy === 'enabled' ? 1 : 0);
+      if (autonomy === 'enabled') {
+        expect(state.activeTask!.nextAction).toBe('human-merge-required');
+        expect(state.reconciliation.nextAt).toBe('2026-10-23T00:01:00.000Z');
+      }
+      const recovered = await resolveState('project', dir, 'model');
+      service.getStatus.mockImplementation(async () => recovered);
+      now += 65_000;
+      const restarted = createRunner();
+      restarted.register(dir);
+      await restarted.start();
+      restarted.stop();
+      expect(github.getPullRequest).toHaveBeenCalledTimes(autonomy === 'enabled' ? 2 : 0);
+      expect(recovered.autonomy).toBe(autonomy);
+      expect(github.mergePullRequest).not.toHaveBeenCalled();
+      expect(planner.reconcileProject).not.toHaveBeenCalled();
+      expect(dispatch).not.toHaveBeenCalled();
+    }
+  );
+
   it('automatically dispatches the first and renewed campaign and stops after satisfaction', async () => {
     const { dir, state, service } = await fixture();
     const dispatches: string[] = [];
     const merges: string[] = [];
+    const externallyMerged = new Set<string>();
     let campaign = 1;
     let ciAttempt = 0;
     const planner = {
@@ -184,6 +263,10 @@ describe('ArgusAutonomyRunner', () => {
     const milestoneE = {
       reconcile: vi.fn(async () => {
         const value = state.activeTask!;
+        if (!externallyMerged.has(value.taskId)) {
+          value.nextAction = 'human-merge-required';
+          return;
+        }
         merges.push(value.taskId);
         if (campaign++ === 1) {
           state.specRevision = 2;
@@ -201,8 +284,11 @@ describe('ArgusAutonomyRunner', () => {
     });
 
     // Remote waits are represented by separate durable wake-ups; no UI action or restart is used.
-    for (let wake = 0; wake < 8 && state.autonomy === 'enabled'; wake++)
+    for (let wake = 0; wake < 16 && state.autonomy === 'enabled'; wake++) {
+      if (state.activeTask?.nextAction === 'human-merge-required')
+        externallyMerged.add(state.activeTask.taskId);
       await runner.wake(dir, `fake-remote-event-${wake}`);
+    }
 
     expect(dispatches).toEqual(['task-1', 'task-2']);
     expect(merges).toEqual(['task-1', 'task-2']);
@@ -279,14 +365,14 @@ describe('ArgusAutonomyRunner', () => {
     expect(permanent.state.reconciliation.reason).toBe('permanent-error');
   });
 
-  it('serializes concurrent merge-ready ticks to one merge orchestration side effect', async () => {
+  it('serializes concurrent externally merged ticks to one completion observation', async () => {
     const { dir, state, service } = await fixture();
     state.activeTask = task(1);
     state.activeTask.phase = 'merge-ready';
     state.activeTask.repository = 'o/r';
     state.activeTask.prNumber = 1;
     state.phase = 'merge-ready';
-    const merge = vi.fn(async () => {
+    const observe = vi.fn(async () => {
       state.activeTask = null;
       state.autonomy = 'satisfied';
       state.phase = 'objective-satisfied';
@@ -296,11 +382,11 @@ describe('ArgusAutonomyRunner', () => {
       { reconcileProject: vi.fn() },
       undefined,
       undefined,
-      { reconcile: merge },
+      { reconcile: observe },
       { jitter: () => 0 }
     );
     await Promise.all([1, 2, 3, 4].map(() => runner.reconcile(dir)));
-    expect(merge).toHaveBeenCalledOnce();
+    expect(observe).toHaveBeenCalledOnce();
     expect(state.phase).toBe('objective-satisfied');
   });
 
@@ -428,6 +514,7 @@ describe('ArgusAutonomyRunner', () => {
     const taskIds: string[] = [];
     const sessions: string[] = [];
     const merges: string[] = [];
+    const externallyMerged = new Set<string>();
     const planner = {
       reconcileProject: vi.fn(async () => {
         const value = task(state.specRevision);
@@ -467,6 +554,10 @@ describe('ArgusAutonomyRunner', () => {
     };
     const milestoneE = {
       reconcile: vi.fn(async () => {
+        if (!externallyMerged.has(state.activeTask!.taskId)) {
+          state.activeTask!.nextAction = 'human-merge-required';
+          return;
+        }
         const revision = state.activeTask!.sourceSpecRevision;
         merges.push(state.activeTask!.taskId);
         if (revision === 5) {
@@ -483,8 +574,11 @@ describe('ArgusAutonomyRunner', () => {
     const runner = new ArgusAutonomyRunner(service, planner, executor, milestoneD, milestoneE, {
       jitter: () => 0,
     });
-    for (let wake = 0; wake < 15 && state.autonomy === 'enabled'; wake++)
+    for (let wake = 0; wake < 25 && state.autonomy === 'enabled'; wake++) {
+      if (state.activeTask?.nextAction === 'human-merge-required')
+        externallyMerged.add(state.activeTask.taskId);
       await runner.wake(dir, `campaign-${state.specRevision}`);
+    }
     expect(taskIds).toEqual(['task-1', 'task-2', 'task-3', 'task-4', 'task-5']);
     expect(sessions).toEqual(['session-1', 'session-2', 'session-3', 'session-4', 'session-5']);
     expect(merges).toEqual(taskIds);

@@ -336,6 +336,12 @@ export class ArgusAutonomyRunner {
         }
         if (MILESTONE_E_PHASES.has(task.phase)) {
           await this.milestoneE.reconcile(projectPath);
+          const observed = await this.argus.getStatus(projectPath);
+          // One remote observation per wake while waiting for a human, not eight rapid polls.
+          if (
+            ['merge-ready', 'merge-intent', 'merging'].includes(observed?.activeTask?.phase || '')
+          )
+            break;
           continue;
         }
         break;
@@ -399,7 +405,7 @@ export class ArgusAutonomyRunner {
         ? 15_000
         : phase === 'ci-check'
           ? 30_000
-          : phase === 'merge-intent' || phase === 'merging'
+          : phase === 'merge-ready' || phase === 'merge-intent' || phase === 'merging'
             ? 60_000
             : 10_000;
     return (

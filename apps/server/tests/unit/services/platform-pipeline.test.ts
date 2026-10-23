@@ -107,10 +107,8 @@ it('one Jules session and PR survive Loki repair, fresh verification, CI, Senior
       runIds: ['ci'],
       failures: [],
     })),
-    mergePullRequest: vi.fn(async (_: string, __: number, expected: string) => {
-      expect(expected).toBe(fresh);
-      done = true;
-      return { merged: true, sha: merged };
+    mergePullRequest: vi.fn(async () => {
+      throw new Error('FORBIDDEN');
     }),
   };
   const worker = {
@@ -231,16 +229,22 @@ it('one Jules session and PR survive Loki repair, fresh verification, CI, Senior
     }),
     release: vi.fn(async () => {}),
   };
-  await new MilestoneEOrchestrator(
+  const observer = new MilestoneEOrchestrator(
     restarted,
     features,
     new GitIntegrationService(github as any, local as any, coordination)
-  ).reconcile(dir);
+  );
+  await observer.reconcile(dir);
+  expect(loaded.nextAction).toBe('human-merge-required');
+  expect(loaded.mergeIntent).toBeNull();
+  expect(github.mergePullRequest).not.toHaveBeenCalled();
+  done = true; // An authorized maintainer merges externally on GitHub.
+  await observer.reconcile(dir);
   expect(jules.createTaskSession).toHaveBeenCalledTimes(1);
   expect(jules.sendMessage).toHaveBeenCalledTimes(1);
-  expect(github.mergePullRequest).toHaveBeenCalledTimes(1);
+  expect(github.mergePullRequest).not.toHaveBeenCalled();
   expect((await features.get(dir, loaded.featureId))?.status).toBe('verified');
   expect(loaded.mergeCommitSha).toBe(merged);
   expect(loaded.localSyncedSha).toBe(merged);
-  expect(coordination.release).toHaveBeenCalledTimes(1);
+  expect(coordination.release).not.toHaveBeenCalled();
 });

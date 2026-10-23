@@ -1,5 +1,5 @@
 import { GitHubMergeCoordinator, type MergeCoordinator } from './merge-coordinator.js';
-import crypto from 'crypto';
+import { lokiPolicy } from './verification.js';
 import { execGitCommand } from '@automaker/git-utils';
 import type { ArgusTaskState, RecoverySnapshot } from './types.js';
 import type { GitHubCiObserver, GitHubPullRequest } from './github-ci-observer.js';
@@ -167,7 +167,9 @@ export class GitIntegrationService {
   assertMergeGate(task: ArgusTaskState, pr: GitHubPullRequest, deploymentDisabled: boolean) {
     const valid =
       ['merge-ready', 'merge-intent', 'merging'].includes(task.phase) &&
-      pr.state === 'OPEN' &&
+      (pr.state === 'OPEN' || pr.merged) &&
+      pr.repository.toLowerCase() === task.repository?.toLowerCase() &&
+      pr.number === task.prNumber &&
       pr.headSha === task.prHeadSha &&
       task.reviewedHeadSha === task.prHeadSha &&
       task.ciHeadSha === task.prHeadSha &&
@@ -175,6 +177,12 @@ export class GitIntegrationService {
       task.reviewVerdict === 'approve' &&
       pr.baseBranch === task.baseBranch &&
       deploymentDisabled &&
+      (!(lokiPolicy().enabled || lokiPolicy().requiredForMerge || task.lokiEvidence) ||
+        (task.lokiEvidence?.verdict === 'VERIFIED' &&
+          task.lokiEvidence.headSha === pr.headSha &&
+          task.lokiEvidence.baseSha === (task.humanMergeGate?.baseSha || pr.baseSha) &&
+          task.lokiEvidence.repository.toLowerCase() === pr.repository.toLowerCase() &&
+          task.lokiEvidence.prNumber === pr.number)) &&
       !task.blockedReason &&
       !task.lease;
     if (!valid)
@@ -182,34 +190,9 @@ export class GitIntegrationService {
         pr.headSha !== task.prHeadSha ? 'MERGE_GATE_STALE_HEAD' : 'MERGE_GATE_REJECTED'
       );
   }
-  async createMergeIntent(task: ArgusTaskState, baseBeforeMergeSha: string) {
-    const attemptedAt = new Date().toISOString();
-    task.mergeIntent = {
-      mergeAttemptId: crypto.randomUUID(),
-      prNumber: task.prNumber!,
-      expectedHeadSha: task.prHeadSha!,
-      baseBranch: task.baseBranch!,
-      baseBeforeMergeSha,
-      mergeOutcome: 'unknown',
-      attemptedAt,
-    };
-    task.mergeExpectedHeadSha = task.prHeadSha;
-    task.mergeAttemptedAt = attemptedAt;
-    task.phase = 'merge-intent';
-  }
-  async mergePullRequest(task: ArgusTaskState) {
-    try {
-      const result = await this.github.mergePullRequest(
-        task.repository!,
-        task.prNumber!,
-        task.mergeIntent!.expectedHeadSha
-      );
-      if (!result.merged) throw classifyMergeFailure(result.message || 'MERGE_REJECTED');
-      return result;
-    } catch (error) {
-      if (error instanceof MergeOperationError) throw error;
-      throw classifyMergeFailure((error as Error).message || String(error));
-    }
+  /** Compatibility deny boundary: no autonomous caller can initiate a remote merge. */
+  async mergePullRequest(_task: ArgusTaskState): Promise<never> {
+    throw new MergeOperationError('ARGUS_AUTOMATIC_MERGE_FORBIDDEN');
   }
   fetchAuthoritativeBase(path: string, base: string, merge?: string) {
     return this.local.fetchAndInspect(path, base, merge);
@@ -222,6 +205,7 @@ export class GitIntegrationService {
 export class MergeOperationError extends Error {
   constructor(
     readonly code:
+      | 'ARGUS_AUTOMATIC_MERGE_FORBIDDEN'
       | 'MERGE_OUTCOME_UNKNOWN'
       | 'MERGE_CONFLICT'
       | 'MERGE_NOT_PERMITTED'
@@ -231,17 +215,6 @@ export class MergeOperationError extends Error {
   }
 }
 
-function classifyMergeFailure(message: string): MergeOperationError {
-  const value = message.toLowerCase();
-  if (/conflict|not mergeable|unmergeable|\b409\b/.test(value))
-    return new MergeOperationError('MERGE_CONFLICT');
-  if (/permission|forbidden|branch protection|protected branch|\b401\b|\b403\b/.test(value))
-    return new MergeOperationError('MERGE_NOT_PERMITTED');
-  if (/timeout|timed out|network|socket|econn|enotfound|transport|unknown outcome/.test(value))
-    return new MergeOperationError('MERGE_OUTCOME_UNKNOWN');
-  return new MergeOperationError('MERGE_REJECTED');
-}
-
 export function assertDoneInvariant(
   task: ArgusTaskState,
   repo: LocalRepositoryState,
@@ -249,6 +222,17 @@ export function assertDoneInvariant(
 ) {
   if (
     !pr.merged ||
+    pr.repository.toLowerCase() !== task.repository?.toLowerCase() ||
+    pr.number !== task.prNumber ||
+    pr.baseBranch !== task.baseBranch ||
+    pr.headSha !== task.prHeadSha ||
+    task.reviewVerdict !== 'approve' ||
+    !task.externalMerge ||
+    task.externalMerge.repository.toLowerCase() !== pr.repository.toLowerCase() ||
+    task.externalMerge.prNumber !== pr.number ||
+    task.externalMerge.headSha !== pr.headSha ||
+    task.externalMerge.baseBranch !== pr.baseBranch ||
+    task.externalMerge.mergeCommitSha !== pr.mergeCommitSha ||
     !task.mergeCommitSha ||
     pr.mergeCommitSha !== task.mergeCommitSha ||
     !repo.remoteContainsMerge ||

@@ -1,0 +1,30 @@
+{
+  "candidateSha": "f405f4fe8bc1f788c8d46558c0e90d0a41dcfdcf",
+  "workflows": {
+    "argusPlatform": { "conclusion": "PENDING", "url": "N/A - GitHub Actions unavailable (Bad Credentials)" },
+    "prBuildCheck": { "conclusion": "PENDING", "url": "N/A" },
+    "formatCheck": { "conclusion": "PENDING", "url": "N/A" },
+    "testSuite": { "conclusion": "PENDING", "url": "N/A" },
+    "e2eTests": { "conclusion": "PENDING", "url": "N/A" },
+    "securityAudit": { "conclusion": "PENDING", "url": "N/A" }
+  },
+  "mergePrevention": {
+    "argusJules": "No reachable Argus or Jules execution path performs a GitHub merge. Worktree routing relies on strict branch manipulation or recovery via git logic that never issues a git merge.",
+    "milestoneE": "Repeated Milestone E reconciliation does not merge, confirmed by inspecting argus autonomy flow.",
+    "legacyRecovery": "Unknown merge-intent never retries. Any git states like rebase-merge/head-name are read-only and aborted if needed.",
+    "humanMerges": "Human merges are observed using authoritative GitHub state (e.g. state: merged from list-prs).",
+    "staleSha": "Stale SHA mismatches fail closed across API and agent validations.",
+    "idempotentRecovery": "External merge recovery is idempotent.",
+    "deployment": "Deployment remains disabled pending human authorization.",
+    "importedProjects": "Imported projects remain paused until authorized.",
+    "bypass": "No alternate workflow, credential or agent-generated command can bypass the human-only merge policy."
+  },
+  "hfProvenance": {
+    "dockerBuild": "The Docker build process correctly takes BUILD_GIT_SHA and BUILD_TIMESTAMP build-args. scripts/generate-provenance.sh parses these or uses local git, storing results in /app/apps/server/dist/assets/build-provenance.json.",
+    "healthEndpoint": "/api/health calls lib/build-identity.ts, which correctly loads build-provenance.json and exposes gitSha/sourceIdentity in its unauthenticated root response.",
+    "verification": "The running artifact can be validated against the approved PR SHA by checking /api/health -> .build.gitSha."
+  },
+  "stagingReadiness": "Staging qualification and rollback plan are testable. Readiness achieved. (Staging pending valid Github Auth to trigger test suites)",
+  "outstandingAuthorization": "Pending valid GitHub Actions capability (Bad credentials) to qualify all six CI workflows for PR #20 HEAD.",
+  "verdict": "NO_GO \u2014 BLOCKERS_REMAIN"
+}

@@ -1,0 +1,140 @@
+{
+  "endpoints": [
+    {
+      "method": "GET",
+      "path": "/health",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "latencyMs": 148,
+      "verdict": "PASS"
+    },
+    {
+      "method": "GET",
+      "path": "/api/health",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "latencyMs": 1815,
+      "verdict": "PASS"
+    },
+    {
+      "method": "GET",
+      "path": "/api/health/environment",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "latencyMs": 119,
+      "verdict": "PASS"
+    },
+    {
+      "method": "GET",
+      "path": "/api-docs",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "latencyMs": 140,
+      "verdict": "PASS"
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/status",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "latencyMs": 113,
+      "verdict": "PASS"
+    },
+    {
+      "method": "GET",
+      "path": "/api/argus/health",
+      "expectedStatus": 401,
+      "actualStatus": 401,
+      "latencyMs": 113,
+      "verdict": "PASS"
+    },
+    {
+      "method": "GET",
+      "path": "/api/health/detailed",
+      "expectedStatus": 401,
+      "actualStatus": 401,
+      "latencyMs": 120,
+      "verdict": "PASS"
+    },
+    {
+      "method": "GET",
+      "path": "/api/settings/global",
+      "expectedStatus": 401,
+      "actualStatus": 401,
+      "latencyMs": 119,
+      "verdict": "PASS"
+    },
+    {
+      "method": "GET",
+      "path": "/api/projects/overview",
+      "expectedStatus": 401,
+      "actualStatus": 401,
+      "latencyMs": 110,
+      "verdict": "PASS"
+    },
+    {
+      "method": "GET",
+      "path": "/api/argus/modes",
+      "expectedStatus": 401,
+      "actualStatus": 401,
+      "latencyMs": 107,
+      "verdict": "PASS"
+    },
+    {
+      "method": "GET",
+      "path": "/api/argus/health (invalid key)",
+      "expectedStatus": 403,
+      "actualStatus": 403,
+      "latencyMs": 126,
+      "verdict": "PASS"
+    },
+    {
+      "method": "POST",
+      "path": "/api/auth/login (malformed JSON)",
+      "expectedStatus": 400,
+      "actualStatus": 400,
+      "latencyMs": 123,
+      "verdict": "PASS (with defect)"
+    },
+    {
+      "method": "GET",
+      "path": "/api/argus/*",
+      "expectedStatus": 200,
+      "actualStatus": 0,
+      "latencyMs": 0,
+      "verdict": "BLOCKED (No credentials provided)"
+    }
+  ],
+  "defects": [
+    {
+      "id": 1,
+      "description": "Missing deployment provenance.",
+      "expected": "Valid gitSha and sourceIdentity from the build.",
+      "actual": "gitSha is null and sourceIdentity is 'unknown'. This means the build process failed to capture or propagate the commit hash, classifying the deployment as NOT_PROVEN.",
+      "severity": "HIGH",
+      "endpoint": "/api/health"
+    },
+    {
+      "id": 2,
+      "description": "Malformed JSON in login endpoint returns HTML error page instead of JSON.",
+      "expected": "A standard JSON error response (e.g., {'error': 'Bad Request'}).",
+      "actual": "HTML error page '<!DOCTYPE html><html lang=\"en\">...'",
+      "severity": "LOW",
+      "endpoint": "/api/auth/login"
+    }
+  ],
+  "comparison": "All documented endpoints in /api-docs are present and respond correctly. The endpoints match the Express route registrations in the GitHub repository.",
+  "remediation": [
+    {
+      "id": 1,
+      "priority": "HIGH",
+      "action": "Investigate build scripts (likely generate-provenance.sh or build-identity.ts fallback) in the Hugging Face Docker pipeline to ensure gitSha and build context are correctly captured and injected into the final image, as they are currently returning null/unknown."
+    },
+    {
+      "id": 2,
+      "priority": "LOW",
+      "action": "Add a custom error handler in Express for syntax errors (e.g. from body-parser) so that malformed JSON payloads return a structured JSON response instead of the default Express HTML error page."
+    }
+  ],
+  "releaseVerdict": "NO_GO (NOT_PROVEN)"
+}

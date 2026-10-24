@@ -7,50 +7,98 @@
   "AUTONOMOUS_EXECUTION_AUTHORIZED": "NO",
   "PRODUCTION_RELEASE_AUTHORIZED": "NO",
   "qualifiedPr19Sha": "8298262e39b9b30da1fbb5006220cdd96d8b4625",
-  "sourceSha": "0380b0856fe1629c4691b3777b16ab82abce6238",
-  "integrationSourceSha": "0380b0856fe1629c4691b3777b16ab82abce6238",
+  "sourceSha": "f405f4fe8bc1f788c8d46558c0e90d0a41dcfdcf",
+  "integrationSourceSha": "f405f4fe8bc1f788c8d46558c0e90d0a41dcfdcf",
   "integrationBaseSha": "d37ced1c6ee44f721fc80930dfb5baefd7871dde",
   "integrationBranch": "integration/argus-human-merge-qualification",
-  "correctivePr": "https://github.com/JsonLord/automaker/pull/20",
-  "publishedEvidenceCommit": "Resolve the final PR #20 HEAD; final exact-commit validation manifest and remote equality are attached to the PR report. These documents do not self-embed their own commit hash.",
+  "correctivePr": "https://github.com/JsonLord/automaker/pull/21",
+  "publishedEvidenceCommit": "Resolve the final PR #21 HEAD; final exact-commit validation manifest and remote equality are attached to the PR report. These documents do not self-embed their own commit hash.",
   "hostedWorkflows": [
     {
-      "name": "Argus Platform",
+      "name": "Argus Platform (f405f4fe8bc1f788c8d46558c0e90d0a41dcfdcf)",
       "conclusion": "NOT_RUN",
-      "reason": "Repository Actions disabled; dispatch returned HTTP 422; no check runs exist for this candidate."
+      "reason": "Previous HTTP 422: Actions disabled."
     },
     {
-      "name": "PR Build Check",
+      "name": "PR Build Check (f405f4fe8bc1f788c8d46558c0e90d0a41dcfdcf)",
       "conclusion": "NOT_RUN",
-      "reason": "Repository Actions disabled; dispatch returned HTTP 422; no check runs exist for this candidate."
+      "reason": "Previous HTTP 422: Actions disabled."
     },
     {
-      "name": "Format Check",
+      "name": "Format Check (f405f4fe8bc1f788c8d46558c0e90d0a41dcfdcf)",
       "conclusion": "NOT_RUN",
-      "reason": "Repository Actions disabled; dispatch returned HTTP 422; no check runs exist for this candidate."
+      "reason": "Previous HTTP 422: Actions disabled."
     },
     {
-      "name": "Test Suite",
+      "name": "Test Suite (f405f4fe8bc1f788c8d46558c0e90d0a41dcfdcf)",
       "conclusion": "NOT_RUN",
-      "reason": "Repository Actions disabled; dispatch returned HTTP 422; no check runs exist for this candidate."
+      "reason": "Previous HTTP 422: Actions disabled."
     },
     {
-      "name": "E2E Tests",
+      "name": "E2E Tests (f405f4fe8bc1f788c8d46558c0e90d0a41dcfdcf)",
       "conclusion": "NOT_RUN",
-      "reason": "Repository Actions disabled; dispatch returned HTTP 422; no check runs exist for this candidate."
+      "reason": "Previous HTTP 422: Actions disabled."
     },
     {
-      "name": "Security Audit",
+      "name": "Security Audit (f405f4fe8bc1f788c8d46558c0e90d0a41dcfdcf)",
       "conclusion": "NOT_RUN",
-      "reason": "Repository Actions disabled; dispatch returned HTTP 422; no check runs exist for this candidate."
+      "reason": "Previous HTTP 422: Actions disabled."
+    },
+    {
+      "name": "Argus Platform (e86d67d1868cb113b1643d62c568f4acb011c044)",
+      "conclusion": "NOT_RUN",
+      "reason": "Latest reported Bad Credentials: authentication failure in the requesting environment."
+    },
+    {
+      "name": "PR Build Check (e86d67d1868cb113b1643d62c568f4acb011c044)",
+      "conclusion": "NOT_RUN",
+      "reason": "Latest reported Bad Credentials: authentication failure in the requesting environment."
+    },
+    {
+      "name": "Format Check (e86d67d1868cb113b1643d62c568f4acb011c044)",
+      "conclusion": "NOT_RUN",
+      "reason": "Latest reported Bad Credentials: authentication failure in the requesting environment."
+    },
+    {
+      "name": "Test Suite (e86d67d1868cb113b1643d62c568f4acb011c044)",
+      "conclusion": "NOT_RUN",
+      "reason": "Latest reported Bad Credentials: authentication failure in the requesting environment."
+    },
+    {
+      "name": "E2E Tests (e86d67d1868cb113b1643d62c568f4acb011c044)",
+      "conclusion": "NOT_RUN",
+      "reason": "Latest reported Bad Credentials: authentication failure in the requesting environment."
+    },
+    {
+      "name": "Security Audit (e86d67d1868cb113b1643d62c568f4acb011c044)",
+      "conclusion": "NOT_RUN",
+      "reason": "Latest reported Bad Credentials: authentication failure in the requesting environment."
     }
   ],
   "blockers": [
-    "GitHub Actions disabled: all six exact-head hosted qualifications missing, including Docker qualification.",
-    "Live health recovered to HTTP 200, but gitSha is null and sourceIdentity is unknown; deployed source provenance is unverified.",
-    "No authorized HF staging target or authenticated configuration/state inventory is available.",
-    "main and hyp-import are not protected; repository maintainers must govern external merge actors separately."
+    "GitHub Actions disabled or inaccessible: all exact-head hosted qualifications missing for PR #20 and PR #21.",
+    "Argus prohibits autonomous merge actions, but GitHub branch protection and external actor permissions remain separate requirements.",
+    "Source generation and health reporting exist, but current live source identity is unverified.",
+    "The running instance has not demonstrated the approved source SHA.",
+    "Staging readiness is conditional, not achieved.",
+    "Next operational blocker: Identify whether GitHub Actions is currently disabled at repository level or whether only the automation's credentials are invalid. Maintainer action is required."
   ],
+  "hfProvenance": {
+    "dockerBuild": "Source generation and health reporting exist. scripts/generate-provenance.sh parses BUILD_GIT_SHA and BUILD_TIMESTAMP.",
+    "healthEndpoint": "/api/health calls lib/build-identity.ts and exposes gitSha/sourceIdentity.",
+    "status": "Current live source identity is unverified. The running instance has not demonstrated the approved source SHA. Staging readiness is conditional, not achieved."
+  },
+  "mergePrevention": {
+    "argusJules": "No reachable Argus or Jules execution path performs a GitHub merge. Worktree routing relies on strict branch manipulation or recovery via git logic that never issues a git merge.",
+    "milestoneE": "Repeated Milestone E reconciliation does not merge, confirmed by inspecting argus autonomy flow.",
+    "legacyRecovery": "Unknown merge-intent never retries. Any git states like rebase-merge/head-name are read-only and aborted if needed.",
+    "humanMerges": "Human merges are observed using authoritative GitHub state (e.g. state: merged from list-prs).",
+    "staleSha": "Stale SHA mismatches fail closed across API and agent validations.",
+    "idempotentRecovery": "External merge recovery is idempotent.",
+    "deployment": "Deployment remains disabled pending human authorization.",
+    "importedProjects": "Imported projects remain paused until authorized.",
+    "bypass": "No alternate workflow, credential or agent-generated command can bypass the human-only merge policy."
+  },
   "observedHfRevision": "4345261eb957cd1a99e1f26bd80b3af38b1558a9",
   "localTestTotals": {
     "serverPassed": 3003,

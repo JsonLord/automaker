@@ -100,9 +100,9 @@
       "method": "GET",
       "path": "/api/argus/*",
       "expectedStatus": 200,
-      "actualStatus": 0,
-      "latencyMs": 0,
-      "verdict": "BLOCKED (No credentials provided)"
+      "actualStatus": 403,
+      "latencyMs": 228,
+      "verdict": "BLOCKED (Provided credentials 'Elzehimer' are invalid)"
     }
   ],
   "defects": [
@@ -134,6 +134,11 @@
       "id": 2,
       "priority": "LOW",
       "action": "Add a custom error handler in Express for syntax errors (e.g. from body-parser) so that malformed JSON payloads return a structured JSON response instead of the default Express HTML error page."
+    },
+    {
+       "id": 3,
+       "priority": "MEDIUM",
+       "action": "Verify that the API Token is correctly set in the environment variables of the Hugging Face space."
     }
   ],
   "releaseVerdict": "NO_GO (NOT_PROVEN)"

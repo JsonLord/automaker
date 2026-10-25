@@ -1,1 +1,0 @@
-{"running":true,"upstreamInstalled":true,"version":"0.1.1","home":"/app/data/argus","provider":"automaker-compatible","model":"gemini-auto","roleBackends":{"MANAGER":"opencode","PLANNER":"opencode","ENGINEER":"opencode","REVIEWER":"opencode"},"autonomy":{"runtime":"running","pendingProjects":0,"blockedProjects":0,"nextWakeAt":null}}

@@ -362,6 +362,21 @@ app.use(
 app.use(express.json({ limit: '50mb' }));
 app.use(cookieParser());
 
+// Error handler specifically for malformed JSON bodies
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  if (err instanceof SyntaxError && 'status' in err && err.status === 400 && 'body' in err) {
+    res.status(400).json({
+      success: false,
+      error: {
+        code: 'MALFORMED_JSON',
+        message: 'Invalid JSON payload received',
+      }
+    });
+    return;
+  }
+  next(err);
+});
+
 // Create shared event emitter for streaming
 const events: EventEmitter = createEventEmitter();
 

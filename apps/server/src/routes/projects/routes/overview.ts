@@ -27,6 +27,7 @@ import type {
   Feature,
   ProjectRef,
 } from '@automaker/types';
+import fs from 'node:fs/promises';
 import { getErrorMessage, logError } from '../common.js';
 
 /**
@@ -167,6 +168,26 @@ export function createOverviewHandler(
       // Collect project statuses in parallel
       const projectStatusPromises = projectRefs.map(async (projectRef): Promise<ProjectStatus> => {
         try {
+          let isAvailable = true;
+          try {
+            await fs.access(projectRef.path);
+          } catch {
+            isAvailable = false;
+          }
+
+          if (!isAvailable) {
+            return {
+              projectId: projectRef.id,
+              projectName: projectRef.name,
+              projectPath: projectRef.path,
+              healthStatus: 'error' as ProjectHealthStatus,
+              featureCounts: { pending: 0, running: 0, completed: 0, failed: 0, verified: 0 },
+              totalFeatures: 0,
+              isAutoModeRunning: false,
+              unreadNotificationCount: 0,
+            };
+          }
+
           // Load features for this project
           const features = await featureLoader.getAll(projectRef.path);
           const featureCounts = computeFeatureCounts(features);

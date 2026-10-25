@@ -1,0 +1,1 @@
+{"status":"ok","timestamp":"2026-10-25T21:26:32.966Z","version":"1.0.0","uptime":93133.943437332,"memory":{"rss":44269568,"heapTotal":44949504,"heapUsed":41374488,"external":3958206,"arrayBuffers":112509},"dataDir":"/app/data","auth":{"enabled":true,"method":"api_key_or_session"},"env":{"nodeVersion":"v22.23.4","platform":"linux","arch":"x64"}}

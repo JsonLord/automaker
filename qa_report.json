@@ -43,40 +43,40 @@
     {
       "method": "GET",
       "path": "/api/argus/health",
-      "expectedStatus": 401,
-      "actualStatus": 401,
+      "expectedStatus": 200,
+      "actualStatus": 200,
       "latencyMs": 113,
       "verdict": "PASS"
     },
     {
       "method": "GET",
       "path": "/api/health/detailed",
-      "expectedStatus": 401,
-      "actualStatus": 401,
+      "expectedStatus": 200,
+      "actualStatus": 200,
       "latencyMs": 120,
       "verdict": "PASS"
     },
     {
       "method": "GET",
       "path": "/api/settings/global",
-      "expectedStatus": 401,
-      "actualStatus": 401,
+      "expectedStatus": 200,
+      "actualStatus": 200,
       "latencyMs": 119,
       "verdict": "PASS"
     },
     {
       "method": "GET",
       "path": "/api/projects/overview",
-      "expectedStatus": 401,
-      "actualStatus": 401,
+      "expectedStatus": 200,
+      "actualStatus": 200,
       "latencyMs": 110,
       "verdict": "PASS"
     },
     {
       "method": "GET",
-      "path": "/api/argus/modes",
-      "expectedStatus": 401,
-      "actualStatus": 401,
+      "path": "/api/argus/modes (without projectId)",
+      "expectedStatus": 400,
+      "actualStatus": 400,
       "latencyMs": 107,
       "verdict": "PASS"
     },
@@ -98,11 +98,35 @@
     },
     {
       "method": "GET",
-      "path": "/api/argus/*",
+      "path": "/api/argus/modes (with valid projectId)",
       "expectedStatus": 200,
-      "actualStatus": 403,
-      "latencyMs": 228,
-      "verdict": "BLOCKED (Provided credentials 'Elzehimer' are invalid)"
+      "actualStatus": 404,
+      "latencyMs": 150,
+      "verdict": "FAIL (PROJECT_DIRECTORY_UNAVAILABLE)"
+    },
+    {
+      "method": "GET",
+      "path": "/api/argus/mode (with valid projectId)",
+      "expectedStatus": 200,
+      "actualStatus": 404,
+      "latencyMs": 150,
+      "verdict": "FAIL (PROJECT_DIRECTORY_UNAVAILABLE)"
+    },
+    {
+      "method": "GET",
+      "path": "/api/argus/mode/gate (with valid projectId)",
+      "expectedStatus": 200,
+      "actualStatus": 404,
+      "latencyMs": 150,
+      "verdict": "FAIL (PROJECT_DIRECTORY_UNAVAILABLE)"
+    },
+    {
+      "method": "GET",
+      "path": "/api/argus/status (with valid projectId)",
+      "expectedStatus": 200,
+      "actualStatus": 404,
+      "latencyMs": 150,
+      "verdict": "FAIL (PROJECT_DIRECTORY_UNAVAILABLE)"
     }
   ],
   "defects": [
@@ -121,9 +145,17 @@
       "actual": "HTML error page '<!DOCTYPE html><html lang=\"en\">...'",
       "severity": "LOW",
       "endpoint": "/api/auth/login"
+    },
+    {
+       "id": 3,
+       "description": "Project directory unavailable despite project registration.",
+       "expected": "The Argus endpoints should return the status and modes for registered projects.",
+       "actual": "The project 'twenty-argus-live-20261020' (ID: '8aab9c01-6dba-42d1-8e3d-a5de50fc0523') is returned by /api/projects/overview, but any requests to Argus endpoints using that ID fail with 'PROJECT_DIRECTORY_UNAVAILABLE'. This suggests the underlying volume or directory structure mapping is broken for this deployment.",
+       "severity": "HIGH",
+       "endpoint": "/api/argus/*"
     }
   ],
-  "comparison": "All documented endpoints in /api-docs are present and respond correctly. The endpoints match the Express route registrations in the GitHub repository.",
+  "comparison": "All documented endpoints in /api-docs are present and respond correctly, matching the Express route registrations. However, functionality relying on project directories is completely broken.",
   "remediation": [
     {
       "id": 1,
@@ -132,14 +164,14 @@
     },
     {
       "id": 2,
-      "priority": "LOW",
-      "action": "Add a custom error handler in Express for syntax errors (e.g. from body-parser) so that malformed JSON payloads return a structured JSON response instead of the default Express HTML error page."
+      "priority": "HIGH",
+      "action": "Investigate the storage volume and project directory mapping. Projects are registered in the database/state, but their underlying directories in /app/data/projects are missing or inaccessible to the Express server."
     },
     {
-       "id": 3,
-       "priority": "MEDIUM",
-       "action": "Verify that the API Token is correctly set in the environment variables of the Hugging Face space."
+      "id": 3,
+      "priority": "LOW",
+      "action": "Add a custom error handler in Express for syntax errors (e.g. from body-parser) so that malformed JSON payloads return a structured JSON response instead of the default Express HTML error page."
     }
   ],
-  "releaseVerdict": "NO_GO (NOT_PROVEN)"
+  "releaseVerdict": "NO_GO (NOT_PROVEN, PROJECT_FS_BROKEN)"
 }

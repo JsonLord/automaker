@@ -1,0 +1,60 @@
+{
+  "gate": "01",
+  "startSha": "0ee817ac",
+  "sourceSha": "3b30cca468b0635f1b2c98633df82229a532e89c",
+  "archive": {
+    "output": "/tmp/pr22-source01b.tar",
+    "gitSha": "3b30cca468b0635f1b2c98633df82229a532e89c",
+    "buildTimestamp": "2026-10-26T01:18:50.000Z",
+    "sha256": "747924ee460e99e31384a66bdf600eb7889827f38a112ad0483542f54426f78d",
+    "format": "git-archive-tar",
+    "sourceFiles": 1810
+  },
+  "tests": {
+    "command": "node --test scripts/tests/build-provenance.test.mjs",
+    "exitCode": 0,
+    "passed": 11,
+    "failed": 0
+  },
+  "serverBuild": {
+    "command": "npm run build:server",
+    "exitCode": 0
+  },
+  "compiledReadback": {
+    "httpStatus": 200,
+    "body": {
+      "status": "ok",
+      "timestamp": "2026-10-26T01:17:44.841Z",
+      "version": "1.0.0",
+      "opencode": "not_available",
+      "build": {
+        "applicationVersion": "1.0.0",
+        "gitSha": "afe99b701a658175fdf32e35fb07e06fc88e395b",
+        "hfSpaceRevision": null,
+        "sourceIdentity": "known",
+        "buildTimestamp": "2026-10-26T01:16:27.000Z",
+        "argus": {
+          "installed": false,
+          "version": null
+        },
+        "opencode": {
+          "installed": false,
+          "version": null
+        },
+        "lokiAdapterAvailable": false,
+        "capabilitiesEnabled": {
+          "loki": false,
+          "continuousEngineering": false,
+          "workerWaves": false,
+          "foreman": false
+        }
+      }
+    }
+  },
+  "docker": {
+    "exitCode": 1,
+    "status": "NOT_PROVEN",
+    "failure": "npm install --ignore-scripts: Exit handler never called; final image not produced. Context verification inside the real builder succeeded. Network/corepack errors also observed; precise npm cause not established."
+  },
+  "status": "CODE_PASS_IMAGE_NOT_PROVEN"
+}

@@ -40,7 +40,7 @@ RUN --mount=type=secret,id=proxy_ca,mode=0444 \
     npm run build:packages && \
     npm run build --workspace=apps/ui && \
     npm run build --workspace=apps/server && \
-    npm rebuild node-pty --workspace=apps/server && \
+    npm_config_nodedir=/usr/local npm rebuild node-pty --workspace=apps/server && \
     PLAYWRIGHT_BROWSERS_PATH=/opt/playwright ./node_modules/.bin/playwright install chromium && \
     npm cache clean --force
 
@@ -51,7 +51,7 @@ RUN --mount=type=secret,id=proxy_ca,mode=0444 \
         SSL_CERT_FILE=/run/secrets/proxy_ca CURL_CA_BUNDLE=/run/secrets/proxy_ca; \
     fi; \
     npm prune --omit=dev --ignore-scripts --no-audit --no-fund && \
-    npm rebuild node-pty --workspace=apps/server
+    npm_config_nodedir=/usr/local npm rebuild node-pty --workspace=apps/server
 
 # Collect artifacts before installing them into the OS image. One final COPY avoids
 # repeatedly snapshotting an entire runtime filesystem on VFS-based builders.

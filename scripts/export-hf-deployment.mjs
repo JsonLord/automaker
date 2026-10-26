@@ -64,10 +64,12 @@ const manifest = {
   files: entries,
 };
 // git archive uses stable tree ordering and commit timestamps. Preserve all apps/** and libs/**.
-execFileSync('git', ['archive', '--format=tar', `--output=${output}`, sha]);
+execFileSync('git', ['-c', 'tar.umask=0022', 'archive', '--format=tar', `--output=${output}`, sha]);
 const temp = mkdtempSync(path.join(os.tmpdir(), 'argus-release-'));
 try {
-  writeFileSync(path.join(temp, manifestName), JSON.stringify(manifest, null, 2) + '\n');
+  writeFileSync(path.join(temp, manifestName), JSON.stringify(manifest, null, 2) + '\n', {
+    mode: 0o644,
+  });
   execFileSync('tar', [
     '--append',
     '--file',

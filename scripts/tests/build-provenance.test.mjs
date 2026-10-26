@@ -41,7 +41,7 @@ async function fixture() {
   execFileSync(process.execPath, [exporter, archive], { cwd: source });
   const context = path.join(root, 'context');
   await fs.mkdir(context);
-  execFileSync('tar', ['-xf', archive, '-C', context]);
+  execFileSync('tar', ['--extract', '--same-permissions', '--file', archive, '-C', context]);
   return {
     root,
     source,
@@ -58,6 +58,14 @@ test('clean git archive reproducibly includes commit-bound provenance and surviv
     execFileSync(process.execPath, [exporter, again], { cwd: f.source });
     assert.deepEqual(await fs.readFile(again), await fs.readFile(f.archive));
     assert.equal(verifyContext(f.context, f.manifest, f.sha).gitSha, f.sha);
+    assert.ok(
+      (await fs.stat(path.join(f.context, 'apps', 'server'))).mode & 0o001,
+      'runtime directories must be traversable by UID 1000'
+    );
+    assert.ok(
+      (await fs.stat(path.join(f.context, 'Dockerfile'))).mode & 0o004,
+      'release files must be readable across image ownership changes'
+    );
     const output = path.join(f.root, 'identity.json');
     execFileSync('sh', [generator], {
       cwd: f.context,

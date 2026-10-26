@@ -92,7 +92,7 @@ jobs:
           export BUILD_TIMESTAMP=$(git show -s --format=%cI HEAD)
           node scripts/export-hf-deployment.mjs /tmp/automaker-source.tar
           mkdir /tmp/automaker-context
-          tar -xf /tmp/automaker-source.tar -C /tmp/automaker-context
+          tar --extract --same-permissions --file=/tmp/automaker-source.tar -C /tmp/automaker-context
           docker build --build-arg BUILD_GIT_SHA=$BUILD_GIT_SHA --build-arg BUILD_TIMESTAMP=$BUILD_TIMESTAMP -t automaker-test /tmp/automaker-context
           docker run --rm --entrypoint cat automaker-test /app/apps/server/dist/assets/build-provenance.json | grep -q "$BUILD_GIT_SHA"
           docker run --rm --entrypoint node automaker-test scripts/test-opencode-inference.mjs

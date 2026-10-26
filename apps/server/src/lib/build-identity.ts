@@ -52,9 +52,11 @@ export async function readBuildIdentity(
     }
   } catch (error) {
     // Use environment variables if file is missing (e.g. tests or local dev without build)
-    gitSha = /^(?!0{40}$)[0-9a-f]{40}$/i.test(process.env.BUILD_GIT_SHA || '')
-      ? process.env.BUILD_GIT_SHA || null
-      : null;
+    gitSha =
+      process.env.NODE_ENV !== 'production' &&
+      /^(?!0{40}$)[0-9a-f]{40}$/i.test(process.env.BUILD_GIT_SHA || '')
+        ? process.env.BUILD_GIT_SHA || null
+        : null;
     buildTimestamp =
       process.env.BUILD_TIMESTAMP && Number.isFinite(Date.parse(process.env.BUILD_TIMESTAMP))
         ? process.env.BUILD_TIMESTAMP
@@ -64,6 +66,9 @@ export async function readBuildIdentity(
   return {
     applicationVersion: getVersion(),
     gitSha,
+    hfSpaceRevision: /^(?!0{40}$)[0-9a-f]{40}$/i.test(process.env.HF_SPACE_REVISION || '')
+      ? process.env.HF_SPACE_REVISION
+      : null,
     sourceIdentity: gitSha ? 'known' : 'unknown',
     buildTimestamp,
     argus,

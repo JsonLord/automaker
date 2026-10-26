@@ -1,0 +1,55 @@
+{
+  "gate": "03",
+  "startSha": "ee3f1f408289676cf939060ae3dbe5f5bac53151",
+  "tests": {
+    "passed": 8,
+    "exitCode": 0,
+    "command": [
+      "npx",
+      "vitest",
+      "run",
+      "-c",
+      "apps/server/vitest.config.ts",
+      "apps/server/tests/unit/http-app.integration.test.ts"
+    ]
+  },
+  "compiledStartup": {
+    "compiledStartup": true,
+    "results": [
+      {
+        "name": "malformed",
+        "status": 400,
+        "mime": "application/json; charset=utf-8",
+        "passed": true
+      },
+      {
+        "name": "valid login",
+        "status": 200,
+        "mime": "application/json; charset=utf-8",
+        "passed": true
+      },
+      {
+        "name": "unsupported",
+        "status": 415,
+        "mime": "application/json; charset=utf-8",
+        "passed": true
+      },
+      {
+        "name": "unauthenticated",
+        "status": 401,
+        "mime": "application/json; charset=utf-8",
+        "passed": true
+      },
+      {
+        "name": "wrong key",
+        "status": 403,
+        "mime": "application/json; charset=utf-8",
+        "passed": true
+      }
+    ],
+    "command": "NODE_ENV=production node apps/server/dist/index.js (isolated temporary HOME/DATA_DIR, fixture-only auth, loopback 7860; no provider credentials)"
+  },
+  "serverBuildExitCode": 0,
+  "lintExitCode": 0,
+  "status": "PASS"
+}

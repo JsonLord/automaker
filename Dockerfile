@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 # Argus modes run inside the existing Node process; no per-mode daemon or GPU.
 # REA binary/live-probe workers, PDF/OCR ingestion and arbitrary scientific workers
 # are optional external capabilities and are not installed into the base image.
@@ -24,46 +25,65 @@ WORKDIR /app
 COPY . .
 
 # Generate provenance file
-RUN mkdir -p /app/apps/server/dist/assets
-COPY scripts/generate-provenance.sh /usr/local/bin/
-RUN chmod +x /usr/local/bin/generate-provenance.sh && generate-provenance.sh
+RUN sh scripts/generate-provenance.sh
 
-# Install all dependencies using the root package-lock.json
-RUN npm install --ignore-scripts
-
-# Build shared libraries
-RUN npm run build:packages
-
-# Build UI
+# Keep the verified install/build/browser sequence in one layer. This also avoids
+# duplicating the full development dependency tree on VFS-based qualification hosts.
 ENV VITE_SKIP_ELECTRON=true
 ENV VITE_SERVER_URL=
-RUN npm run build --workspace=apps/ui
-
-# Build Server
-RUN npm run build --workspace=apps/server && \
-    npm rebuild node-pty --workspace=apps/server
-
-# Download the browser while build-only tooling is available, then keep its cache
-# without shipping Electron, test runners, or packaging tools in the server image.
-RUN PLAYWRIGHT_BROWSERS_PATH=/opt/playwright ./node_modules/.bin/playwright install chromium
+RUN --mount=type=secret,id=proxy_ca,mode=0444 \
+    if [ -f /run/secrets/proxy_ca ]; then \
+      export NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca PIP_CERT=/run/secrets/proxy_ca \
+        SSL_CERT_FILE=/run/secrets/proxy_ca CURL_CA_BUNDLE=/run/secrets/proxy_ca; \
+    fi; \
+    npm ci --ignore-scripts && \
+    npm run build:packages && \
+    npm run build --workspace=apps/ui && \
+    npm run build --workspace=apps/server && \
+    npm_config_nodedir=/usr/local npm rebuild node-pty --workspace=apps/server && \
+    PLAYWRIGHT_BROWSERS_PATH=/opt/playwright ./node_modules/.bin/playwright install chromium && \
+    npm cache clean --force
 
 FROM builder AS runtime-dependencies
-RUN npm install --omit=dev --ignore-scripts --no-audit --no-fund && \
-    npm rebuild node-pty --workspace=apps/server
+RUN --mount=type=secret,id=proxy_ca,mode=0444 \
+    if [ -f /run/secrets/proxy_ca ]; then \
+      export NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca PIP_CERT=/run/secrets/proxy_ca \
+        SSL_CERT_FILE=/run/secrets/proxy_ca CURL_CA_BUNDLE=/run/secrets/proxy_ca; \
+    fi; \
+    npm prune --omit=dev --ignore-scripts --no-audit --no-fund && \
+    npm_config_nodedir=/usr/local npm rebuild node-pty --workspace=apps/server
 
-# =============================================================================
-# FINAL PRODUCTION STAGE
-# =============================================================================
+# Collect artifacts before installing them into the OS image. One final COPY avoids
+# repeatedly snapshotting an entire runtime filesystem on VFS-based builders.
+FROM scratch AS runtime-assets
+COPY --from=builder /app/package*.json /app/
+COPY --from=builder /app/vitest.config.ts /app/
+COPY --from=builder /app/libs /app/libs
+COPY --from=runtime-dependencies /app/apps/server /app/apps/server
+COPY --from=builder /app/apps/ui/dist /app/apps/ui/dist
+COPY --from=builder /app/scripts /app/scripts
+COPY --chmod=0755 entrypoint.sh /app/entrypoint.sh
+COPY --chmod=0755 update_settings.py /usr/local/bin/update_settings.py
+COPY --from=runtime-dependencies /app/node_modules /app/node_modules
+COPY --from=builder /opt/playwright /opt/playwright
+
 FROM node:22-slim
 ARG BUILD_GIT_SHA
 ARG BUILD_TIMESTAMP
+ARG OPENCODE_VERSION=1.18.35
+ARG ARGUS_SOURCE_REVISION=746f76b7a74a1217507c9ee348eecd3b782f7c92
+ARG ARGUS_PACKAGE_VERSION=0.1.1
 ENV BUILD_GIT_SHA=${BUILD_GIT_SHA} BUILD_TIMESTAMP=${BUILD_TIMESTAMP}
-
+ENV OPENCODE_VERSION=${OPENCODE_VERSION} ARGUS_SOURCE_REVISION=${ARGUS_SOURCE_REVISION} ARGUS_PACKAGE_VERSION=${ARGUS_PACKAGE_VERSION}
 WORKDIR /app
-
-# Install git, curl, bash, python3, lsof, procps and tools
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    git curl bash ca-certificates openssh-client jq python3 python3-venv python3-pip wget lsof procps \
+# Optional public CA bundle is mounted for this build step only, never copied.
+RUN --mount=type=secret,id=proxy_ca,mode=0444 \
+    if [ -f /run/secrets/proxy_ca ]; then \
+      export NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca PIP_CERT=/run/secrets/proxy_ca \
+        SSL_CERT_FILE=/run/secrets/proxy_ca CURL_CA_BUNDLE=/run/secrets/proxy_ca; \
+    fi; \
+    apt-get update && apt-get install -y --no-install-recommends \
+    gh git curl bash ca-certificates openssh-client jq python3 python3-venv python3-pip wget lsof procps \
     # Playwright/Chromium dependencies
     libglib2.0-0 libnss3 libnspr4 libdbus-1-3 libatk1.0-0 libatk-bridge2.0-0 \
     libcups2 libdrm2 libxkbcommon0 libatspi2.0-0 libxcomposite1 libxdamage1 \
@@ -71,90 +91,28 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libx11-6 libx11-xcb1 libxcb1 libxext6 libxrender1 libxss1 libxtst6 \
     libxshmfence1 libgtk-3-0 libexpat1 libfontconfig1 fonts-liberation \
     xdg-utils libpango-1.0-0 libpangocairo-1.0-0 libpangoft2-1.0-0 libu2f-udev libvulkan1 \
-    && rm -rf /var/lib/apt/lists/*
-
-# Enable corepack and prepare pnpm
-RUN corepack enable && (corepack prepare pnpm@latest --activate || npm install -g pnpm --force)
-
-# node:slim image already has a 'node' user with UID 1000
-# Ensure node user can write to /app and has a proper home
-RUN mkdir -p /home/node/.local/bin && \
-    chown -R node:node /home/node && \
-    chown -R node:node /app
-
-USER node
-ENV HOME=/home/node
-ENV PATH="/opt/argus/bin:/home/node/.local/bin:/home/node/.opencode/bin:${PATH}"
-
-# Install OpenCode CLI
-ARG OPENCODE_VERSION=1.18.35
-ENV OPENCODE_VERSION=${OPENCODE_VERSION}
-RUN npm install --prefix /home/node/.local/opencode --ignore-scripts --no-audit --no-fund \
+    && rm -rf /var/lib/apt/lists/* && \
+    corepack enable && (corepack prepare pnpm@latest --activate || npm install -g pnpm --force) && \
+    mkdir -p /home/node/.local/bin && \
+    npm install --prefix /home/node/.local/opencode --ignore-scripts --no-audit --no-fund \
       "opencode-linux-$(node -p process.arch)@${OPENCODE_VERSION}" && \
     ln -s "/home/node/.local/opencode/node_modules/opencode-linux-$(node -p process.arch)/bin/opencode" /home/node/.local/bin/opencode && \
-    opencode --version | grep -Fx "${OPENCODE_VERSION}"
-
-# Microsoft ArgusAgent 0.1.1 source. Upgrade only by changing both documented pins.
-ARG ARGUS_SOURCE_REVISION=746f76b7a74a1217507c9ee348eecd3b782f7c92
-ARG ARGUS_PACKAGE_VERSION=0.1.1
-ENV ARGUS_SOURCE_REVISION=${ARGUS_SOURCE_REVISION}
-ENV ARGUS_PACKAGE_VERSION=${ARGUS_PACKAGE_VERSION}
-USER root
-RUN python3 -m venv /opt/argus && \
+    /home/node/.local/bin/opencode --version | grep -Fx "${OPENCODE_VERSION}" && \
+    python3 -m venv /opt/argus && \
     /opt/argus/bin/pip install --no-cache-dir --upgrade pip && \
     /opt/argus/bin/pip install --no-cache-dir \
       "argus-skill @ https://github.com/microsoft/ArgusAgent/archive/${ARGUS_SOURCE_REVISION}.zip" && \
     /opt/argus/bin/argus --version | grep -F "${ARGUS_PACKAGE_VERSION}" && \
-    chown -R node:node /opt/argus
+    mkdir -p /app/data && \
+    chown -R node:node /home/node /opt/argus /app && \
+    npm cache clean --force
+COPY --from=runtime-assets / /
 USER node
-
-# Install GitHub CLI (gh)
-USER root
-RUN mkdir -p -m 755 /etc/apt/keyrings && \
-    wget -qO- https://cli.github.com/packages/githubcli-archive-keyring.gpg | tee /etc/apt/keyrings/githubcli-archive-keyring.gpg > /dev/null && \
-    chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg && \
-    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null && \
-    apt-get update && \
-    apt-get install -y gh && \
-    rm -rf /var/lib/apt/lists/*
-USER node
-
-# Copy built artifacts and dependencies from builder
-COPY --from=builder --chown=node:node /app/package*.json ./
-COPY --from=builder --chown=node:node /app/vitest.config.ts ./
-COPY --from=runtime-dependencies --chown=node:node /app/node_modules ./node_modules
-COPY --from=builder --chown=node:node /opt/playwright /opt/playwright
-COPY --from=builder --chown=node:node /app/libs ./libs
-COPY --from=builder --chown=node:node /app/apps/server ./apps/server
-COPY --from=builder --chown=node:node /app/apps/ui/dist ./apps/ui/dist
-COPY --from=builder --chown=node:node /app/scripts ./scripts
-
-# Use the browser cache prepared by the builder; build-only CLI dependencies are pruned.
+ENV HOME=/home/node
+ENV PATH="/opt/argus/bin:/home/node/.local/bin:/home/node/.opencode/bin:${PATH}"
 ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright
-
-# Create data directory
-RUN mkdir -p /app/data && chown node:node /app/data
-
-# Environment variables
-ENV PORT=7860
-ENV DATA_DIR=/app/data
-ENV ARGUS_SKILL_HOME=/app/data/argus
-ENV NODE_ENV=production
-ENV AUTOMAKER_AUTO_LOGIN=false
-ENV AUTOMAKER_DISABLE_AUTH=false
-ENV AUTOMAKER_HIDE_API_KEY=true
+ENV PORT=7860 DATA_DIR=/app/data ARGUS_SKILL_HOME=/app/data/argus
+ENV NODE_ENV=production AUTOMAKER_AUTO_LOGIN=false AUTOMAKER_DISABLE_AUTH=false AUTOMAKER_HIDE_API_KEY=true
 ENV ALLOWED_ROOT_DIRECTORY=/app/data/projects
-
-# Copy scripts
-COPY --chown=node:node entrypoint.sh ./entrypoint.sh
-COPY --chown=node:node update_settings.py /usr/local/bin/update_settings.py
-
-USER root
-RUN chmod +x ./entrypoint.sh /usr/local/bin/update_settings.py
-USER node
-
-# Expose port
 EXPOSE 7860
-
-# Use entrypoint
 ENTRYPOINT ["./entrypoint.sh"]

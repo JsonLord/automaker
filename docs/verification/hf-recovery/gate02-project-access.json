@@ -1,0 +1,33 @@
+{
+  "gate": "02",
+  "startSha": "22baff39cac6c1c8665eb59132fb5bf6fac579c4",
+  "tests": {
+    "command": [
+      "npx",
+      "vitest",
+      "run",
+      "-c",
+      "apps/server/vitest.config.ts",
+      "apps/server/tests/unit/services/project-inspection.test.ts",
+      "apps/server/tests/unit/services/argus-modes.integration.test.ts"
+    ],
+    "exitCode": 0,
+    "passed": 22
+  },
+  "buildServerExitCode": 0,
+  "status": "PASS",
+  "fixtures": [
+    "valid nested registered directory",
+    "missing directory",
+    "unreadable directory",
+    "inaccessible parent",
+    "regular file",
+    "broken symlink",
+    "outside-root symlink",
+    "forbidden metadata symlink",
+    "stale registration",
+    "cross-project identity mismatch",
+    "missing/corrupt/unreadable feature state",
+    "mixed-health aggregate"
+  ]
+}

@@ -37,7 +37,7 @@ export function requireJsonContentType(req: Request, res: Response, next: NextFu
 
   // Check if Content-Type header exists and contains application/json
   // Allows for charset parameter: "application/json; charset=utf-8"
-  if (!contentType || !contentType.toLowerCase().includes('application/json')) {
+  if (!contentType || contentType.split(';', 1)[0].trim().toLowerCase() !== 'application/json') {
     res.status(415).json({
       success: false,
       error: 'Unsupported Media Type',

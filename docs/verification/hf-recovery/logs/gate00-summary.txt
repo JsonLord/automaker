@@ -1,0 +1,9 @@
+# Subtest: provenance remains truthful and usable with missing source
+not ok 1 - provenance remains truthful and usable with missing source
+# Subtest: provenance remains truthful and usable with zero placeholder
+not ok 2 - provenance remains truthful and usable with zero placeholder
+# Subtest: provenance remains truthful and usable with real source
+ok 3 - provenance remains truthful and usable with real source
+# tests 3
+# pass 1
+# fail 2

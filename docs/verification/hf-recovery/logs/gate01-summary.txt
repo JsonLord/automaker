@@ -1,0 +1,25 @@
+# Subtest: clean git archive reproducibly includes commit-bound provenance and survives without .git
+ok 1 - clean git archive reproducibly includes commit-bound provenance and survives without .git
+# Subtest: rejects missing
+ok 2 - rejects missing
+# Subtest: rejects zero
+ok 3 - rejects zero
+# Subtest: rejects malformed
+ok 4 - rejects malformed
+# Subtest: rejects wrong SHA
+ok 5 - rejects wrong SHA
+# Subtest: rejects wrong commit
+ok 6 - rejects wrong commit
+# Subtest: rejects wrong content
+ok 7 - rejects wrong content
+# Subtest: rejects wrong tree
+ok 8 - rejects wrong tree
+# Subtest: rejects wrong timestamp
+ok 9 - rejects wrong timestamp
+# Subtest: rejects extra content
+ok 10 - rejects extra content
+# Subtest: rejects a stale expected SHA even when the manifest and context agree
+ok 11 - rejects a stale expected SHA even when the manifest and context agree
+# tests 11
+# pass 11
+# fail 0

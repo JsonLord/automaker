@@ -1,0 +1,59 @@
+{
+  "gate": "05",
+  "startSha": "7fe67d6e3c5b4d6b70c2ebb27a804dc768e01dcf",
+  "status": "PLAN_READY_LIVE_NOT_AUTHORIZED",
+  "selectedMount": "/data (explicit read-write approved HF volume; POSIX semantics must be qualified)",
+  "configuration": {
+    "DATA_DIR": "/data/automaker",
+    "ARGUS_SKILL_HOME": "/data/automaker/argus",
+    "ALLOWED_ROOT_DIRECTORY": "/data/automaker/projects",
+    "PORT": 7860,
+    "uid": 1000
+  },
+  "documentation": "https://huggingface.co/docs/hub/spaces-storage",
+  "documentationObservation": "Current docs recommend bucket-backed attached volumes at a chosen path; default disk is ephemeral. No hard-link/fsync guarantee was observed.",
+  "checks": [
+    {
+      "name": "live inventory and encrypted backup",
+      "status": "NOT_RUN_REQUIRES_AUTHORIZATION"
+    },
+    {
+      "name": "volume attachment and UID1000 permissions",
+      "status": "NOT_RUN_REQUIRES_AUTHORIZATION"
+    },
+    {
+      "name": "atomic hard-link/fsync/concurrency probe",
+      "status": "NOT_RUN_REQUIRES_AUTHORIZATION"
+    },
+    {
+      "name": "Twenty identity recovery decision",
+      "status": "NOT_RUN_REQUIRES_AUTHORIZATION"
+    },
+    {
+      "name": "staging deployment",
+      "status": "NOT_RUN_REQUIRES_AUTHORIZATION"
+    },
+    {
+      "name": "authenticated disposable four-mode API smoke",
+      "status": "NOT_RUN_REQUIRES_AUTHORIZATION"
+    },
+    {
+      "name": "Space restart and persistence",
+      "status": "NOT_RUN_REQUIRES_AUTHORIZATION"
+    },
+    {
+      "name": "disposable cleanup",
+      "status": "NOT_RUN_REQUIRES_AUTHORIZATION"
+    },
+    {
+      "name": "production promotion",
+      "status": "NOT_RUN_REQUIRES_AUTHORIZATION"
+    }
+  ],
+  "CODE_READY": "SEE_FINAL_QUALIFICATION",
+  "IMAGE_PROVEN": "SEE_FINAL_READBACK",
+  "STORAGE_READY": false,
+  "LIVE_RUNTIME_PROVEN": false,
+  "liveMutations": [],
+  "acceptance": "PASS for operator plan only. Deployment remains NO-GO."
+}

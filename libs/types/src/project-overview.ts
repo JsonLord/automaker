@@ -47,6 +47,11 @@ export interface FeatureStatusCounts {
  * in the multi-project overview dashboard.
  */
 export interface ProjectStatus {
+  /** Counts are partial compatibility values unless featureCountsKnown is true. */
+  featureCountsKnown?: boolean;
+  featureState?: 'complete' | 'incomplete' | 'unknown';
+  availability?: 'available' | 'unavailable';
+  availabilityReason?: string;
   /** Project unique identifier (matches ProjectRef.id) */
   projectId: string;
   /** Project display name */

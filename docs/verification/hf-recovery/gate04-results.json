@@ -1,0 +1,134 @@
+{
+  "gate": "04",
+  "startSha": "7c6476dc94b939a60cf5da037ae7cf45e12b5ffd",
+  "implementationEndSha": "ab0a8957960198e0d3d1751b860d8bc3094f7752",
+  "qualifiedCodeSha": "9626087f74b469db80064c3f3c9072d60a08273c",
+  "qualification": {
+    "sha": "9626087f74b469db80064c3f3c9072d60a08273c",
+    "results": [
+      {
+        "name": "packages-build",
+        "command": ["npm", "run", "build:packages"],
+        "exitCode": 0,
+        "seconds": 13.96,
+        "log": "/tmp/pr22-final-packages-build.log"
+      },
+      {
+        "name": "server-build",
+        "command": ["npm", "run", "build", "--workspace=apps/server"],
+        "exitCode": 0,
+        "seconds": 17.79,
+        "log": "/tmp/pr22-final-server-build.log"
+      },
+      {
+        "name": "ui-build",
+        "command": ["npm", "run", "build", "--workspace=apps/ui"],
+        "exitCode": 0,
+        "seconds": 16.87,
+        "log": "/tmp/pr22-final-ui-build.log"
+      },
+      {
+        "name": "typecheck",
+        "command": ["npm", "run", "typecheck"],
+        "exitCode": 0,
+        "seconds": 19.59,
+        "log": "/tmp/pr22-final-typecheck.log"
+      },
+      {
+        "name": "format",
+        "command": ["npm", "run", "format:check"],
+        "exitCode": 0,
+        "seconds": 17.99,
+        "log": "/tmp/pr22-final-format.log"
+      },
+      {
+        "name": "server-lint",
+        "command": ["npm", "run", "lint:server:errors"],
+        "exitCode": 0,
+        "seconds": 4.45,
+        "log": "/tmp/pr22-final-server-lint.log"
+      },
+      {
+        "name": "ui-lint",
+        "command": ["npm", "run", "lint:errors"],
+        "exitCode": 0,
+        "seconds": 9.84,
+        "log": "/tmp/pr22-final-ui-lint.log"
+      },
+      {
+        "name": "server-tests",
+        "command": ["npm", "run", "test:server"],
+        "exitCode": 0,
+        "seconds": 38.08,
+        "log": "/tmp/pr22-final-server-tests.log"
+      },
+      {
+        "name": "server-coverage",
+        "command": ["npm", "run", "test:server:coverage"],
+        "exitCode": 0,
+        "seconds": 38.94,
+        "log": "/tmp/pr22-final-server-coverage.log"
+      },
+      {
+        "name": "package-tests",
+        "command": ["npm", "run", "test:packages"],
+        "exitCode": 0,
+        "seconds": 13.15,
+        "log": "/tmp/pr22-final-package-tests.log"
+      },
+      {
+        "name": "release-tests",
+        "command": [
+          "node",
+          "--test",
+          "scripts/tests/build-provenance.test.mjs",
+          "scripts/tests/test-hf-runtime.test.mjs",
+          "scripts/tests/check-clean-working-tree.test.mjs"
+        ],
+        "exitCode": 0,
+        "seconds": 1.53,
+        "log": "/tmp/pr22-final-release-tests.log"
+      },
+      {
+        "name": "browser",
+        "command": ["npm", "run", "test"],
+        "exitCode": 0,
+        "seconds": 124.36,
+        "log": "/tmp/pr22-final-browser-retry.log",
+        "recovery": "Rerun after ENOSPC; 72 passed, 2 existing skipped."
+      }
+    ]
+  },
+  "exportPermissionsRegression": {
+    "sha": "ab0a8957960198e0d3d1751b860d8bc3094f7752",
+    "passed": 11,
+    "failed": 0,
+    "exitCode": 0
+  },
+  "secretScan": {
+    "sha": "0b36b9c36344ff18e88b36721cb3dcde84077144",
+    "checkedTextFiles": 1781,
+    "scope": "Tracked text <=2 MB; high-confidence GitHub/HF token and private-key patterns. Does not prove absence of every possible secret. Export separately rejects authority/config/state paths.",
+    "findings": []
+  },
+  "hostedWorkflows": {
+    "status": "BLOCKED",
+    "runIds": [],
+    "urls": [],
+    "reason": "PR synchronize produced no runs; settings endpoint returns 403. Fresh final-head check is required."
+  },
+  "image": {
+    "buildSourceSha": "9626087f74b469db80064c3f3c9072d60a08273c",
+    "imageId": "sha256:4224ea62e5560f1f0ede906e30ae33c578294ebb2069f922afcb2c992eecacb4",
+    "buildSucceeded": true,
+    "readbackSucceeded": false,
+    "status": "NOT_PROVEN",
+    "cause": "Context extraction under restrictive umask produced root-only source directories; canonical archive permissions/extraction now fixed. Final post-evidence image readback pending."
+  },
+  "CODE_READY": "LOCAL_TESTS_PASS_FINAL_REQUALIFICATION_REQUIRED",
+  "IMAGE_PROVEN": false,
+  "STORAGE_READY": false,
+  "LIVE_RUNTIME_PROVEN": false,
+  "status": "PARTIAL_BLOCKED",
+  "finalEvidence": "Final immutable-head post-report qualification, image readback and remote equality are in the PR handoff and /workspace/pr22-evidence/final-report.json. This report preserves the chronological gate observations rather than claiming a later commit was tested."
+}

@@ -1,0 +1,16 @@
+{
+  "gate": "00",
+  "startSha": "6d4af122c924e95c27930d4bb87b7109e29081fa",
+  "baseSha": "f405f4fe8bc1f788c8d46558c0e90d0a41dcfdcf",
+  "baselineReviewSha": "8480c1fcff60688da8b5a0a7444b9692f4b38f1d",
+  "newDiff": "Only automaker_pr22_corrective_pass.md added since review baseline; read all 129 lines.",
+  "baselineTests": {
+    "command": "node --test scripts/tests/build-provenance.test.mjs",
+    "exitCode": 1,
+    "passed": 1,
+    "failed": 2
+  },
+  "hostedRuns": [],
+  "reviews": [],
+  "acceptance": "PASS: evidence frozen; production mount/storage cause not established."
+}

@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 # Argus modes run inside the existing Node process; no per-mode daemon or GPU.
 # REA binary/live-probe workers, PDF/OCR ingestion and arbitrary scientific workers
 # are optional external capabilities and are not installed into the base image.
@@ -28,26 +29,56 @@ RUN mkdir -p /app/apps/server/dist/assets
 RUN sh scripts/generate-provenance.sh
 
 # Install all dependencies using the root package-lock.json
-RUN npm install --ignore-scripts
+RUN --mount=type=secret,id=proxy_ca \
+    if [ -f /run/secrets/proxy_ca ]; then \
+      export NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca PIP_CERT=/run/secrets/proxy_ca \
+        SSL_CERT_FILE=/run/secrets/proxy_ca CURL_CA_BUNDLE=/run/secrets/proxy_ca; \
+    fi; \
+    npm ci --ignore-scripts
 
 # Build shared libraries
-RUN npm run build:packages
+RUN --mount=type=secret,id=proxy_ca \
+    if [ -f /run/secrets/proxy_ca ]; then \
+      export NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca PIP_CERT=/run/secrets/proxy_ca \
+        SSL_CERT_FILE=/run/secrets/proxy_ca CURL_CA_BUNDLE=/run/secrets/proxy_ca; \
+    fi; \
+    npm run build:packages
 
 # Build UI
 ENV VITE_SKIP_ELECTRON=true
 ENV VITE_SERVER_URL=
-RUN npm run build --workspace=apps/ui
+RUN --mount=type=secret,id=proxy_ca \
+    if [ -f /run/secrets/proxy_ca ]; then \
+      export NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca PIP_CERT=/run/secrets/proxy_ca \
+        SSL_CERT_FILE=/run/secrets/proxy_ca CURL_CA_BUNDLE=/run/secrets/proxy_ca; \
+    fi; \
+    npm run build --workspace=apps/ui
 
 # Build Server
-RUN npm run build --workspace=apps/server && \
+RUN --mount=type=secret,id=proxy_ca \
+    if [ -f /run/secrets/proxy_ca ]; then \
+      export NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca PIP_CERT=/run/secrets/proxy_ca \
+        SSL_CERT_FILE=/run/secrets/proxy_ca CURL_CA_BUNDLE=/run/secrets/proxy_ca; \
+    fi; \
+    npm run build --workspace=apps/server && \
     npm rebuild node-pty --workspace=apps/server
 
 # Download the browser while build-only tooling is available, then keep its cache
 # without shipping Electron, test runners, or packaging tools in the server image.
-RUN PLAYWRIGHT_BROWSERS_PATH=/opt/playwright ./node_modules/.bin/playwright install chromium
+RUN --mount=type=secret,id=proxy_ca \
+    if [ -f /run/secrets/proxy_ca ]; then \
+      export NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca PIP_CERT=/run/secrets/proxy_ca \
+        SSL_CERT_FILE=/run/secrets/proxy_ca CURL_CA_BUNDLE=/run/secrets/proxy_ca; \
+    fi; \
+    PLAYWRIGHT_BROWSERS_PATH=/opt/playwright ./node_modules/.bin/playwright install chromium
 
 FROM builder AS runtime-dependencies
-RUN npm install --omit=dev --ignore-scripts --no-audit --no-fund && \
+RUN --mount=type=secret,id=proxy_ca \
+    if [ -f /run/secrets/proxy_ca ]; then \
+      export NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca PIP_CERT=/run/secrets/proxy_ca \
+        SSL_CERT_FILE=/run/secrets/proxy_ca CURL_CA_BUNDLE=/run/secrets/proxy_ca; \
+    fi; \
+    npm install --omit=dev --ignore-scripts --no-audit --no-fund && \
     npm rebuild node-pty --workspace=apps/server
 
 # =============================================================================
@@ -73,7 +104,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Enable corepack and prepare pnpm
-RUN corepack enable && (corepack prepare pnpm@latest --activate || npm install -g pnpm --force)
+RUN --mount=type=secret,id=proxy_ca \
+    if [ -f /run/secrets/proxy_ca ]; then \
+      export NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca PIP_CERT=/run/secrets/proxy_ca \
+        SSL_CERT_FILE=/run/secrets/proxy_ca CURL_CA_BUNDLE=/run/secrets/proxy_ca; \
+    fi; \
+    corepack enable && (corepack prepare pnpm@latest --activate || npm install -g pnpm --force)
 
 # node:slim image already has a 'node' user with UID 1000
 # Ensure node user can write to /app and has a proper home
@@ -88,7 +124,12 @@ ENV PATH="/opt/argus/bin:/home/node/.local/bin:/home/node/.opencode/bin:${PATH}"
 # Install OpenCode CLI
 ARG OPENCODE_VERSION=1.18.35
 ENV OPENCODE_VERSION=${OPENCODE_VERSION}
-RUN npm install --prefix /home/node/.local/opencode --ignore-scripts --no-audit --no-fund \
+RUN --mount=type=secret,id=proxy_ca \
+    if [ -f /run/secrets/proxy_ca ]; then \
+      export NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca PIP_CERT=/run/secrets/proxy_ca \
+        SSL_CERT_FILE=/run/secrets/proxy_ca CURL_CA_BUNDLE=/run/secrets/proxy_ca; \
+    fi; \
+    npm install --prefix /home/node/.local/opencode --ignore-scripts --no-audit --no-fund \
       "opencode-linux-$(node -p process.arch)@${OPENCODE_VERSION}" && \
     ln -s "/home/node/.local/opencode/node_modules/opencode-linux-$(node -p process.arch)/bin/opencode" /home/node/.local/bin/opencode && \
     opencode --version | grep -Fx "${OPENCODE_VERSION}"
@@ -99,7 +140,12 @@ ARG ARGUS_PACKAGE_VERSION=0.1.1
 ENV ARGUS_SOURCE_REVISION=${ARGUS_SOURCE_REVISION}
 ENV ARGUS_PACKAGE_VERSION=${ARGUS_PACKAGE_VERSION}
 USER root
-RUN python3 -m venv /opt/argus && \
+RUN --mount=type=secret,id=proxy_ca \
+    if [ -f /run/secrets/proxy_ca ]; then \
+      export NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca PIP_CERT=/run/secrets/proxy_ca \
+        SSL_CERT_FILE=/run/secrets/proxy_ca CURL_CA_BUNDLE=/run/secrets/proxy_ca; \
+    fi; \
+    python3 -m venv /opt/argus && \
     /opt/argus/bin/pip install --no-cache-dir --upgrade pip && \
     /opt/argus/bin/pip install --no-cache-dir \
       "argus-skill @ https://github.com/microsoft/ArgusAgent/archive/${ARGUS_SOURCE_REVISION}.zip" && \
@@ -109,8 +155,13 @@ USER node
 
 # Install GitHub CLI (gh)
 USER root
-RUN mkdir -p -m 755 /etc/apt/keyrings && \
-    wget -qO- https://cli.github.com/packages/githubcli-archive-keyring.gpg | tee /etc/apt/keyrings/githubcli-archive-keyring.gpg > /dev/null && \
+RUN --mount=type=secret,id=proxy_ca \
+    if [ -f /run/secrets/proxy_ca ]; then \
+      export NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca PIP_CERT=/run/secrets/proxy_ca \
+        SSL_CERT_FILE=/run/secrets/proxy_ca CURL_CA_BUNDLE=/run/secrets/proxy_ca; \
+    fi; \
+    mkdir -p -m 755 /etc/apt/keyrings && \
+    curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | tee /etc/apt/keyrings/githubcli-archive-keyring.gpg > /dev/null && \
     chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg && \
     echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null && \
     apt-get update && \

@@ -3,7 +3,15 @@
   "startSha": "ee3f1f408289676cf939060ae3dbe5f5bac53151",
   "tests": {
     "passed": 8,
-    "exitCode": 0
+    "exitCode": 0,
+    "command": [
+      "npx",
+      "vitest",
+      "run",
+      "-c",
+      "apps/server/vitest.config.ts",
+      "apps/server/tests/unit/http-app.integration.test.ts"
+    ]
   },
   "compiledStartup": {
     "compiledStartup": true,
@@ -38,7 +46,8 @@
         "mime": "application/json; charset=utf-8",
         "passed": true
       }
-    ]
+    ],
+    "command": "NODE_ENV=production node apps/server/dist/index.js (isolated temporary HOME/DATA_DIR, fixture-only auth, loopback 7860; no provider credentials)"
   },
   "serverBuildExitCode": 0,
   "lintExitCode": 0,

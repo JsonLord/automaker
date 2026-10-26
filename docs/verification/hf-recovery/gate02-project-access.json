@@ -2,7 +2,15 @@
   "gate": "02",
   "startSha": "22baff39cac6c1c8665eb59132fb5bf6fac579c4",
   "tests": {
-    "command": "vitest run -c apps/server/vitest.config.ts ...project-inspection.test.ts ...argus-modes.integration.test.ts",
+    "command": [
+      "npx",
+      "vitest",
+      "run",
+      "-c",
+      "apps/server/vitest.config.ts",
+      "apps/server/tests/unit/services/project-inspection.test.ts",
+      "apps/server/tests/unit/services/argus-modes.integration.test.ts"
+    ],
     "exitCode": 0,
     "passed": 22
   },

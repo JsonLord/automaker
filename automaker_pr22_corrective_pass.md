@@ -120,6 +120,7 @@ No HF Space writes or restarts in this gate. Output: gate05-hf-operator-plan.md 
 Push your corrections non-force to the appropriate PR #22 head after confirming branch/ref, and keep PR open. If you must work on a separate repair branch first, explain ancestry and how it is integrated without overwriting unrelated commits. Do not merge.
 
 Deliver:
+
 1. PR link, final head SHA and changed-file list.
 2. Gates 00-05 artifacts, sanitized logs and JSON evidence.
 3. Exact test counts and real CI links.

@@ -25,26 +25,10 @@ WORKDIR /app
 COPY . .
 
 # Generate provenance file
-RUN mkdir -p /app/apps/server/dist/assets
 RUN sh scripts/generate-provenance.sh
 
-# Install all dependencies using the root package-lock.json
-RUN --mount=type=secret,id=proxy_ca,mode=0444 \
-    if [ -f /run/secrets/proxy_ca ]; then \
-      export NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca PIP_CERT=/run/secrets/proxy_ca \
-        SSL_CERT_FILE=/run/secrets/proxy_ca CURL_CA_BUNDLE=/run/secrets/proxy_ca; \
-    fi; \
-    npm ci --ignore-scripts
-
-# Build shared libraries
-RUN --mount=type=secret,id=proxy_ca,mode=0444 \
-    if [ -f /run/secrets/proxy_ca ]; then \
-      export NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca PIP_CERT=/run/secrets/proxy_ca \
-        SSL_CERT_FILE=/run/secrets/proxy_ca CURL_CA_BUNDLE=/run/secrets/proxy_ca; \
-    fi; \
-    npm run build:packages
-
-# Build UI
+# Keep the verified install/build/browser sequence in one layer. This also avoids
+# duplicating the full development dependency tree on VFS-based qualification hosts.
 ENV VITE_SKIP_ELECTRON=true
 ENV VITE_SERVER_URL=
 RUN --mount=type=secret,id=proxy_ca,mode=0444 \
@@ -52,25 +36,13 @@ RUN --mount=type=secret,id=proxy_ca,mode=0444 \
       export NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca PIP_CERT=/run/secrets/proxy_ca \
         SSL_CERT_FILE=/run/secrets/proxy_ca CURL_CA_BUNDLE=/run/secrets/proxy_ca; \
     fi; \
-    npm run build --workspace=apps/ui
-
-# Build Server
-RUN --mount=type=secret,id=proxy_ca,mode=0444 \
-    if [ -f /run/secrets/proxy_ca ]; then \
-      export NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca PIP_CERT=/run/secrets/proxy_ca \
-        SSL_CERT_FILE=/run/secrets/proxy_ca CURL_CA_BUNDLE=/run/secrets/proxy_ca; \
-    fi; \
+    npm ci --ignore-scripts && \
+    npm run build:packages && \
+    npm run build --workspace=apps/ui && \
     npm run build --workspace=apps/server && \
-    npm rebuild node-pty --workspace=apps/server
-
-# Download the browser while build-only tooling is available, then keep its cache
-# without shipping Electron, test runners, or packaging tools in the server image.
-RUN --mount=type=secret,id=proxy_ca,mode=0444 \
-    if [ -f /run/secrets/proxy_ca ]; then \
-      export NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca PIP_CERT=/run/secrets/proxy_ca \
-        SSL_CERT_FILE=/run/secrets/proxy_ca CURL_CA_BUNDLE=/run/secrets/proxy_ca; \
-    fi; \
-    PLAYWRIGHT_BROWSERS_PATH=/opt/playwright ./node_modules/.bin/playwright install chromium
+    npm rebuild node-pty --workspace=apps/server && \
+    PLAYWRIGHT_BROWSERS_PATH=/opt/playwright ./node_modules/.bin/playwright install chromium && \
+    npm cache clean --force
 
 FROM builder AS runtime-dependencies
 RUN --mount=type=secret,id=proxy_ca,mode=0444 \
@@ -78,7 +50,7 @@ RUN --mount=type=secret,id=proxy_ca,mode=0444 \
       export NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca PIP_CERT=/run/secrets/proxy_ca \
         SSL_CERT_FILE=/run/secrets/proxy_ca CURL_CA_BUNDLE=/run/secrets/proxy_ca; \
     fi; \
-    npm install --omit=dev --ignore-scripts --no-audit --no-fund && \
+    npm prune --omit=dev --ignore-scripts --no-audit --no-fund && \
     npm rebuild node-pty --workspace=apps/server
 
 # =============================================================================

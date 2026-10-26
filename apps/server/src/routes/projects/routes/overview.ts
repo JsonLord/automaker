@@ -27,8 +27,11 @@ import type {
   Feature,
   ProjectRef,
 } from '@automaker/types';
-import fs from 'node:fs/promises';
-import { getErrorMessage, logError } from '../common.js';
+import {
+  inspectProjectDirectory,
+  inspectProjectFeatures,
+} from '../../../services/argus/project-inspection.js';
+import { logError } from '../common.js';
 
 /**
  * Compute feature status counts from a list of features
@@ -151,7 +154,7 @@ function getLastActivityAt(features: Feature[]): string | undefined {
 }
 
 export function createOverviewHandler(
-  featureLoader: FeatureLoader,
+  _featureLoader: FeatureLoader,
   autoModeService: AutoModeServiceCompat,
   settingsService: SettingsService,
   notificationService: NotificationService
@@ -168,19 +171,17 @@ export function createOverviewHandler(
       // Collect project statuses in parallel
       const projectStatusPromises = projectRefs.map(async (projectRef): Promise<ProjectStatus> => {
         try {
-          let isAvailable = true;
-          try {
-            await fs.access(projectRef.path);
-          } catch {
-            isAvailable = false;
-          }
-
-          if (!isAvailable) {
+          const inspection = await inspectProjectDirectory(projectRef.path);
+          if (!inspection.available) {
             return {
               projectId: projectRef.id,
               projectName: projectRef.name,
               projectPath: projectRef.path,
               healthStatus: 'error' as ProjectHealthStatus,
+              availability: 'unavailable',
+              availabilityReason: inspection.reason,
+              featureState: 'unknown',
+              featureCountsKnown: false,
               featureCounts: { pending: 0, running: 0, completed: 0, failed: 0, verified: 0 },
               totalFeatures: 0,
               isAutoModeRunning: false,
@@ -189,7 +190,8 @@ export function createOverviewHandler(
           }
 
           // Load features for this project
-          const features = await featureLoader.getAll(projectRef.path);
+          const featureState = await inspectProjectFeatures(inspection.physicalPath);
+          const features = featureState.features;
           const featureCounts = computeFeatureCounts(features);
           const totalFeatures = features.length;
 
@@ -217,7 +219,9 @@ export function createOverviewHandler(
           }
 
           // Compute health status
-          const healthStatus = computeHealthStatus(featureCounts, isAutoModeRunning);
+          const healthStatus = featureState.complete
+            ? computeHealthStatus(featureCounts, isAutoModeRunning)
+            : 'error';
 
           // Get last activity timestamp
           const lastActivityAt = getLastActivityAt(features);
@@ -227,6 +231,14 @@ export function createOverviewHandler(
             projectName: projectRef.name,
             projectPath: projectRef.path,
             healthStatus,
+            availability: 'available',
+            featureState: featureState.complete
+              ? 'complete'
+              : features.length
+                ? 'incomplete'
+                : 'unknown',
+            featureCountsKnown: featureState.complete,
+            availabilityReason: featureState.reason,
             featureCounts,
             totalFeatures,
             lastActivityAt,
@@ -234,14 +246,18 @@ export function createOverviewHandler(
             activeBranch: autoModeStatus.branchName ?? undefined,
             unreadNotificationCount,
           };
-        } catch (error) {
-          logError(error, `Failed to load project status: ${projectRef.name}`);
+        } catch {
+          // Do not expose raw filesystem errors or trigger recovery writes on a read.
           // Return a minimal status for projects that fail to load
           return {
             projectId: projectRef.id,
             projectName: projectRef.name,
             projectPath: projectRef.path,
             healthStatus: 'error' as ProjectHealthStatus,
+            availability: 'unavailable',
+            availabilityReason: 'PROJECT_STATUS_UNAVAILABLE',
+            featureState: 'unknown',
+            featureCountsKnown: false,
             featureCounts: {
               pending: 0,
               running: 0,
@@ -335,11 +351,17 @@ export function createOverviewHandler(
 
       res.json({
         success: true,
+        featureCountsComplete: projectStatuses.every(
+          (status) => status.featureCountsKnown === true
+        ),
+        incompleteProjectCount: projectStatuses.filter(
+          (status) => status.featureCountsKnown !== true
+        ).length,
         ...overview,
       });
     } catch (error) {
       logError(error, 'Get project overview failed');
-      res.status(500).json({ success: false, error: getErrorMessage(error) });
+      res.status(500).json({ success: false, error: 'PROJECT_OVERVIEW_UNAVAILABLE' });
     }
   };
 }

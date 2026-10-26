@@ -1,4 +1,4 @@
-import fs from 'fs/promises';
+import { inspectProjectDirectory } from './project-inspection.js';
 import path from 'path';
 import type { SettingsService } from '../settings-service.js';
 
@@ -10,11 +10,6 @@ export class ArgusAccessError extends Error {
     super(message);
   }
 }
-const within = (root: string, candidate: string) => {
-  const relative = path.relative(root, candidate);
-  return !relative || (!relative.startsWith('..') && !path.isAbsolute(relative));
-};
-
 /** Resolve registered physical roots, not arbitrary authenticated filesystem input. */
 export class ArgusProjectAccess {
   constructor(private settings: Pick<SettingsService, 'getGlobalSettings'>) {}
@@ -38,22 +33,8 @@ export class ArgusProjectAccess {
         path.resolve(registered.path) !== path.resolve(input.projectPath as string))
     )
       throw new ArgusAccessError(404, 'REGISTERED_PROJECT_NOT_FOUND');
-    let actual: string;
-    try {
-      actual = await fs.realpath(registered.path);
-    } catch {
-      throw new ArgusAccessError(404, 'PROJECT_DIRECTORY_UNAVAILABLE');
-    }
-    if (process.env.ALLOWED_ROOT_DIRECTORY) {
-      const root = await fs.realpath(process.env.ALLOWED_ROOT_DIRECTORY);
-      if (!within(root, actual)) throw new ArgusAccessError(403, 'PROJECT_OUTSIDE_ALLOWED_ROOT');
-    }
-    try {
-      if ((await fs.lstat(path.join(actual, '.automaker'))).isSymbolicLink())
-        throw new ArgusAccessError(403, 'ARGUS_METADATA_SYMLINK_REFUSED');
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
-    }
-    return actual;
+    const inspection = await inspectProjectDirectory(registered.path);
+    if (!inspection.available) throw new ArgusAccessError(inspection.status, inspection.reason);
+    return inspection.physicalPath;
   }
 }

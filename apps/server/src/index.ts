@@ -1,3 +1,4 @@
+import { handleApiDocs } from './api-docs.js';
 import { ArgusModeService } from './services/argus/modes/service.js';
 import { EngineeringScout } from './services/argus/engineering-scout.js';
 import { LokiVerifier, RemoteLokiExecutor } from './services/argus/verification.js';
@@ -12,7 +13,7 @@ import { LokiVerifier, RemoteLokiExecutor } from './services/argus/verification.
 import express from 'express';
 import cors from 'cors';
 import morgan from 'morgan';
-import cookieParser from 'cookie-parser';
+import { createHttpApplication } from './http-app.js';
 import cookie from 'cookie';
 import { WebSocketServer, WebSocket } from 'ws';
 import { createServer } from 'http';
@@ -39,7 +40,7 @@ const LOG_LEVEL_MAP: Record<string, LogLevel> = {
   debug: LogLevel.DEBUG,
 };
 import { authMiddleware, validateWsConnectionToken, checkRawAuthentication } from './lib/auth.js';
-import { requireJsonContentType } from './middleware/require-json-content-type.js';
+
 import { createAuthRoutes } from './routes/auth/index.js';
 import { createFsRoutes } from './routes/fs/index.js';
 import { createHealthRoutes, createDetailedHandler } from './routes/health/index.js';
@@ -271,110 +272,94 @@ ${pathsChecked
 initAllowedPaths();
 
 // Create Express app
-const app = express();
+const app = createHttpApplication({
+  beforeParsing(app) {
+    // Move health checks to the top but DON'T intercept the root '/' which serves the UI
+    app.get('/health', (_req, res) => res.status(200).json({ status: 'ok' }));
+    app.get('/api-docs', handleApiDocs);
 
-// Move health checks to the top but DON'T intercept the root '/' which serves the UI
-app.get('/health', (_req, res) => res.status(200).json({ status: 'ok' }));
-import { handleApiDocs } from './api-docs.js';
-app.get('/api-docs', handleApiDocs);
-
-// Middleware
-// Custom colored logger showing only endpoint and status code (dynamically configurable)
-morgan.token('status-colored', (_req, res) => {
-  const status = res.statusCode;
-  if (status >= 500) return `\x1b[31m${status}\x1b[0m`; // Red for server errors
-  if (status >= 400) return `\x1b[33m${status}\x1b[0m`; // Yellow for client errors
-  if (status >= 300) return `\x1b[36m${status}\x1b[0m`; // Cyan for redirects
-  return `\x1b[32m${status}\x1b[0m`; // Green for success
-});
-
-app.use(
-  morgan(':method :url :status-colored', {
-    // Skip when request logging is disabled or for health check endpoints
-    skip: (req) =>
-      !requestLoggingEnabled ||
-      req.url === '/api/health' ||
-      req.url === '/api/auto-mode/context-exists',
-  })
-);
-// CORS configuration
-// When using credentials (cookies), origin cannot be '*'
-// We dynamically allow the requesting origin for local development
-
-// Check if origin is a local/private network address
-function isLocalOrigin(origin: string): boolean {
-  try {
-    const url = new URL(origin);
-    const hostname = url.hostname;
-    return (
-      hostname === 'localhost' ||
-      hostname === '127.0.0.1' ||
-      hostname === '[::1]' ||
-      hostname === '0.0.0.0' ||
-      hostname.startsWith('192.168.') ||
-      hostname.startsWith('10.') ||
-      /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(hostname) ||
-      hostname.endsWith('.hf.space') ||
-      hostname.endsWith('.huggingface.co')
-    );
-  } catch {
-    return false;
-  }
-}
-
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      // Allow requests with no origin (like mobile apps, curl, Electron)
-      if (!origin) {
-        callback(null, true);
-        return;
-      }
-
-      // If CORS_ORIGIN is set, use it (can be comma-separated list)
-      const allowedOrigins = process.env.CORS_ORIGIN?.split(',')
-        .map((o) => o.trim())
-        .filter(Boolean);
-      if (allowedOrigins && allowedOrigins.length > 0) {
-        if (allowedOrigins.includes('*')) {
-          callback(null, true);
-          return;
-        }
-        if (allowedOrigins.includes(origin)) {
-          callback(null, origin);
-          return;
-        }
-        // Fall through to local network check below
-      }
-
-      // Allow all localhost/loopback/private network origins (any port)
-      if (isLocalOrigin(origin)) {
-        callback(null, origin);
-        return;
-      }
-
-      // Reject other origins by default for security
-      callback(new Error('Not allowed by CORS'));
-    },
-    credentials: true,
-  })
-);
-app.use(express.json({ limit: '50mb' }));
-app.use(cookieParser());
-
-// Error handler specifically for malformed JSON bodies
-app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  if (err instanceof SyntaxError && 'status' in err && err.status === 400 && 'body' in err) {
-    res.status(400).json({
-      success: false,
-      error: {
-        code: 'MALFORMED_JSON',
-        message: 'Invalid JSON payload received',
-      }
+    // Middleware
+    // Custom colored logger showing only endpoint and status code (dynamically configurable)
+    morgan.token('status-colored', (_req, res) => {
+      const status = res.statusCode;
+      if (status >= 500) return `\x1b[31m${status}\x1b[0m`; // Red for server errors
+      if (status >= 400) return `\x1b[33m${status}\x1b[0m`; // Yellow for client errors
+      if (status >= 300) return `\x1b[36m${status}\x1b[0m`; // Cyan for redirects
+      return `\x1b[32m${status}\x1b[0m`; // Green for success
     });
-    return;
-  }
-  next(err);
+
+    app.use(
+      morgan(':method :url :status-colored', {
+        // Skip when request logging is disabled or for health check endpoints
+        skip: (req) =>
+          !requestLoggingEnabled ||
+          req.url === '/api/health' ||
+          req.url === '/api/auto-mode/context-exists',
+      })
+    );
+    // CORS configuration
+    // When using credentials (cookies), origin cannot be '*'
+    // We dynamically allow the requesting origin for local development
+
+    // Check if origin is a local/private network address
+    function isLocalOrigin(origin: string): boolean {
+      try {
+        const url = new URL(origin);
+        const hostname = url.hostname;
+        return (
+          hostname === 'localhost' ||
+          hostname === '127.0.0.1' ||
+          hostname === '[::1]' ||
+          hostname === '0.0.0.0' ||
+          hostname.startsWith('192.168.') ||
+          hostname.startsWith('10.') ||
+          /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(hostname) ||
+          hostname.endsWith('.hf.space') ||
+          hostname.endsWith('.huggingface.co')
+        );
+      } catch {
+        return false;
+      }
+    }
+
+    app.use(
+      cors({
+        origin: (origin, callback) => {
+          // Allow requests with no origin (like mobile apps, curl, Electron)
+          if (!origin) {
+            callback(null, true);
+            return;
+          }
+
+          // If CORS_ORIGIN is set, use it (can be comma-separated list)
+          const allowedOrigins = process.env.CORS_ORIGIN?.split(',')
+            .map((o) => o.trim())
+            .filter(Boolean);
+          if (allowedOrigins && allowedOrigins.length > 0) {
+            if (allowedOrigins.includes('*')) {
+              callback(null, true);
+              return;
+            }
+            if (allowedOrigins.includes(origin)) {
+              callback(null, origin);
+              return;
+            }
+            // Fall through to local network check below
+          }
+
+          // Allow all localhost/loopback/private network origins (any port)
+          if (isLocalOrigin(origin)) {
+            callback(null, origin);
+            return;
+          }
+
+          // Reject other origins by default for security
+          callback(new Error('Not allowed by CORS'));
+        },
+        credentials: true,
+      })
+    );
+  },
 });
 
 // Create shared event emitter for streaming
@@ -521,7 +506,6 @@ setInterval(() => {
 
 // Require Content-Type: application/json for all API POST/PUT/PATCH requests
 // This helps prevent CSRF and content-type confusion attacks
-app.use('/api', requireJsonContentType);
 
 // Serve static files from UI build
 const UI_DIST_PATH = path.resolve(__dirname, '../../../apps/ui/dist');

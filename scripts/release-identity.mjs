@@ -86,6 +86,8 @@ export function verifyContext(root, manifest, expectedSha) {
       parent = path.join(parent, part);
       if (fs.lstatSync(parent).isSymbolicLink()) throw new Error('RELEASE_PARENT_SYMLINK');
     }
+    if (!fs.existsSync(path.join(root, file.path)) && file.mode !== '120000')
+      throw new Error(`RELEASE_ENTRY_MISSING:${file.path}`);
     const target = path.join(root, file.path),
       stat = fs.lstatSync(target);
     if (

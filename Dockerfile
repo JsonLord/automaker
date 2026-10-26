@@ -106,7 +106,7 @@ RUN --mount=type=secret,id=proxy_ca,mode=0444 \
     mkdir -p /app/data && \
     chown -R node:node /home/node /opt/argus /app && \
     npm cache clean --force
-COPY --from=runtime-assets --chown=node:node / /
+COPY --from=runtime-assets / /
 USER node
 ENV HOME=/home/node
 ENV PATH="/opt/argus/bin:/home/node/.local/bin:/home/node/.opencode/bin:${PATH}"

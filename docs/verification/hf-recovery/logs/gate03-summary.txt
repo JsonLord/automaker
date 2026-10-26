@@ -1,0 +1,11 @@
+ ✓ |server| apps/server/tests/unit/http-app.integration.test.ts > production HTTP transport and actual auth routes > returns bounded sanitized MALFORMED_JSON on the real login route 23ms
+ ✓ |server| apps/server/tests/unit/http-app.integration.test.ts > production HTTP transport and actual auth routes > valid JSON reaches real login and succeeds with the configured fixture key 6ms
+ ✓ |server| apps/server/tests/unit/http-app.integration.test.ts > production HTTP transport and actual auth routes > preserves failed login and protected-route authentication 9ms
+ ✓ |server| apps/server/tests/unit/http-app.integration.test.ts > production HTTP transport and actual auth routes > retains 415 content policy for text/plain 2ms
+ ✓ |server| apps/server/tests/unit/http-app.integration.test.ts > production HTTP transport and actual auth routes > retains 415 content policy for application/x-www-form-urlencoded 2ms
+ ✓ |server| apps/server/tests/unit/http-app.integration.test.ts > production HTTP transport and actual auth routes > retains 415 content policy for application/jsonp 3ms
+ ✓ |server| apps/server/tests/unit/http-app.integration.test.ts > production HTTP transport and actual auth routes > does not rewrite non-parser SyntaxError to MALFORMED_JSON 3ms
+ ✓ |server| apps/server/tests/unit/http-app.integration.test.ts > production HTTP transport and actual auth routes > bounds the actual 50 MB parser limit and sanitizes 413 errors 137ms
+ Test Files  1 passed (1)
+      Tests  8 passed (8)
+   Duration  800ms (transform 338ms, setup 30ms, import 471ms, tests 187ms, environment 0ms)

@@ -1,0 +1,9 @@
+#12 1.306 {"gitSha":"3b30cca468b0635f1b2c98633df82229a532e89c","sourceIdentity":"known","buildTimestamp":"2026-10-26T01:18:50.000Z","releaseTree":"0e716a79068e8f848bafc02a81bee79085e3c13e"}
+#14 72.77 npm error Exit handler never called!
+#14 72.77 npm error This is an error with npm itself. Please report this error at:
+#14 72.77 npm error   <https://github.com/npm/cli/issues>
+#14 72.77 npm error A complete log of this run can be found in: /root/.npm/_logs/2026-10-26T01_19_13_223Z-debug-0.log
+72.77 npm error Exit handler never called!
+72.77 npm error This is an error with npm itself. Please report this error at:
+72.77 npm error   <https://github.com/npm/cli/issues>
+72.77 npm error A complete log of this run can be found in: /root/.npm/_logs/2026-10-26T01_19_13_223Z-debug-0.log

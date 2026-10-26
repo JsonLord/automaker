@@ -25,8 +25,7 @@ COPY . .
 
 # Generate provenance file
 RUN mkdir -p /app/apps/server/dist/assets
-COPY scripts/generate-provenance.sh /usr/local/bin/
-RUN chmod +x /usr/local/bin/generate-provenance.sh && generate-provenance.sh
+RUN sh scripts/generate-provenance.sh
 
 # Install all dependencies using the root package-lock.json
 RUN npm install --ignore-scripts
